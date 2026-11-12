@@ -2,9 +2,10 @@ import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/tournament_engine.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Tournaments, entries, draws and standings.
-class TournamentsController extends FeatureController {
+class TournamentsController extends FeatureController<TournamentRepository> {
   TournamentsController(super.repo);
 
   List<Tournament> get tournaments => repo.tournaments;

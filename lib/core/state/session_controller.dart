@@ -2,9 +2,10 @@ import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/onboarding.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Session, identity and account-directory reads and writes.
-class SessionController extends FeatureController {
+class SessionController extends FeatureController<SessionRepository> {
   SessionController(super.repo);
 
   bool get ready => repo.ready;
@@ -57,7 +58,7 @@ class SessionController extends FeatureController {
 }
 
 /// Profile statistics and identity edits for the signed-in account.
-class ProfileController extends FeatureController {
+class ProfileController extends FeatureController<ProfileRepository> {
   ProfileController(super.repo);
 
   Account? get currentAccount => repo.currentAccount;
@@ -80,7 +81,7 @@ class ProfileController extends FeatureController {
 }
 
 /// Per-account demo switches (reminders, invitations, visibility).
-class PreferencesController extends FeatureController {
+class PreferencesController extends FeatureController<PreferencesRepository> {
   PreferencesController(super.repo);
 
   Map<String, bool> get preferences => repo.preferences;
@@ -92,7 +93,8 @@ class PreferencesController extends FeatureController {
 }
 
 /// Notifications for the signed-in account.
-class NotificationsController extends FeatureController {
+class NotificationsController
+    extends FeatureController<NotificationRepository> {
   NotificationsController(super.repo);
 
   List<AppNotification> get myNotifications => repo.myNotifications;

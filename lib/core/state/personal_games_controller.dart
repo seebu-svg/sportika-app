@@ -2,9 +2,11 @@ import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Private, account-scoped scorecards. Never feeds official standings.
-class PersonalGamesController extends FeatureController {
+class PersonalGamesController
+    extends FeatureController<PersonalGamesRepository> {
   PersonalGamesController(super.repo);
 
   List<PersonalMatch> get personal => repo.personal;

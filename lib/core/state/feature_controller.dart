@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Base for every feature controller.
 ///
@@ -9,13 +9,14 @@ import 'package:sportika/core/data/local_sportika_repository.dart';
 /// repository because local mutations are synchronous; when a remote repository
 /// replaces it, this is the layer that gains loading and error state without
 /// screens changing.
-abstract class FeatureController extends ChangeNotifier {
+abstract class FeatureController<R extends SportikaRepository>
+    extends ChangeNotifier {
   FeatureController(this.repo) {
     repo.addListener(_onRepositoryChanged);
   }
 
   @protected
-  final LocalSportikaRepository repo;
+  final R repo;
 
   void _onRepositoryChanged() => notifyListeners();
 

@@ -1,3 +1,8 @@
+// The store implements all nine repository interfaces, so every member below
+// is an interface implementation. Annotating one hundred members with
+// `@override` would obscure the code without adding information.
+// ignore_for_file: annotate_overrides
+
 import 'package:flutter/foundation.dart';
 
 import 'package:sportika/shared/data/local_storage.dart';
@@ -10,13 +15,24 @@ import 'package:sportika/shared/models/official_result.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/shared/models/tournament_engine.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// The single source of truth for the prototype.
 ///
 /// Everything is persisted to one JSON document after each mutation, so a
 /// personal scorecard survives closing the app, and official scoring resumes
 /// from the last saved event (spec §2.3, §6).
-class LocalSportikaRepository extends ChangeNotifier {
+class LocalSportikaRepository extends ChangeNotifier
+    implements
+        FixtureRepository,
+        GameRepository,
+        NotificationRepository,
+        PersonalGamesRepository,
+        PreferencesRepository,
+        ProfileRepository,
+        SessionRepository,
+        TeamRepository,
+        TournamentRepository {
   LocalSportikaRepository(this._storage);
 
   final LocalStorage _storage;

@@ -2,9 +2,10 @@ import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Official fixtures: live board, scoring log, results and disputes.
-class FixturesController extends FeatureController {
+class FixturesController extends FeatureController<FixtureRepository> {
   FixturesController(super.repo);
 
   List<Fixture> get fixtures => repo.fixtures;

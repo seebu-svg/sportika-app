@@ -1,9 +1,10 @@
 import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
+import 'package:sportika/core/data/repositories.dart';
 
 /// Squads (teams and pairs) plus the player directory used to fill them.
-class TeamsController extends FeatureController {
+class TeamsController extends FeatureController<TeamRepository> {
   TeamsController(super.repo);
 
   List<Squad> get squads => repo.squads;
