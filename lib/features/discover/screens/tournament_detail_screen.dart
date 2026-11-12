@@ -126,7 +126,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ],
           if (isOwner) ...[
-            SectionTitle('Organizer tools'),
+            const SectionTitle('Organizer tools'),
             SurfaceCard(
               child: Column(
                 children: [
@@ -440,7 +440,7 @@ class _HeaderCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.place_outlined,
                 size: 12,
                 color: SportikaColors.textDim,

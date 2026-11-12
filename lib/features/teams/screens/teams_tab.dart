@@ -53,7 +53,7 @@ class TeamsTab extends StatelessWidget {
                 tone: SportikaColors.mint,
                 onPressed: () => _createSquad(context, state),
               ),
-              SectionTitle('My squads'),
+              const SectionTitle('My squads'),
               if (squads.isEmpty)
                 const EmptyState(
                   title: 'No squads yet',
@@ -68,7 +68,7 @@ class TeamsTab extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _SquadCard(squad: squad),
                   ),
-              SectionTitle('My entries'),
+              const SectionTitle('My entries'),
               if (entries.isEmpty)
                 const EmptyState(
                   title: 'No tournament entries',
@@ -81,7 +81,7 @@ class TeamsTab extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _EntryRow(entry: entry),
                   ),
-              SectionTitle('Players'),
+              const SectionTitle('Players'),
               for (final player in players)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),

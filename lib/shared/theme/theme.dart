@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:sportika/features/personal_games/scoring/engine.dart' as scoring;
+import 'package:sportika/features/personal_games/scoring/engine.dart'
+    as scoring;
 
 /// Sportika design tokens - layered navy surfaces with athletic accents. Accent roles stay disciplined: blue for action, mint for
 /// live/active, gold for achievement, and navy for hero surfaces.

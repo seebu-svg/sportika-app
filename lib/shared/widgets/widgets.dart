@@ -282,13 +282,20 @@ class PrimaryButton extends StatelessWidget {
           Icon(icon, size: 17, color: foreground),
           const SizedBox(width: 8),
         ],
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.4,
-            fontSize: small ? 12.5 : 14,
-            color: foreground,
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
+                fontSize: small ? 12.5 : 14,
+                color: foreground,
+              ),
+            ),
           ),
         ),
       ],
@@ -882,30 +889,36 @@ class BrandMark extends StatelessWidget {
       children: [
         mark,
         SizedBox(width: size * 0.28),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'SPORTIKA',
-              style: TextStyle(
-                fontSize: size * 0.34,
-                fontWeight: FontWeight.w900,
-                letterSpacing: size * 0.06,
-                color: SportikaColors.text,
-                height: 1.1,
-              ),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'SPORTIKA',
+                  style: TextStyle(
+                    fontSize: size * 0.34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: size * 0.06,
+                    color: SportikaColors.text,
+                    height: 1.1,
+                  ),
+                ),
+                Text(
+                  'THE GAME CONNECTS US.',
+                  style: TextStyle(
+                    fontSize: size * 0.12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: size * 0.032,
+                    color: SportikaColors.textMuted,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              'THE GAME CONNECTS US.',
-              style: TextStyle(
-                fontSize: size * 0.12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: size * 0.032,
-                color: SportikaColors.textMuted,
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );

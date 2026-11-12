@@ -73,9 +73,19 @@ class _SignInScreenState extends State<SignInScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'New to Sportika?',
-                style: TextStyle(fontSize: 11.5, color: SportikaColors.textDim),
+              const Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'New to Sportika?',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: SportikaColors.textDim,
+                    ),
+                  ),
+                ),
               ),
               AuthLink('Create an account', onTap: flow.openCreateAccount),
             ],

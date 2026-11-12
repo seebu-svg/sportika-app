@@ -255,7 +255,12 @@ void main() {
     final finalSidesBefore = state.sideLabelsOf(finalFixture);
     expect(finalSidesBefore.where((s) => s == 'TBD').length, 2);
 
-    // Scorer records and submits - nothing advances yet.
+    // The organizer assigns the scorer, who opens the fixture, records the log
+    // and hands it to review - nothing advances yet. Official scoring requires
+    // an assigned scorer and an explicitly started match.
+    state.assignScorer(semi.id, 'acc-seebu');
+    await state.signIn('acc-seebu');
+    state.startOfficialScoring(semi.id);
     for (final event in padelWin('semi')) {
       state.recordOfficialEvent(semi.id, event);
     }

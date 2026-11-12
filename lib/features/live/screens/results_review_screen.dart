@@ -72,7 +72,7 @@ class ResultsReviewScreen extends StatelessWidget {
                   highlight: fixture.id == highlightId,
                 ),
               ),
-          SectionTitle('Published results'),
+          const SectionTitle('Published results'),
           if (published.isEmpty)
             const EmptyState(
               title: 'No published results yet',

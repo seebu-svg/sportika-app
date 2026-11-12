@@ -169,9 +169,7 @@ class AuthFlowController extends ChangeNotifier {
     notifyListeners();
     _sessionTimer = Timer(const Duration(milliseconds: 1750), () {
       if (_disposed) return;
-      _stage = account.setupComplete
-          ? AuthStage.home
-          : AuthStage.profileBasics;
+      _stage = account.setupComplete ? AuthStage.home : AuthStage.profileBasics;
       notifyListeners();
     });
   }

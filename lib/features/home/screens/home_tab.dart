@@ -320,7 +320,12 @@ class _HomeTabState extends State<HomeTab> {
   Widget _header(BuildContext context, Account me) => SafeArea(
     bottom: false,
     child: Padding(
-      padding: EdgeInsets.fromLTRB(_pagePadding(context), 14, _pagePadding(context), 16),
+      padding: EdgeInsets.fromLTRB(
+        _pagePadding(context),
+        14,
+        _pagePadding(context),
+        16,
+      ),
       child: Row(
         children: [
           InkWell(
@@ -390,7 +395,11 @@ class _HomeTabState extends State<HomeTab> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0x14061426), Color(0xCC09182D), SportikaColors.page],
+                colors: [
+                  Color(0x14061426),
+                  Color(0xCC09182D),
+                  SportikaColors.page,
+                ],
                 stops: [.05, .62, 1],
               ),
             ),
@@ -413,14 +422,14 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                FittedBox(
+                const FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'YOUR NEXT MATCH\nSTARTS HERE.',
                     maxLines: 2,
                     softWrap: false,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Barlow Condensed',
                       fontSize: 42,
                       height: .95,
@@ -434,12 +443,12 @@ class _HomeTabState extends State<HomeTab> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: Text(
                         'Discover games, find your people and make it count.',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           color: SportikaColors.textBody,
                         ),
@@ -450,7 +459,10 @@ class _HomeTabState extends State<HomeTab> {
                       onTap: () => openHomeTab(context, 1),
                       borderRadius: BorderRadius.circular(8),
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 8,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -492,7 +504,8 @@ class _HomeTabState extends State<HomeTab> {
         scrollDirection: Axis.horizontal,
         children: [
           _sportChip(null, 'All', null),
-          for (final sport in Sport.values) _sportChip(sport, sport.label, sport),
+          for (final sport in Sport.values)
+            _sportChip(sport, sport.label, sport),
         ],
       ),
     );
@@ -500,9 +513,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _sportChip(Sport? sport, String label, Sport? glyphSport) {
     final selected = _sport == sport;
-    final tone = sport == null
-        ? SportikaColors.blueBright
-        : sportColor(sport);
+    final tone = sport == null ? SportikaColors.blueBright : sportColor(sport);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Material(
@@ -787,9 +798,7 @@ class _HomeTabState extends State<HomeTab> {
           Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: SportikaColors.border),
-              ),
+              border: Border(bottom: BorderSide(color: SportikaColors.border)),
             ),
             child: Row(
               children: [
@@ -1027,7 +1036,9 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: SportikaColors.blue,
-                      side: const BorderSide(color: SportikaColors.borderStrong),
+                      side: const BorderSide(
+                        color: SportikaColors.borderStrong,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1035,7 +1046,10 @@ class _HomeTabState extends State<HomeTab> {
                     ),
                     child: const Text(
                       'View tournament',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -1139,10 +1153,11 @@ class _HomeTabState extends State<HomeTab> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: (game.full
-                                ? SportikaColors.gold
-                                : SportikaColors.mint)
-                            .withValues(alpha: .92),
+                        color:
+                            (game.full
+                                    ? SportikaColors.gold
+                                    : SportikaColors.mint)
+                                .withValues(alpha: .92),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -1352,8 +1367,18 @@ class _HomeTabState extends State<HomeTab> {
 
   String _monthShort(DateTime d) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return months[d.month - 1];
   }

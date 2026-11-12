@@ -42,10 +42,10 @@ class ProfileTab extends StatelessWidget {
 
     return Column(
       children: [
-        TabHeader(
+        const TabHeader(
           title: 'Me',
           subtitle: 'Your profile, statistics, history and settings.',
-          actions: const [NotificationBell(), SizedBox(width: 16)],
+          actions: [NotificationBell(), SizedBox(width: 16)],
         ),
         Expanded(
           child: ListView(

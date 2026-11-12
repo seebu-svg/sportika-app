@@ -129,7 +129,11 @@ class _ScorerFixtureCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.schedule, size: 12, color: SportikaColors.textDim),
+              const Icon(
+                Icons.schedule,
+                size: 12,
+                color: SportikaColors.textDim,
+              ),
               const SizedBox(width: 4),
               Text(
                 dateShort(fixture.scheduledAt),

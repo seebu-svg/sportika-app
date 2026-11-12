@@ -781,7 +781,7 @@ class AuthCheckbox extends StatelessWidget {
           ),
         ),
         child: value
-            ? Icon(Icons.check, size: 15, color: SportikaColors.deepest)
+            ? const Icon(Icons.check, size: 15, color: SportikaColors.deepest)
             : null,
       ),
     );

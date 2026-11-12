@@ -498,8 +498,8 @@ void main() {
   group('Seed data', () {
     test('builds a coherent world for all four sports', () {
       final world = buildSeed();
-      expect(world.accounts.length, 8);
-      expect(world.tournaments.length, 4);
+      expect(world.accounts.length, 22);
+      expect(world.tournaments.length, 8);
       expect(world.fixtures, isNotEmpty);
 
       final published = world.fixtures.where((f) => f.result != null).toList();

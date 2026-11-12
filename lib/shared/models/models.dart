@@ -57,8 +57,7 @@ class Account {
 
   /// Falls back to the email local part so seeded accounts still have a name
   /// for the @handle line.
-  String get username =>
-      handle.isNotEmpty ? handle : email.split('@').first;
+  String get username => handle.isNotEmpty ? handle : email.split('@').first;
 
   PlayingLevel levelFor(Sport sport) =>
       levels[sport.key] ?? defaultLevelFor(sport);
@@ -93,10 +92,8 @@ class Account {
         .map((e) => SportX.fromKey(e as String))
         .toSet(),
     levels: (j['levels'] as Map? ?? {}).map(
-      (key, value) => MapEntry(
-        key as String,
-        PlayingLevelX.fromKey(value as String?),
-      ),
+      (key, value) =>
+          MapEntry(key as String, PlayingLevelX.fromKey(value as String?)),
     ),
     playStyle: PlayStyleX.fromKey(j['playStyle'] as String?),
     avatar: j['avatar'] as String? ?? 'midnight',

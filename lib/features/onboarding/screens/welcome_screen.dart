@@ -57,22 +57,22 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      children: [
-        const SizedBox(height: 34),
-        const AuthEyebrow('WELCOME TO SPORTIKA'),
-        const SizedBox(height: 16),
-        const AuthHeadline('THE GAME', accent: 'CONNECTS US.', size: 48),
-        const SizedBox(height: 16),
-        const AuthLead(
+      children: const [
+        SizedBox(height: 34),
+        AuthEyebrow('WELCOME TO SPORTIKA'),
+        SizedBox(height: 16),
+        AuthHeadline('THE GAME', accent: 'CONNECTS US.', size: 48),
+        SizedBox(height: 16),
+        AuthLead(
           'Premium scorekeeping, real tournaments and a sporting community — '
           'in one calm, fast app. Built for the way Karachi plays.',
           maxWidth: 330,
         ),
-        const SizedBox(height: 26),
-        const AuthRule(label: 'THIS SEASON'),
-        const SizedBox(height: 14),
+        SizedBox(height: 26),
+        AuthRule(label: 'THIS SEASON'),
+        SizedBox(height: 14),
         Row(
-          children: const [
+          children: [
             Expanded(
               child: _Metric(value: '04', label: 'SPORTS'),
             ),

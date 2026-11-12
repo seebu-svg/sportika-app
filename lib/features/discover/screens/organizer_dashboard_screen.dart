@@ -85,7 +85,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
             onPressed: () =>
                 pushScreen(context, const CreateTournamentScreen()),
           ),
-          SectionTitle('Needs your decision'),
+          const SectionTitle('Needs your decision'),
           if (pending.isEmpty && review.isEmpty)
             const EmptyState(
               title: 'Nothing waiting',
@@ -130,7 +130,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
                 ),
               ),
           ],
-          SectionTitle('Disputed results'),
+          const SectionTitle('Disputed results'),
           if (disputes.isEmpty)
             const EmptyState(
               title: 'No open disputes',
@@ -145,7 +145,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _OrganizerDisputeCard(fixture: fixture),
               ),
-          SectionTitle('Your tournaments'),
+          const SectionTitle('Your tournaments'),
           if (mine.isEmpty)
             const EmptyState(
               title: 'No tournaments yet',

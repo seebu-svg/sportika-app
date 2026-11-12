@@ -71,8 +71,14 @@ class SplashScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const AuthEyebrow('Karachi · Est. 2026'),
-                        const Spacer(),
+                        const Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: AuthEyebrow('Karachi · Est. 2026'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Text(
                           'PRE-AUTH',
                           style: authDisplay(
@@ -123,33 +129,40 @@ class SplashScreen extends StatelessWidget {
                     const SizedBox(height: 22),
                     Row(
                       children: [
-                        Container(
-                          height: 2,
-                          width: 132,
-                          color: SportikaColors.border,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: 1),
-                              duration: const Duration(milliseconds: 1650),
-                              curve: Curves.easeInOutCubic,
-                              builder: (context, value, _) =>
-                                  FractionallySizedBox(
-                                    widthFactor: value,
-                                    child: Container(
-                                      color: SportikaColors.mint,
+                        Expanded(
+                          child: Container(
+                            height: 2,
+                            color: SportikaColors.border,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: const Duration(milliseconds: 1650),
+                                curve: Curves.easeInOutCubic,
+                                builder: (context, value, _) =>
+                                    FractionallySizedBox(
+                                      widthFactor: value,
+                                      child: Container(
+                                        color: SportikaColors.mint,
+                                      ),
                                     ),
-                                  ),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'PREPARING YOUR GAME',
-                          style: authDisplay(
-                            9.5,
-                            color: SportikaColors.textDim,
-                            letterSpacing: 1.8,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'PREPARING YOUR GAME',
+                              style: authDisplay(
+                                9.5,
+                                color: SportikaColors.textDim,
+                                letterSpacing: 1.8,
+                              ),
+                            ),
                           ),
                         ),
                       ],

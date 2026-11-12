@@ -86,7 +86,7 @@ class MatchHistoryScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: personalScorecardTile(context, match),
               ),
-          SectionTitle('Official matches'),
+          const SectionTitle('Official matches'),
           if (official.isEmpty)
             const EmptyState(
               title: 'No official appearances',

@@ -69,7 +69,7 @@ class TournamentCard extends StatelessWidget {
           const SizedBox(height: 3),
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.place_outlined,
                 size: 12,
                 color: SportikaColors.textDim,

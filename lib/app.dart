@@ -99,10 +99,7 @@ class RootGate extends StatelessWidget {
           ),
         );
       },
-      child: KeyedSubtree(
-        key: ValueKey(stage),
-        child: screen,
-      ),
+      child: KeyedSubtree(key: ValueKey(stage), child: screen),
     );
   }
 }

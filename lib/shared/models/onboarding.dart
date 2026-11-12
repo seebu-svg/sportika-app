@@ -70,11 +70,10 @@ extension PlayingLevelX on PlayingLevel {
     PlayingLevel.pro => 'Competing seriously',
   };
 
-  static PlayingLevel fromKey(String? key) =>
-      PlayingLevel.values.firstWhere(
-        (l) => l.name == key,
-        orElse: () => PlayingLevel.intermediate,
-      );
+  static PlayingLevel fromKey(String? key) => PlayingLevel.values.firstWhere(
+    (l) => l.name == key,
+    orElse: () => PlayingLevel.intermediate,
+  );
 }
 
 /// How often an account expects to be on court or in the middle.
@@ -132,10 +131,7 @@ class AuthRules {
     (label: 'At least 8 characters', passes: (v) => v.trim().length >= 8),
     (label: 'One letter', passes: (v) => v.contains(RegExp('[A-Za-z]'))),
     (label: 'One number', passes: (v) => v.contains(RegExp('[0-9]'))),
-    (
-      label: 'One symbol',
-      passes: (v) => v.contains(RegExp(r'[^A-Za-z0-9\s]')),
-    ),
+    (label: 'One symbol', passes: (v) => v.contains(RegExp(r'[^A-Za-z0-9\s]'))),
   ];
 
   static String strengthLabel(String value) {

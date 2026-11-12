@@ -148,8 +148,8 @@ class _StandingHeader extends StatelessWidget {
       letterSpacing: 0.6,
       color: SportikaColors.textDim,
     );
-    return Row(
-      children: const [
+    return const Row(
+      children: [
         SizedBox(width: 20, child: Text('#', style: style)),
         Expanded(child: Text('TEAM', style: style)),
         _HeadCell('P'),
@@ -453,7 +453,7 @@ class TournamentEntriesSection extends StatelessWidget {
           ],
         ),
         if (pending.isNotEmpty) ...[
-          SectionTitle('Awaiting decision'),
+          const SectionTitle('Awaiting decision'),
           for (final entry in pending)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -482,7 +482,7 @@ class TournamentEntriesSection extends StatelessWidget {
               ),
             ),
         if (other.isNotEmpty) ...[
-          SectionTitle('Not playing'),
+          const SectionTitle('Not playing'),
           for (final entry in other)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
