@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -19,7 +19,7 @@ class ResultsReviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final submitted = state.fixturesAwaitingReview
         .where((f) => tournamentId == null || f.tournamentId == tournamentId)
         .toList();
@@ -111,7 +111,7 @@ class _ReviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final progress = state.progressOfFixture(fixture);
     final sides = state.sideLabelsOf(fixture);
     final tournament = state.tournamentOf(fixture);

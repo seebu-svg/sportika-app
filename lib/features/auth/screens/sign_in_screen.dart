@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
@@ -47,7 +47,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<AuthFlowController>();
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final demos = [
       state.accountById('acc-seebu'),
       state.accountById('acc-yasir'),

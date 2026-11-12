@@ -5,7 +5,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/padel/padel.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 
 /// Acceptance criteria from the Sportika spec, exercised through the same
 /// state object the UI uses (spec §6).
@@ -31,10 +31,10 @@ List<ScoringEvent> padelWin(String tag) => [
         ev(PadelEngine.kPoint, 0, id: '$tag-s$set-g$game-p$point'),
 ];
 
-Future<AppState> freshState() async {
+Future<LocalSportikaRepository> freshState() async {
   SharedPreferences.setMockInitialValues({});
   final storage = await LocalStorage.open();
-  final state = AppState(storage);
+  final state = LocalSportikaRepository(storage);
   await state.load();
   return state;
 }
@@ -67,7 +67,7 @@ void main() {
       state.toggleGameJoin(game);
       expect(game.members.length, before + 1);
       await Future<void>.delayed(Duration.zero);
-      final reopened = AppState(await LocalStorage.open());
+      final reopened = LocalSportikaRepository(await LocalStorage.open());
       await reopened.load();
       expect(
         reopened.games.firstWhere((g) => g.id == game.id).members,
@@ -100,7 +100,7 @@ void main() {
 
     // A fresh state object reads the same document the app wrote.
     await Future<void>.delayed(Duration.zero);
-    final reopened = AppState(await LocalStorage.open());
+    final reopened = LocalSportikaRepository(await LocalStorage.open());
     await reopened.load();
 
     expect(reopened.currentAccount?.id, 'acc-seebu');
@@ -206,7 +206,7 @@ void main() {
     expect(fixture.events.length, before + 1);
 
     await Future<void>.delayed(Duration.zero);
-    final reopened = AppState(await LocalStorage.open());
+    final reopened = LocalSportikaRepository(await LocalStorage.open());
     await reopened.load();
     expect(reopened.fixtureById(fixture.id)!.events.length, before + 1);
   });

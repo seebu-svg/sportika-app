@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
@@ -26,7 +26,7 @@ class _PersonalGamesScreenState extends State<PersonalGamesScreen> {
   int days = 0;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final all = state.myPersonal;
     final games = all
         .where(
@@ -183,7 +183,7 @@ class PersonalGameDetailsScreen extends StatelessWidget {
   final String id;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final m = state.personalById(id);
     if (m == null || m.ownerId != state.currentAccount?.id) {
       return Scaffold(
@@ -370,7 +370,7 @@ class _EditPersonalGameScreenState extends State<EditPersonalGameScreen> {
                 );
                 return;
               }
-              context.read<AppState>().updatePersonalDetails(
+              context.read<LocalSportikaRepository>().updatePersonalDetails(
                 widget.match.id,
                 {
                   'venue': venue.text,
@@ -394,7 +394,7 @@ class PersonalTimelineScreen extends StatelessWidget {
   final String id;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final m = state.personalById(id);
     if (m == null || m.ownerId != state.currentAccount?.id) {
       return const SizedBox.shrink();
@@ -426,7 +426,7 @@ class PersonalTimelineScreen extends StatelessWidget {
 
   Future<void> _edit(
     BuildContext context,
-    AppState state,
+    LocalSportikaRepository state,
     PersonalMatch m,
     int index,
   ) async {
@@ -482,7 +482,7 @@ class PersonalStatsScreen extends StatelessWidget {
   final String id;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final m = state.personalById(id);
     if (m == null || m.ownerId != state.currentAccount?.id) {
       return const SizedBox.shrink();
@@ -520,7 +520,7 @@ class PersonalPerformanceScreen extends StatelessWidget {
   const PersonalPerformanceScreen({super.key});
   @override
   Widget build(BuildContext context) {
-    final games = context.watch<AppState>().myPersonal;
+    final games = context.watch<LocalSportikaRepository>().myPersonal;
     return Scaffold(
       appBar: AppBar(title: const Text('Personal performance overview')),
       body: ListView(
@@ -556,7 +556,7 @@ class PersonalScoringSettingsScreen extends StatelessWidget {
   final String id;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final m = state.personalById(id);
     if (m == null || m.ownerId != state.currentAccount?.id) {
       return const SizedBox.shrink();

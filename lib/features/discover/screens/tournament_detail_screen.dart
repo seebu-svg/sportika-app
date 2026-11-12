@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/results_review_screen.dart';
@@ -26,7 +26,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final tournament = state.tournamentById(widget.id);
     if (tournament == null) {
       return Scaffold(
@@ -228,7 +228,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   Future<void> _generateDraw(
     BuildContext context,
-    AppState state,
+    LocalSportikaRepository state,
     Tournament tournament,
   ) async {
     final count = await state.generateDraw(tournament.id);
@@ -243,7 +243,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _register(BuildContext context, Tournament tournament) async {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
 
     if (tournament.entryType == EntryType.individual) {
       final ok = await showDialog<bool>(
@@ -398,7 +398,7 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final confirmed = context.watch<AppState>().confirmedCountFor(tournament);
+    final confirmed = context.watch<LocalSportikaRepository>().confirmedCountFor(tournament);
     final limit = tournament.registrationLimit;
     final fill = limit == 0 ? 0.0 : (confirmed / limit).clamp(0.0, 1.0);
 
@@ -513,7 +513,7 @@ class _MyEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final tone = statusColor(entry.status.key);
 
     return SurfaceCard(

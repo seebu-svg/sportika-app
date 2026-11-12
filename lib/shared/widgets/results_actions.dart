@@ -5,7 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/official_result.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Organizer actions on a fixture, shared by the fixture page, the organizer
@@ -26,7 +26,7 @@ Future<T?> _sheet<T>(BuildContext context, Widget child) {
 /// Publishes the folded event log. A second publish is recorded as a
 /// correction that keeps the previous result and the stated reason (spec §4.5).
 Future<void> publishFixture(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   if (fixture.result == null && fixture.events.isEmpty) {
     showSnack(
       context,
@@ -162,7 +162,7 @@ Future<void> publishFixture(BuildContext context, Fixture fixture) async {
 }
 
 Future<void> recordWalkoverFor(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final reason = TextEditingController();
   final sides = [state.sideLabel(fixture, 0), state.sideLabel(fixture, 1)];
 
@@ -222,7 +222,7 @@ Future<void> recordWalkoverFor(BuildContext context, Fixture fixture) async {
 }
 
 Future<void> editFixtureSchedule(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final venue = TextEditingController(text: fixture.venue);
   var date = fixture.scheduledAt;
 
@@ -324,7 +324,7 @@ Future<void> editFixtureSchedule(BuildContext context, Fixture fixture) async {
 }
 
 Future<void> assignScorerSheet(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final me = state.currentAccount;
   final candidates = state.accounts
       .where((a) => a.has(UserRole.scorer) || a.id == me?.id)
@@ -481,7 +481,7 @@ class _ScorerRow extends StatelessWidget {
 }
 
 Future<void> raiseDisputeFor(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final note = TextEditingController();
   final sent = await _sheet<bool>(
     context,
@@ -537,7 +537,7 @@ Future<void> raiseDisputeFor(BuildContext context, Fixture fixture) async {
 }
 
 Future<void> resolveDisputeFor(BuildContext context, Fixture fixture) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final note = TextEditingController();
   final uphold = await showDialog<bool>(
     context: context,

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sportika/features/home/screens/home_tab.dart';
 import 'package:sportika/shared/data/local_storage.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/models/enums.dart';
@@ -17,7 +17,7 @@ void main() {
       await tester.binding.setSurfaceSize(Size(width, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       SharedPreferences.setMockInitialValues({});
-      final state = AppState(await LocalStorage.open());
+      final state = LocalSportikaRepository(await LocalStorage.open());
       await state.load();
       await state.signIn('acc-seebu');
       await tester.pumpWidget(

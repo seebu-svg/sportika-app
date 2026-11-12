@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
@@ -16,7 +16,7 @@ class ScorerWorkspaceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final assigned = state.myScoringFixtures;
     final inPlay = assigned
         .where((f) => f.status != FixtureStatus.submitted)
@@ -76,7 +76,7 @@ class _ScorerFixtureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final tournament = state.tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
     final sides = state.sideLabelsOf(fixture);

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -29,7 +29,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final all = state.filterTournaments(sport: _sport);
     final mine = state.filterTournaments(sport: _sport, myEntriesOnly: true);
     final items = _organized
@@ -144,7 +144,7 @@ class _TournamentsTabState extends State<TournamentsTab> {
     );
   }
 
-  bool _hasEntry(AppState state, Tournament tournament) {
+  bool _hasEntry(LocalSportikaRepository state, Tournament tournament) {
     final me = state.currentAccount?.id;
     if (me == null) return false;
     return state

@@ -8,7 +8,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
@@ -16,7 +16,7 @@ import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 
 /// All routes here resolve only the signed-in account's private scorecard.
 PersonalMatch? privateMatch(BuildContext context, String id) {
-  final state = context.watch<AppState>();
+  final state = context.watch<LocalSportikaRepository>();
   final match = state.personalById(id);
   return match?.ownerId == state.currentAccount?.id ? match : null;
 }
@@ -310,7 +310,7 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
               onPressed: () {
                 if (!locked) {
                   if (!form.currentState!.validate()) return;
-                  context.read<AppState>().updatePersonalDetails(m.id, {
+                  context.read<LocalSportikaRepository>().updatePersonalDetails(m.id, {
                     'roster0': parse(names[0].text),
                     'roster1': parse(names[1].text),
                     'discipline': discipline,
@@ -370,7 +370,7 @@ class SportLiveTools extends StatelessWidget {
   final PersonalMatch match;
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final p = state.progressOfPersonal(match);
     final cricket = match.sport == Sport.cricket;
     var batting = (p.state['batSide'] as int?) ?? -1;
@@ -489,7 +489,7 @@ class _FutsalClockState extends State<FutsalClock> {
   @override
   Widget build(BuildContext context) {
     final m = widget.match;
-    final p = context.read<AppState>().progressOfPersonal(m);
+    final p = context.read<LocalSportikaRepository>().progressOfPersonal(m);
     var elapsed = (p.state['periodElapsed'] as int?) ?? 0;
     final anchor = DateTime.tryParse(p.state['resumeAt'] ?? '');
     if (p.state['running'] == true && anchor != null) {
@@ -539,7 +539,7 @@ class SportDetailScreen extends StatelessWidget {
         ),
       );
     }
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final p = state.progressOfPersonal(m);
     final title = sportScreens(m.sport)[index];
     return Scaffold(
@@ -810,7 +810,7 @@ class SportDetailScreen extends StatelessWidget {
                     'Undo',
                   )) {
                     if (context.mounted) {
-                      context.read<AppState>().undoPersonalEvent(m.id);
+                      context.read<LocalSportikaRepository>().undoPersonalEvent(m.id);
                     }
                   }
                 },
@@ -1058,7 +1058,7 @@ class SportDetailScreen extends StatelessWidget {
       ),
     );
     if (save == true && context.mounted) {
-      context.read<AppState>().recordPersonalEvent(
+      context.read<LocalSportikaRepository>().recordPersonalEvent(
         m.id,
         ScoringEvent(
           id: newId('ev'),
@@ -1069,7 +1069,7 @@ class SportDetailScreen extends StatelessWidget {
             if (player.isNotEmpty) 'player': player,
           },
           at: DateTime.now(),
-          byAccountId: context.read<AppState>().currentAccount!.id,
+          byAccountId: context.read<LocalSportikaRepository>().currentAccount!.id,
         ),
       );
     }
@@ -1082,7 +1082,7 @@ Future<void> recordSportAction(
   ScoreAction a,
   int? side,
 ) async {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final e = a.build(ActionContext(side: side, by: state.currentAccount!.id));
   state.recordPersonalEvent(m.id, e);
 }

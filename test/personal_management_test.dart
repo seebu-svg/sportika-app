@@ -5,14 +5,14 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 
 void main() {
   test(
     'paused cards reject scoring and private metadata survives serialization',
     () async {
       SharedPreferences.setMockInitialValues({});
-      final state = AppState(await LocalStorage.open());
+      final state = LocalSportikaRepository(await LocalStorage.open());
       await state.load();
       // Same demo sign-in entry point used by the application.
       await state.signIn(state.accounts.first.id);

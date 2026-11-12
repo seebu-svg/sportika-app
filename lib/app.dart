@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:sportika/app/providers.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/state/app_state.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/features/auth/screens/account_type_screen.dart';
 import 'package:sportika/features/onboarding/screens/auth_error_screen.dart';
@@ -28,14 +30,17 @@ class SportikaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sportika',
-      debugShowCheckedModeBanner: false,
-      theme: buildSportikaTheme(),
-      home: ChangeNotifierProvider<AuthFlowController>(
-        create: (context) =>
-            AuthFlowController(context.read<AppState>())..begin(),
-        child: const RootGate(),
+    return buildAppProviders(
+      repository: context.read<LocalSportikaRepository>(),
+      child: MaterialApp(
+        title: 'Sportika',
+        debugShowCheckedModeBanner: false,
+        theme: buildSportikaTheme(),
+        home: ChangeNotifierProvider<AuthFlowController>(
+          create: (context) =>
+              AuthFlowController(context.read<SessionController>())..begin(),
+          child: const RootGate(),
+        ),
       ),
     );
   }
@@ -52,7 +57,7 @@ class RootGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<SessionController>();
     final flow = context.watch<AuthFlowController>();
 
     if (!state.ready) return const SplashScreen();

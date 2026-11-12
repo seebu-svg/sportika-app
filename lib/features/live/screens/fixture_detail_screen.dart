@@ -5,7 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -21,7 +21,7 @@ class FixtureDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final fixture = state.fixtureById(fixtureId);
     if (fixture == null) {
       return Scaffold(
@@ -374,7 +374,7 @@ class FixtureDetailScreen extends StatelessWidget {
   }
 
   static bool _isParticipant(
-    AppState state,
+    LocalSportikaRepository state,
     Fixture fixture,
     String accountId,
   ) {
@@ -453,7 +453,7 @@ class _DisputeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final resolved = fixture.disputeResolved;
 
     return SurfaceCard(
@@ -531,7 +531,7 @@ class _Roster extends StatelessWidget {
     required this.sides,
   });
 
-  final AppState state;
+  final LocalSportikaRepository state;
   final Fixture fixture;
   final List<String> sides;
 
@@ -567,7 +567,7 @@ class _EntryRoster extends StatelessWidget {
 
   final String label;
   final Entry? entry;
-  final AppState state;
+  final LocalSportikaRepository state;
 
   @override
   Widget build(BuildContext context) {

@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -42,7 +42,7 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final me = state.currentAccount;
     if (me == null) return const SizedBox.shrink();
 
@@ -658,7 +658,7 @@ class _HomeTabState extends State<HomeTab> {
 
   // --------------------------------------------------------------- fixture --
 
-  Widget _upcomingMatch(BuildContext context, AppState state, Fixture fixture) {
+  Widget _upcomingMatch(BuildContext context, LocalSportikaRepository state, Fixture fixture) {
     final tournament = state.tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
     final venue = [
@@ -775,7 +775,7 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Broadcast-style scoreboard: dark floor, big condensed numerals, one
   /// live indicator and the situation label the scoring engine provides.
-  Widget _liveScore(BuildContext context, AppState state, Fixture fixture) {
+  Widget _liveScore(BuildContext context, LocalSportikaRepository state, Fixture fixture) {
     final progress = state.progressOfFixture(fixture);
     final home = progress.scoreDisplay.isNotEmpty
         ? progress.scoreDisplay[0]
@@ -935,7 +935,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _discoverCard(
     BuildContext context,
-    AppState state,
+    LocalSportikaRepository state,
     Tournament tournament,
   ) {
     final confirmed = state.confirmedCountFor(tournament);
@@ -1065,7 +1065,7 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Horizontal, image-backed discovery cards - photography first, one line
   /// of condensed title and the availability state.
-  Widget _gameRail(BuildContext context, AppState state) {
+  Widget _gameRail(BuildContext context, LocalSportikaRepository state) {
     final games = state.games
         .where((g) => _sport == null || g.sport == _sport)
         .take(6)
@@ -1384,7 +1384,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   /// Index of the side the signed-in account plays for, or -1.
-  int _mySide(AppState state, Fixture fixture) {
+  int _mySide(LocalSportikaRepository state, Fixture fixture) {
     final me = state.currentAccount?.id;
     if (me == null) return -1;
     final myEntryIds = state.entries

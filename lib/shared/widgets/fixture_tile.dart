@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
@@ -18,7 +18,7 @@ Widget officialFixtureTile(
   VoidCallback? onTap,
   bool showTournament = true,
 }) {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final tournament = state.tournamentOf(fixture);
   final sport = tournament?.sport ?? Sport.cricket;
 
@@ -93,7 +93,7 @@ Widget personalScorecardTile(
   PersonalMatch match, {
   VoidCallback? onTap,
 }) {
-  final state = context.read<AppState>();
+  final state = context.read<LocalSportikaRepository>();
   final progress = state.progressOfPersonal(match);
   final completed = match.status == PersonalMatchStatus.completed;
 

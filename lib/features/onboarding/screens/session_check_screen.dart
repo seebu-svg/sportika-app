@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
@@ -55,7 +55,7 @@ class _SessionVerificationScreenState extends State<SessionVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final flow = context.read<AuthFlowController>();
-    final account = context.watch<AppState>().currentAccount;
+    final account = context.watch<LocalSportikaRepository>().currentAccount;
     final name = account?.displayName ?? 'Athlete';
 
     return Scaffold(

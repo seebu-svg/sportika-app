@@ -5,7 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/tournament_engine.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -19,7 +19,7 @@ class TournamentFixturesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final fixtures = state.fixturesFor(tournament.id);
     if (fixtures.isEmpty) {
       return EmptyState(
@@ -78,7 +78,7 @@ class TournamentBracket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     if (state.fixturesFor(tournament.id).isEmpty) {
       return const EmptyState(
         title: 'Nothing to show yet',
@@ -101,7 +101,7 @@ class _StandingsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final rows = state.standingsFor(tournament);
     if (rows.isEmpty) {
       return const EmptyState(
@@ -266,7 +266,7 @@ class _Bracket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final rounds = state.roundsFor(tournament);
 
     return SingleChildScrollView(
@@ -316,7 +316,7 @@ class _BracketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final sides = state.sideLabelsOf(fixture);
     final result = fixture.result;
     final winner = result?.winnerIndex ?? -1;
@@ -405,7 +405,7 @@ class TournamentEntriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final entries = state.entriesFor(tournament.id);
     if (entries.isEmpty) {
       return const EmptyState(
@@ -511,7 +511,7 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final members = entry.memberAccountIds
         .map((id) => state.accountById(id)?.displayName)
         .whereType<String>()

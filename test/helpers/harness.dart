@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:sportika/app.dart';
 import 'package:sportika/shared/data/local_storage.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 
 /// Shared widget-test harness.
 ///
@@ -17,26 +17,26 @@ const Duration authTimer = Duration(milliseconds: 1900);
 
 /// A loaded, seeded state. Pass `onboardingSeen: false` when the journey under
 /// test has to start at onboarding instead of the sign-in gate.
-Future<AppState> freshState({bool onboardingSeen = true}) async {
+Future<LocalSportikaRepository> freshState({bool onboardingSeen = true}) async {
   SharedPreferences.setMockInitialValues(
     onboardingSeen ? {'sportika.onboarding_seen.v1': true} : {},
   );
-  final state = AppState(await LocalStorage.open());
+  final state = LocalSportikaRepository(await LocalStorage.open());
   await state.load();
   return state;
 }
 
 /// Pumps the real app at a phone-sized surface and resolves the splash.
-Future<AppState> pumpApp(
+Future<LocalSportikaRepository> pumpApp(
   WidgetTester tester, {
-  AppState? state,
+  LocalSportikaRepository? state,
   Size size = const Size(400, 844),
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final appState = state ?? await freshState();
   await tester.pumpWidget(
-    ChangeNotifierProvider<AppState>.value(
+    ChangeNotifierProvider<LocalSportikaRepository>.value(
       value: appState,
       child: const SportikaApp(),
     ),

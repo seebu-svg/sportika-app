@@ -7,7 +7,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/community_game.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 
@@ -29,7 +29,7 @@ class _GamesTabState extends State<GamesTab> {
   String myScope = 'All';
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final games = state.games
         .where(
           (g) =>
@@ -429,7 +429,7 @@ class GameDetailScreen extends StatelessWidget {
   final CommunityGame game;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final joined = game.members.contains(state.currentAccount?.id);
     return Scaffold(
       appBar: AppBar(title: const Text('Match details')),
@@ -638,7 +638,7 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                 );
                 return;
               }
-              final state = context.read<AppState>();
+              final state = context.read<LocalSportikaRepository>();
               state.publishGame(
                 CommunityGame(
                   id: DateTime.now().microsecondsSinceEpoch.toString(),

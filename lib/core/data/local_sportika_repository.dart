@@ -16,8 +16,8 @@ import 'package:sportika/shared/models/tournament_engine.dart';
 /// Everything is persisted to one JSON document after each mutation, so a
 /// personal scorecard survives closing the app, and official scoring resumes
 /// from the last saved event (spec §2.3, §6).
-class AppState extends ChangeNotifier {
-  AppState(this._storage);
+class LocalSportikaRepository extends ChangeNotifier {
+  LocalSportikaRepository(this._storage);
 
   final LocalStorage _storage;
 

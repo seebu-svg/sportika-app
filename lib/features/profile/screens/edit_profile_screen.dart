@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final me = context.read<AppState>().currentAccount;
+    final me = context.read<LocalSportikaRepository>().currentAccount;
     _name = TextEditingController(text: me?.displayName ?? '');
     _city = TextEditingController(text: me?.city ?? '');
     _email = TextEditingController(text: me?.email ?? '');
@@ -37,7 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final me = state.currentAccount;
 
     return Scaffold(

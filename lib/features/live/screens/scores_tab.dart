@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
@@ -20,7 +20,7 @@ class _ScoresTabState extends State<ScoresTab> {
   Sport? sport;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final fixtures = (tab == 0 ? state.liveFixtures : state.completedFixtures)
         .where((f) => sport == null || state.tournamentOf(f)?.sport == sport)
         .toList();

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
 
@@ -223,7 +223,7 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
                   setState(() => step++);
                   return;
                 }
-                final state = context.read<AppState>();
+                final state = context.read<LocalSportikaRepository>();
                 final m = state.startPersonalMatch(
                   sport: sport,
                   format: format,

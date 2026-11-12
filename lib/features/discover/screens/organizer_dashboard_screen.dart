@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
@@ -22,7 +22,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final me = state.currentAccount;
     final mine = state.tournamentsForOrganizer(me?.id);
     final pending = <Entry>[
@@ -171,7 +171,7 @@ class _PendingEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final tournament = state.tournamentById(entry.tournamentId);
 
     return SurfaceCard(
@@ -250,7 +250,7 @@ class _OrganizerTournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final pending = state.pendingEntriesFor(tournament.id).length;
     final fixtures = state.fixturesFor(tournament.id);
     final review = state.fixturesAwaitingReview
@@ -336,7 +336,7 @@ class _OrganizerDisputeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final tournament = state.tournamentOf(fixture);
     final sides = state.sideLabelsOf(fixture);
 

@@ -5,7 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
@@ -18,7 +18,7 @@ class TeamsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final squads = state.mySquads;
     final me = state.currentAccount;
     final entries =
@@ -94,7 +94,7 @@ class TeamsTab extends StatelessWidget {
     );
   }
 
-  Future<void> _createSquad(BuildContext context, AppState state) async {
+  Future<void> _createSquad(BuildContext context, LocalSportikaRepository state) async {
     final name = TextEditingController();
     var sport = Sport.padel;
     var type = SportEngines.defaultEntryType(sport);
@@ -269,7 +269,7 @@ class _SquadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<AppState>();
+    final state = context.read<LocalSportikaRepository>();
     final tone = sportColor(squad.sport);
     final memberNames = squad.memberAccountIds
         .map((id) => state.accountById(id)?.displayName)
@@ -340,7 +340,7 @@ class _SquadCard extends StatelessWidget {
     );
   }
 
-  void _showSquad(BuildContext context, AppState state, Squad squad) {
+  void _showSquad(BuildContext context, LocalSportikaRepository state, Squad squad) {
     showAppSheet(
       context,
       AppSheet(
@@ -423,7 +423,7 @@ class _EntryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final tournament = state.tournamentById(entry.tournamentId);
 
     return SurfaceCard(

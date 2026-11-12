@@ -6,7 +6,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
@@ -17,7 +17,7 @@ enum ScorecardMode { personal, official }
 ///
 /// The screen renders whatever the sport engine exposes: score lines, chips,
 /// actions and completion state. Recording appends to the event log through
-/// [AppState], which is what makes undo exact and resume automatic.
+/// [LocalSportikaRepository], which is what makes undo exact and resume automatic.
 class ScorecardScreen extends StatelessWidget {
   const ScorecardScreen({super.key, required this.id, required this.mode});
 
@@ -26,7 +26,7 @@ class ScorecardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
 
     if (mode == ScorecardMode.personal) {
       final match = state.personalById(id);
@@ -66,7 +66,7 @@ class _PersonalScorecard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final progress = state.progressOfPersonal(match);
     final accent = sportColor(match.sport);
 
@@ -312,7 +312,7 @@ class _OfficialScorecard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final tournament = state.tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
     final progress = state.progressOfFixture(fixture);
@@ -394,7 +394,7 @@ class _OfficialFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     if (locked) {
       final result = fixture.result;
       return SurfaceCard(

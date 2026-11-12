@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/onboarding.dart';
-import 'package:sportika/shared/state/app_state.dart';
 
 /// Every screen and supporting state in the pre-authentication flow.
 ///
@@ -44,7 +44,7 @@ class AuthFlowController extends ChangeNotifier {
     _app.addListener(_handleAccountChange);
   }
 
-  final AppState _app;
+  final SessionController _app;
 
   /// A sign-out from the profile tab puts the app back on Sign In and clears
   /// the credentials held by the flow.

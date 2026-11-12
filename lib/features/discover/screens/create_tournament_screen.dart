@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Spec §4.1: create and publish a tournament with its sport, dates, entry
@@ -45,7 +45,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final rules = SportEngines.rulesFor(_sport, _ruleFormat);
     final rulesSummary = SportEngines.describeRules(_sport, rules);
 
@@ -268,7 +268,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   }
 
   Future<void> _create(
-    AppState state,
+    LocalSportikaRepository state,
     String rulesSummary,
     Map<String, dynamic> rules,
   ) async {

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
@@ -21,7 +21,7 @@ class ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final me = state.currentAccount;
     if (me == null) return const SizedBox.shrink();
 
@@ -385,7 +385,7 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
-  Future<void> _resetDemo(BuildContext context, AppState state) async {
+  Future<void> _resetDemo(BuildContext context, LocalSportikaRepository state) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

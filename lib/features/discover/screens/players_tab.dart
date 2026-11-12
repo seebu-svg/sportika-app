@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Players discovery for the Discover tab: the community directory, filtered
@@ -24,7 +24,7 @@ class _PlayersTabState extends State<PlayersTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     final needle = query.trim().toLowerCase();
     final players =
         state.accounts
@@ -85,7 +85,7 @@ class _PlayerCard extends StatelessWidget {
   const _PlayerCard({required this.account, required this.state});
 
   final Account account;
-  final AppState state;
+  final LocalSportikaRepository state;
 
   @override
   Widget build(BuildContext context) {
@@ -169,7 +169,7 @@ class _PlayerSheet extends StatelessWidget {
   const _PlayerSheet({required this.account, required this.state});
 
   final Account account;
-  final AppState state;
+  final LocalSportikaRepository state;
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +269,7 @@ class _AppearanceRow extends StatelessWidget {
   const _AppearanceRow({required this.fixture, required this.state});
 
   final Fixture fixture;
-  final AppState state;
+  final LocalSportikaRepository state;
 
   @override
   Widget build(BuildContext context) {

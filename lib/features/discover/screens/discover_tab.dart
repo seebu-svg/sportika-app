@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/state/app_state.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/discover/screens/create_tournament_screen.dart';
@@ -25,7 +25,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
+    final state = context.watch<LocalSportikaRepository>();
     return Column(
       children: [
         TabHeader(
@@ -69,7 +69,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
     );
   }
 
-  Future<void> _showCreateSheet(AppState state) async {
+  Future<void> _showCreateSheet(LocalSportikaRepository state) async {
     final me = state.currentAccount;
     await showModalBottomSheet<void>(
       context: context,
