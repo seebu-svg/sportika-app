@@ -20,6 +20,10 @@ abstract class FeatureController<R extends SportikaRepository>
 
   void _onRepositoryChanged() => notifyListeners();
 
+  /// Re-reads the repository so every pull-to-refresh and retry goes through
+  /// one entry point instead of each screen inventing its own.
+  Future<void> reload() => repo.reload();
+
   @override
   void dispose() {
     repo.removeListener(_onRepositoryChanged);

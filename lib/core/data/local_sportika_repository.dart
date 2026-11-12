@@ -116,6 +116,9 @@ class LocalSportikaRepository extends ChangeNotifier
     await _persist();
   }
 
+  @override
+  Future<void> reload() => load();
+
   void _adopt(SeedWorld world) {
     preferences = {};
     games = seedCommunityGames();

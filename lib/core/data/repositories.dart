@@ -12,7 +12,12 @@ import 'package:sportika/shared/models/tournament_engine.dart';
 /// Controllers only ever see `Future`-returning methods and immutable
 /// snapshots, so a REST-backed implementation can replace
 /// [LocalSportikaRepository] without touching a single screen.
-abstract class SportikaRepository implements Listenable {}
+abstract class SportikaRepository implements Listenable {
+  /// Re-reads the backing store. Pull-to-refresh and retry call this: the
+  /// local implementation re-decodes the saved document, a REST one would
+  /// refetch.
+  Future<void> reload();
+}
 
 /// Read/write surface for the fixture feature.
 abstract class FixtureRepository extends SportikaRepository {
@@ -161,7 +166,6 @@ abstract class TeamRepository extends SportikaRepository {
   List<Squad> squadsOf(String accountId);
   List<Account> get accounts;
   List<Account> get otherPlayers;
-  String? get currentAccountId;
   Squad createSquad({
     required String name,
     required Sport sport,
@@ -181,6 +185,7 @@ abstract class TeamRepository extends SportikaRepository {
   void transferCaptain(String squadId, String accountId);
   void leaveSquad(String squadId);
   void deleteSquad(String squadId);
+  String? get currentAccountId;
 }
 
 /// Read/write surface for the tournament feature.
