@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/core/state/personal_games_controller.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
+import 'package:sportika/app/routes.dart';
 
 class NewPersonalMatchScreen extends StatefulWidget {
   const NewPersonalMatchScreen({super.key, this.sport});
@@ -26,6 +28,10 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
       notes = TextEditingController(),
       players = TextEditingController();
   final form = GlobalKey<FormState>();
+
+  /// Set when the current step is not satisfied yet. The wizard never advances
+  /// silently: the reason stays on screen until the gap is closed.
+  String? _error;
   static const titles = [
     'Create personal game',
     'Select sport',
@@ -85,6 +91,14 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
             ),
             const SizedBox(height: 12),
             LinearProgressIndicator(value: (step + 1) / 6),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              InlineBanner(
+                icon: Icons.error_outline,
+                tone: SportikaColors.danger,
+                text: _error!,
+              ),
+            ],
             const SizedBox(height: 24),
             if (step == 0) ...[
               const Icon(Icons.sports_score, size: 72),
@@ -219,8 +233,16 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
               label: Text(step == 5 ? 'Start game' : 'Continue'),
               onPressed: () {
                 if (!form.currentState!.validate()) return;
+                final blocker = _blocker();
+                if (blocker != null) {
+                  setState(() => _error = blocker);
+                  return;
+                }
                 if (step < 5) {
-                  setState(() => step++);
+                  setState(() {
+                    _error = null;
+                    step++;
+                  });
                   return;
                 }
                 final state = context.read<PersonalGamesController>();
@@ -235,18 +257,19 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
                   'notes': notes.text,
                   'players': players.text,
                 });
-                Navigator.pushReplacement(
+                pushReplacementRoute(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SportMatchSetupScreen(id: m.id, startAfterSave: true),
-                  ),
+                  AppRoute.personalSetup,
+                  args: PersonalSetupArgs(m.id, startAfterSave: true),
                 );
               },
             ),
             if (step > 0)
               TextButton(
-                onPressed: () => setState(() => step--),
+                onPressed: () => setState(() {
+                  _error = null;
+                  step--;
+                }),
                 child: const Text('Back'),
               ),
           ],
@@ -254,6 +277,24 @@ class _NewPersonalMatchScreenState extends State<NewPersonalMatchScreen> {
       ),
     ),
   );
+
+  /// Why the current step cannot advance, or null when it can. Only the step
+  /// being shown is judged, so an untouched later step never blocks the wizard.
+  String? _blocker() {
+    switch (step) {
+      case 2:
+        if (format.trim().isEmpty) return 'Choose a match format to continue.';
+      case 3:
+        if (a.text.trim().isEmpty || b.text.trim().isEmpty) {
+          return 'Name both sides before continuing.';
+        }
+        if (a.text.trim().toLowerCase() == b.text.trim().toLowerCase()) {
+          return 'Side A and side B need different names.';
+        }
+    }
+    return null;
+  }
+
   String? validateSide(String? v) =>
       v == null || v.trim().isEmpty ? 'Enter a player or team name' : null;
 }

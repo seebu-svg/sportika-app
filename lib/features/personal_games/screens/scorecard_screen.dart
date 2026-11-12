@@ -12,6 +12,7 @@ import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
+import 'package:sportika/app/routes.dart';
 
 enum ScorecardMode { personal, official }
 
@@ -90,15 +91,24 @@ class _PersonalScorecard extends StatelessWidget {
             color: SportikaColors.surfaceElevated,
             onSelected: (value) async {
               if (value == 'details') {
-                openPersonal(context, PersonalGameDetailsScreen(id: match.id));
+                pushRoute(
+                  context,
+                  AppRoute.personalGameDetail,
+                  args: PersonalMatchArgs(match.id),
+                );
               }
               if (value == 'timeline') {
-                openPersonal(context, PersonalTimelineScreen(id: match.id));
+                pushRoute(
+                  context,
+                  AppRoute.personalTimeline,
+                  args: PersonalMatchArgs(match.id),
+                );
               }
               if (value == 'settings') {
-                openPersonal(
+                pushRoute(
                   context,
-                  PersonalScoringSettingsScreen(id: match.id),
+                  AppRoute.personalSettings,
+                  args: PersonalMatchArgs(match.id),
                 );
               }
               if (value == 'pause') {

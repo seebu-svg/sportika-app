@@ -15,6 +15,7 @@ import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
+import 'package:sportika/app/routes.dart';
 
 /// All routes here resolve only the signed-in account's private scorecard.
 PersonalMatch? privateMatch(BuildContext context, String id) {
@@ -73,17 +74,23 @@ List<String> sportScreens(Sport sport) => switch (sport) {
 };
 void openSportScreen(BuildContext context, PersonalMatch m, int index) {
   if (index == 0 || index == 1) {
-    openPersonal(
+    pushRoute(
       context,
-      SportMatchSetupScreen(id: m.id, playersOnly: index == 1),
+      AppRoute.personalSetup,
+      args: PersonalSetupArgs(m.id, playersOnly: index == 1),
     );
   } else if (index == 2) {
-    openPersonal(
+    pushRoute(
       context,
-      ScorecardScreen(id: m.id, mode: ScorecardMode.personal),
+      AppRoute.scorecard,
+      args: ScorecardArgs(m.id, ScorecardMode.personal),
     );
   } else {
-    openPersonal(context, SportDetailScreen(id: m.id, index: index));
+    pushRoute(
+      context,
+      AppRoute.personalSportDetail,
+      args: PersonalSportDetailArgs(m.id, index),
+    );
   }
 }
 
@@ -420,14 +427,20 @@ class SportLiveTools extends StatelessWidget {
             title: Text('${match.sport.label} match centre'),
             subtitle: const Text('Setup, trackers, scorecards & result'),
             trailing: const Icon(Icons.arrow_forward),
-            onTap: () =>
-                openPersonal(context, SportMatchCentreScreen(id: match.id)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.personalMatchCentre,
+              args: PersonalMatchArgs(match.id),
+            ),
           ),
         ),
         if (match.details['sportSetupComplete'] != true)
           TextButton(
-            onPressed: () =>
-                openPersonal(context, SportMatchSetupScreen(id: match.id)),
+            onPressed: () => pushRoute(
+              context,
+              AppRoute.personalSetup,
+              args: PersonalSetupArgs(match.id),
+            ),
             child: const Text('Set up players & match details'),
           ),
         if (cricket && match.status != PersonalMatchStatus.completed) ...[
@@ -456,9 +469,10 @@ class SportLiveTools extends StatelessWidget {
         if (match.sport == Sport.futsal) ...[
           FutsalClock(match: match),
           TextButton.icon(
-            onPressed: () => openPersonal(
+            onPressed: () => pushRoute(
               context,
-              SportDetailScreen(id: match.id, index: 4),
+              AppRoute.personalSportDetail,
+              args: PersonalSportDetailArgs(match.id, 4),
             ),
             icon: const Icon(Icons.style),
             label: const Text('Goals, fouls & cards'),
@@ -1021,8 +1035,11 @@ class SportDetailScreen extends StatelessWidget {
           ),
         ),
       TextButton(
-        onPressed: () =>
-            openPersonal(context, PersonalTimelineScreen(id: m.id)),
+        onPressed: () => pushRoute(
+          context,
+          AppRoute.personalTimeline,
+          args: PersonalMatchArgs(m.id),
+        ),
         child: const Text('Edit event history'),
       ),
     ];

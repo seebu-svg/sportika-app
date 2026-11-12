@@ -13,11 +13,13 @@ import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
 import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
+import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
 import 'package:sportika/features/teams/screens/create_team_screen.dart';
 import 'package:sportika/features/teams/screens/team_detail_screen.dart';
 import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
 import 'package:sportika/features/profile/screens/settings_screen.dart';
 import 'package:sportika/shared/models/community_game.dart';
+import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
 
 /// Named routes for every pushed screen.
@@ -50,6 +52,55 @@ abstract final class AppRoute {
   static const String personalGames = '/personal';
   static const String newPersonalMatch = '/personal/new';
   static const String scorecard = '/personal/scorecard';
+  static const String personalPerformance = '/personal/performance';
+  static const String personalGameDetail = '/personal/game';
+  static const String personalMatchCentre = '/personal/centre';
+  static const String personalTimeline = '/personal/timeline';
+  static const String personalStats = '/personal/stats';
+  static const String personalEdit = '/personal/edit';
+  static const String personalSetup = '/personal/setup';
+  static const String personalSportDetail = '/personal/sport';
+  static const String personalSettings = '/personal/settings';
+}
+
+/// Arguments for the personal screens that are keyed by one private match.
+@immutable
+class PersonalMatchArgs {
+  const PersonalMatchArgs(this.id);
+
+  final String id;
+}
+
+/// Arguments for [AppRoute.personalEdit]. The whole match is handed over so the
+/// editor can prefill without reaching back into the store.
+@immutable
+class PersonalEditArgs {
+  const PersonalEditArgs(this.match);
+
+  final PersonalMatch match;
+}
+
+/// Arguments for [AppRoute.personalSetup].
+@immutable
+class PersonalSetupArgs {
+  const PersonalSetupArgs(
+    this.id, {
+    this.startAfterSave = false,
+    this.playersOnly = false,
+  });
+
+  final String id;
+  final bool startAfterSave;
+  final bool playersOnly;
+}
+
+/// Arguments for [AppRoute.personalSportDetail].
+@immutable
+class PersonalSportDetailArgs {
+  const PersonalSportDetailArgs(this.id, this.index);
+
+  final String id;
+  final int index;
 }
 
 /// Arguments for [AppRoute.tournamentDetail].
@@ -159,6 +210,39 @@ Widget Function(Object? args) _builderFor(String name) {
       return (_) => const PersonalGamesScreen();
     case AppRoute.newPersonalMatch:
       return (_) => const NewPersonalMatchScreen();
+    case AppRoute.personalPerformance:
+      return (_) => const PersonalPerformanceScreen();
+    case AppRoute.personalGameDetail:
+      return (args) =>
+          PersonalGameDetailsScreen(id: (args as PersonalMatchArgs).id);
+    case AppRoute.personalMatchCentre:
+      return (args) =>
+          SportMatchCentreScreen(id: (args as PersonalMatchArgs).id);
+    case AppRoute.personalTimeline:
+      return (args) =>
+          PersonalTimelineScreen(id: (args as PersonalMatchArgs).id);
+    case AppRoute.personalSettings:
+      return (args) =>
+          PersonalScoringSettingsScreen(id: (args as PersonalMatchArgs).id);
+    case AppRoute.personalStats:
+      return (args) => PersonalStatsScreen(id: (args as PersonalMatchArgs).id);
+    case AppRoute.personalEdit:
+      return (args) =>
+          EditPersonalGameScreen(match: (args as PersonalEditArgs).match);
+    case AppRoute.personalSetup:
+      return (args) {
+        final setup = args as PersonalSetupArgs;
+        return SportMatchSetupScreen(
+          id: setup.id,
+          startAfterSave: setup.startAfterSave,
+          playersOnly: setup.playersOnly,
+        );
+      };
+    case AppRoute.personalSportDetail:
+      return (args) {
+        final detail = args as PersonalSportDetailArgs;
+        return SportDetailScreen(id: detail.id, index: detail.index);
+      };
     case AppRoute.scorecard:
       return (args) {
         final card = args as ScorecardArgs;
@@ -182,6 +266,21 @@ Route<dynamic>? onGenerateRoute(RouteSettings settings) {
 /// arguments; nothing outside this file builds a [MaterialPageRoute].
 Future<T?> pushRoute<T>(BuildContext context, String name, {Object? args}) {
   return Navigator.of(context).push<T>(
+    MaterialPageRoute<T>(
+      settings: RouteSettings(name: name, arguments: args),
+      builder: (_) => _builderFor(name)(args),
+    ),
+  );
+}
+
+/// Like [pushRoute] but replaces the current page, so a wizard cannot be
+/// reached again with the back button after it has handed over.
+Future<T?> pushReplacementRoute<T>(
+  BuildContext context,
+  String name, {
+  Object? args,
+}) {
+  return Navigator.of(context).pushReplacement<T, dynamic>(
     MaterialPageRoute<T>(
       settings: RouteSettings(name: name, arguments: args),
       builder: (_) => _builderFor(name)(args),

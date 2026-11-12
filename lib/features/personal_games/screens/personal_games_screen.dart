@@ -8,12 +8,8 @@ import 'package:sportika/core/state/personal_games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
-import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
-
-void openPersonal(BuildContext c, Widget screen) =>
-    Navigator.push(c, MaterialPageRoute(builder: (_) => screen));
+import 'package:sportika/app/routes.dart';
 
 class PersonalGamesScreen extends StatefulWidget {
   const PersonalGamesScreen({super.key});
@@ -57,8 +53,7 @@ class _PersonalGamesScreenState extends State<PersonalGamesScreen> {
           IconButton(
             tooltip: 'Performance overview',
             icon: const Icon(Icons.insights),
-            onPressed: () =>
-                openPersonal(context, const PersonalPerformanceScreen()),
+            onPressed: () => pushRoute(context, AppRoute.personalPerformance),
           ),
         ],
       ),
@@ -76,8 +71,7 @@ class _PersonalGamesScreenState extends State<PersonalGamesScreen> {
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: () =>
-                openPersonal(context, const NewPersonalMatchScreen()),
+            onPressed: () => pushRoute(context, AppRoute.newPersonalMatch),
             icon: const Icon(Icons.add),
             label: const Text('Create personal game'),
           ),
@@ -169,8 +163,11 @@ class _PersonalGamesScreenState extends State<PersonalGamesScreen> {
                 ),
                 isThreeLine: true,
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () =>
-                    openPersonal(context, PersonalGameDetailsScreen(id: m.id)),
+                onTap: () => pushRoute(
+                  context,
+                  AppRoute.personalGameDetail,
+                  args: PersonalMatchArgs(m.id),
+                ),
               ),
             ),
         ],
@@ -218,8 +215,11 @@ class PersonalGameDetailsScreen extends StatelessWidget {
             leading: Icon(sportGlyph(m.sport)),
             title: Text('${m.sport.label} match centre'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () =>
-                openPersonal(context, SportMatchCentreScreen(id: m.id)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.personalMatchCentre,
+              args: PersonalMatchArgs(m.id),
+            ),
           ),
           KeyValueRow('Status', m.status.label),
           KeyValueRow('Format', '${m.sport.label} · ${m.formatLabel}'),
@@ -236,9 +236,10 @@ class PersonalGameDetailsScreen extends StatelessWidget {
             ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () => openPersonal(
+            onPressed: () => pushRoute(
               context,
-              ScorecardScreen(id: id, mode: ScorecardMode.personal),
+              AppRoute.scorecard,
+              args: ScorecardArgs(id, ScorecardMode.personal),
             ),
             child: Text(
               m.status == PersonalMatchStatus.completed
@@ -249,18 +250,29 @@ class PersonalGameDetailsScreen extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.timeline),
             title: const Text('Match timeline / score history'),
-            onTap: () => openPersonal(context, PersonalTimelineScreen(id: id)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.personalTimeline,
+              args: PersonalMatchArgs(id),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.bar_chart),
             title: const Text('Match statistics'),
-            onTap: () => openPersonal(context, PersonalStatsScreen(id: id)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.personalStats,
+              args: PersonalMatchArgs(id),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Edit game details'),
-            onTap: () =>
-                openPersonal(context, EditPersonalGameScreen(match: m)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.personalEdit,
+              args: PersonalEditArgs(m),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.delete_outline),
