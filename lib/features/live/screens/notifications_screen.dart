@@ -13,7 +13,7 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<NotificationsController>();
     final items = state.myNotifications;
 
     return Scaffold(
@@ -60,7 +60,7 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.read<NotificationsController>();
     final tone = _tone(notification.kind);
 
     return SurfaceCard(
@@ -166,7 +166,7 @@ class NotificationBell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unread = context.watch<LocalSportikaRepository>().unreadCount;
+    final unread = context.watch<NotificationsController>().unreadCount;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Stack(

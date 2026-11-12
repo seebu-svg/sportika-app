@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
@@ -14,6 +16,7 @@ import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/features/discover/screens/organizer_dashboard_screen.dart';
 import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
 
 /// Profile, roles, history entry points and the demo-data controls.
 class ProfileTab extends StatelessWidget {
@@ -21,12 +24,14 @@ class ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final me = state.currentAccount;
+    final state = context.watch<SessionController>();
+    final me = context.read<ProfileController>().currentAccount;
     if (me == null) return const SizedBox.shrink();
 
-    final official = state.officialMatchesPlayed();
-    final entryIds = state.entries
+    final official = context.read<ProfileController>().officialMatchesPlayed();
+    final entryIds = context
+        .read<TournamentsController>()
+        .entries
         .where((e) => e.memberAccountIds.contains(me.id))
         .map((e) => e.id)
         .toSet();
@@ -157,7 +162,7 @@ class ProfileTab extends StatelessWidget {
                   leading: Icon(sportGlyph(sport), color: SportikaColors.mint),
                   title: Text(sport.label),
                   subtitle: Text(
-                    '${official.where((f) => state.tournamentOf(f)?.sport == sport).length} official appearances',
+                    '${official.where((f) => context.read<FixturesController>().tournamentOf(f)?.sport == sport).length} official appearances',
                   ),
                   trailing: sport == Sport.cricket
                       ? const StatusPill('Primary', color: SportikaColors.mint)
@@ -169,7 +174,9 @@ class ProfileTab extends StatelessWidget {
                 onAction: () => openHomeTab(context, 3),
               ),
               for (final team
-                  in state.squads
+                  in context
+                      .read<TeamsController>()
+                      .squads
                       .where((s) => s.memberAccountIds.contains(me.id))
                       .take(3))
                 ListTile(
@@ -244,9 +251,11 @@ class ProfileTab extends StatelessWidget {
                     SheetOption(
                       icon: Icons.notifications_none,
                       title: 'Notifications',
-                      subtitle: state.unreadCount == 0
+                      subtitle:
+                          context.read<NotificationsController>().unreadCount ==
+                              0
                           ? 'All caught up'
-                          : '${state.unreadCount} unread',
+                          : '${context.read<NotificationsController>().unreadCount} unread',
                       tone: SportikaColors.gold,
                       onTap: () =>
                           pushScreen(context, const NotificationsScreen()),
@@ -279,7 +288,7 @@ class ProfileTab extends StatelessWidget {
                           icon: Icons.sports_score,
                           title: 'Scorer workspace',
                           subtitle:
-                              '${state.myScoringFixtures.length} fixtures assigned',
+                              '${context.read<FixturesController>().myScoringFixtures.length} fixtures assigned',
                           tone: SportikaColors.blueBright,
                           onTap: () => pushScreen(
                             context,
@@ -295,14 +304,22 @@ class ProfileTab extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Match reminders'),
                 subtitle: const Text('Local demo preference'),
-                value: state.preference('reminders'),
-                onChanged: (v) => state.setPreference('reminders', v),
+                value: context.read<PreferencesController>().preference(
+                  'reminders',
+                ),
+                onChanged: (v) => context
+                    .read<PreferencesController>()
+                    .setPreference('reminders', v),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Community invitations'),
-                value: state.preference('invites'),
-                onChanged: (v) => state.setPreference('invites', v),
+                value: context.read<PreferencesController>().preference(
+                  'invites',
+                ),
+                onChanged: (v) => context
+                    .read<PreferencesController>()
+                    .setPreference('invites', v),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -310,8 +327,12 @@ class ProfileTab extends StatelessWidget {
                 subtitle: const Text(
                   'Demo visibility preference; personal scores always stay private.',
                 ),
-                value: state.preference('publicProfile'),
-                onChanged: (v) => state.setPreference('publicProfile', v),
+                value: context.read<PreferencesController>().preference(
+                  'publicProfile',
+                ),
+                onChanged: (v) => context
+                    .read<PreferencesController>()
+                    .setPreference('publicProfile', v),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -385,7 +406,7 @@ class ProfileTab extends StatelessWidget {
     );
   }
 
-  Future<void> _resetDemo(BuildContext context, LocalSportikaRepository state) async {
+  Future<void> _resetDemo(BuildContext context, SessionController state) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

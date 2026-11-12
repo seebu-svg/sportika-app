@@ -21,7 +21,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final me = context.read<LocalSportikaRepository>().currentAccount;
+    final me = context.read<ProfileController>().currentAccount;
     _name = TextEditingController(text: me?.displayName ?? '');
     _city = TextEditingController(text: me?.city ?? '');
     _email = TextEditingController(text: me?.email ?? '');
@@ -37,7 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<ProfileController>();
     final me = state.currentAccount;
 
     return Scaffold(

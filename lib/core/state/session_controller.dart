@@ -73,7 +73,8 @@ class ProfileController extends FeatureController {
       repo.sportsPlayedBy(accountId);
 
   /// Official fixtures the given account has appeared in.
-  List<Fixture> appearancesOf(String accountId) => repo.appearancesOf(accountId);
+  List<Fixture> appearancesOf(String accountId) =>
+      repo.appearancesOf(accountId);
 
   List<Fixture> officialMatchesPlayed() => repo.officialMatchesPlayed();
 }

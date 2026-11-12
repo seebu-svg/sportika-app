@@ -6,7 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -29,11 +30,17 @@ class _TournamentsTabState extends State<TournamentsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
     final all = state.filterTournaments(sport: _sport);
     final mine = state.filterTournaments(sport: _sport, myEntriesOnly: true);
     final items = _organized
-        ? all.where((t) => t.organizerId == state.currentAccount?.id).toList()
+        ? all
+              .where(
+                (t) =>
+                    t.organizerId ==
+                    context.read<ProfileController>().currentAccount?.id,
+              )
+              .toList()
         : _mineOnly
         ? mine
         : all;
@@ -84,7 +91,9 @@ class _TournamentsTabState extends State<TournamentsTab> {
                         ? 'Register for an event and it will appear in this list.'
                         : 'Organizers publish new events from their dashboard.',
                     icon: Icons.emoji_events_outlined,
-                    action: state.canOrganize && !_mineOnly
+                    action:
+                        context.read<SessionController>().canOrganize &&
+                            !_mineOnly
                         ? GhostButton(
                             label: 'Create a tournament',
                             icon: Icons.add,
@@ -144,8 +153,8 @@ class _TournamentsTabState extends State<TournamentsTab> {
     );
   }
 
-  bool _hasEntry(LocalSportikaRepository state, Tournament tournament) {
-    final me = state.currentAccount?.id;
+  bool _hasEntry(TournamentsController state, Tournament tournament) {
+    final me = context.read<ProfileController>().currentAccount?.id;
     if (me == null) return false;
     return state
         .entriesFor(tournament.id)

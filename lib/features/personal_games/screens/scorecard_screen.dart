@@ -6,7 +6,9 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/personal_games_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/sport_scoring_screens.dart';
@@ -26,11 +28,14 @@ class ScorecardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    context.watch<PersonalGamesController>();
 
     if (mode == ScorecardMode.personal) {
+      final state = context.watch<PersonalGamesController>();
       final match = state.personalById(id);
-      if (match == null || match.ownerId != state.currentAccount?.id) {
+      if (match == null ||
+          match.ownerId !=
+              context.read<ProfileController>().currentAccount?.id) {
         return Scaffold(
           appBar: sportikaAppBar('Scorecard'),
           body: const Padding(
@@ -45,7 +50,7 @@ class ScorecardScreen extends StatelessWidget {
       return _PersonalScorecard(match: match);
     }
 
-    final fixture = state.fixtureById(id);
+    final fixture = context.read<FixturesController>().fixtureById(id);
     if (fixture == null) {
       return Scaffold(
         appBar: sportikaAppBar('Fixture'),
@@ -66,7 +71,8 @@ class _PersonalScorecard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<PersonalGamesController>();
+    context.watch<PersonalGamesController>();
     final progress = state.progressOfPersonal(match);
     final accent = sportColor(match.sport);
 
@@ -103,6 +109,8 @@ class _PersonalScorecard extends StatelessWidget {
                   paused ? 'Continue recording your private scorecard.' : 'Your score is saved. Resume from Saved / Paused Games.',
                   paused ? 'Resume' : 'Pause',
                 )) {
+                  if (!context.mounted) return;
+                  final state = context.read<PersonalGamesController>();
                   state.setPersonalStatus(
                     match.id,
                     paused
@@ -119,6 +127,8 @@ class _PersonalScorecard extends StatelessWidget {
                     'Keep the recorded score and mark this game completed. An unfinished match has no inferred winner.',
                     'End game',
                   )) {
+                if (!context.mounted) return;
+                final state = context.read<PersonalGamesController>();
                 state.setPersonalStatus(
                   match.id,
                   PersonalMatchStatus.completed,
@@ -128,6 +138,8 @@ class _PersonalScorecard extends StatelessWidget {
               if (value == 'delete') {
                 final ok = await _confirmDelete(context);
                 if (ok == true) {
+                  if (!context.mounted) return;
+                  final state = context.read<PersonalGamesController>();
                   state.deletePersonalMatch(match.id);
                   if (context.mounted) Navigator.of(context).maybePop();
                 }
@@ -189,6 +201,7 @@ class _PersonalScorecard extends StatelessWidget {
         onAction: match.status != PersonalMatchStatus.inProgress
             ? null
             : (action, side) {
+                final state = context.read<PersonalGamesController>();
                 final built = action.build(
                   ActionContext(
                     side:
@@ -200,7 +213,9 @@ class _PersonalScorecard extends StatelessWidget {
                               ? 1 - (progress.state['batSide'] as int)
                               : side)
                         : side,
-                    by: state.currentAccount?.id ?? '',
+                    by:
+                        context.read<ProfileController>().currentAccount?.id ??
+                        '',
                   ),
                 );
                 state.recordPersonalEvent(
@@ -245,6 +260,8 @@ class _PersonalScorecard extends StatelessWidget {
                       'Remove the most recent entry and recalculate the score. This may reopen a completed game.',
                       'Undo',
                     )) {
+                  if (!context.mounted) return;
+                  final state = context.read<PersonalGamesController>();
                   state.undoPersonalEvent(match.id);
                 }
               },
@@ -312,10 +329,12 @@ class _OfficialScorecard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final tournament = state.tournamentOf(fixture);
+    context.watch<PersonalGamesController>();
+    final tournament = context.read<FixturesController>().tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
-    final progress = state.progressOfFixture(fixture);
+    final progress = context.read<FixturesController>().progressOfFixture(
+      fixture,
+    );
     final accent = sportColor(sport);
 
     final locked =
@@ -324,12 +343,14 @@ class _OfficialScorecard extends StatelessWidget {
     final canScore =
         !locked &&
         fixture.status != FixtureStatus.submitted &&
-        state.hasRole(UserRole.scorer) &&
-        fixture.scorerAccountIds.contains(state.currentAccount?.id);
+        context.read<SessionController>().hasRole(UserRole.scorer) &&
+        fixture.scorerAccountIds.contains(
+          context.read<ProfileController>().currentAccount?.id,
+        );
 
     return Scaffold(
       appBar: sportikaAppBar(
-        '${state.sideLabel(fixture, 0)} vs ${state.sideLabel(fixture, 1)}',
+        '${context.read<FixturesController>().sideLabel(fixture, 0)} vs ${context.read<FixturesController>().sideLabel(fixture, 1)}',
         subtitle:
             '${tournament?.name ?? 'Official fixture'} · ${fixture.stage}',
       ),
@@ -343,7 +364,7 @@ class _OfficialScorecard extends StatelessWidget {
             : fixture.status == FixtureStatus.submitted
             ? 'Submitted · awaiting organizer review'
             : fixture.status == FixtureStatus.live
-            ? 'Live · scorer ${state.accountById(fixture.scorerAccountIds.firstOrNull)?.displayName ?? 'unassigned'}'
+            ? 'Live · scorer ${context.read<SessionController>().accountById(fixture.scorerAccountIds.firstOrNull)?.displayName ?? 'unassigned'}'
             : 'Ready to score',
         completedNote: locked
             ? (fixture.result?.headline ?? 'Result published')
@@ -353,9 +374,14 @@ class _OfficialScorecard extends StatelessWidget {
         onAction: canScore
             ? (action, side) {
                 final built = action.build(
-                  ActionContext(side: side, by: state.currentAccount?.id ?? ''),
+                  ActionContext(
+                    side: side,
+                    by:
+                        context.read<ProfileController>().currentAccount?.id ??
+                        '',
+                  ),
                 );
-                state.recordOfficialEvent(
+                context.read<FixturesController>().recordOfficialEvent(
                   fixture.id,
                   ScoringEvent(
                     id: newId('ev'),
@@ -369,7 +395,9 @@ class _OfficialScorecard extends StatelessWidget {
               }
             : null,
         onUndo: canScore && fixture.events.isNotEmpty
-            ? () => state.undoOfficialEvent(fixture.id)
+            ? () => context.read<FixturesController>().undoOfficialEvent(
+                fixture.id,
+              )
             : null,
         footer: _OfficialFooter(
           fixture: fixture,
@@ -394,7 +422,7 @@ class _OfficialFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    context.watch<PersonalGamesController>();
     if (locked) {
       final result = fixture.result;
       return SurfaceCard(
@@ -472,8 +500,10 @@ class _OfficialFooter extends StatelessWidget {
       );
     }
 
-    if (!state.hasRole(UserRole.scorer) ||
-        !fixture.scorerAccountIds.contains(state.currentAccount?.id)) {
+    if (!context.read<SessionController>().hasRole(UserRole.scorer) ||
+        !fixture.scorerAccountIds.contains(
+          context.read<ProfileController>().currentAccount?.id,
+        )) {
       return const InfoBanner(
         icon: Icons.lock_outline,
         text: 'Official match center · scoring is managed by the assigned scorer.',
@@ -491,9 +521,10 @@ class _OfficialFooter extends StatelessWidget {
               ? SportikaColors.mint
               : SportikaColors.surfaceElevated,
           onPressed: () async {
+            final fixtures = context.read<FixturesController>();
             final ok = await _confirmSubmit(context);
             if (ok == true) {
-              state.submitOfficialResult(fixture.id);
+              fixtures.submitOfficialResult(fixture.id);
               if (context.mounted) Navigator.of(context).maybePop();
             }
           },

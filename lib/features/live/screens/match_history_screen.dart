@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/personal_games_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -15,12 +16,12 @@ class MatchHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<PersonalGamesController>();
     final personal = state.myPersonal;
     final inProgress = personal.where(
       (m) => m.events.isNotEmpty || m.sideNames.isNotEmpty,
     );
-    final official = state.officialMatchesPlayed();
+    final official = context.read<ProfileController>().officialMatchesPlayed();
     final completed = state.myPersonal
         .where((m) => m.status.name == 'completed')
         .length;

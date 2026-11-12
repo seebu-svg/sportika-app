@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Players discovery for the Discover tab: the community directory, filtered
@@ -24,10 +26,12 @@ class _PlayersTabState extends State<PlayersTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<ProfileController>();
     final needle = query.trim().toLowerCase();
     final players =
-        state.accounts
+        context
+            .read<SessionController>()
+            .accounts
             .where((a) => a.has(UserRole.player))
             .where(
               (a) =>
@@ -85,13 +89,13 @@ class _PlayerCard extends StatelessWidget {
   const _PlayerCard({required this.account, required this.state});
 
   final Account account;
-  final LocalSportikaRepository state;
+  final ProfileController state;
 
   @override
   Widget build(BuildContext context) {
     final sports = state.sportsPlayedBy(account.id);
     final appearances = state.appearancesOf(account.id).length;
-    final teams = state.squadsOf(account.id).length;
+    final teams = context.read<TeamsController>().squadsOf(account.id).length;
     final isMe = account.id == state.currentAccount?.id;
 
     return Card(
@@ -169,14 +173,14 @@ class _PlayerSheet extends StatelessWidget {
   const _PlayerSheet({required this.account, required this.state});
 
   final Account account;
-  final LocalSportikaRepository state;
+  final ProfileController state;
 
   @override
   Widget build(BuildContext context) {
     final sports = state.sportsPlayedBy(account.id);
     final appearances = state.appearancesOf(account.id)
       ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
-    final teams = state.squadsOf(account.id);
+    final teams = context.read<TeamsController>().squadsOf(account.id);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,12 +273,12 @@ class _AppearanceRow extends StatelessWidget {
   const _AppearanceRow({required this.fixture, required this.state});
 
   final Fixture fixture;
-  final LocalSportikaRepository state;
+  final ProfileController state;
 
   @override
   Widget build(BuildContext context) {
-    final sides = state.sideLabelsOf(fixture);
-    final tournament = state.tournamentOf(fixture);
+    final sides = context.read<FixturesController>().sideLabelsOf(fixture);
+    final tournament = context.read<FixturesController>().tournamentOf(fixture);
     return SurfaceCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(

@@ -4,8 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 
 /// Spec §4.1: create and publish a tournament with its sport, dates, entry
 /// type, registration limit and match rules.
@@ -45,7 +46,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<SessionController>();
     final rules = SportEngines.rulesFor(_sport, _ruleFormat);
     final rulesSummary = SportEngines.describeRules(_sport, rules);
 
@@ -268,7 +269,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   }
 
   Future<void> _create(
-    LocalSportikaRepository state,
+    SessionController state,
     String rulesSummary,
     Map<String, dynamic> rules,
   ) async {
@@ -284,7 +285,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       );
       return;
     }
-    await state.createTournament(
+    await context.read<TournamentsController>().createTournament(
       name: _name.text,
       city: _city.text.trim().isEmpty ? 'Karachi' : _city.text.trim(),
       sport: _sport,

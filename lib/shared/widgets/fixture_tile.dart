@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/personal_games_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
@@ -18,7 +19,7 @@ Widget officialFixtureTile(
   VoidCallback? onTap,
   bool showTournament = true,
 }) {
-  final state = context.read<LocalSportikaRepository>();
+  final state = context.read<FixturesController>();
   final tournament = state.tournamentOf(fixture);
   final sport = tournament?.sport ?? Sport.cricket;
 
@@ -29,6 +30,7 @@ Widget officialFixtureTile(
     homeScore = result.sideScores[0];
     awayScore = result.sideScores[1];
   } else if (fixture.events.isNotEmpty) {
+    final state = context.read<FixturesController>();
     final progress = state.progressOfFixture(fixture);
     if (progress.scoreDisplay.length >= 2) {
       homeScore = progress.scoreDisplay[0];
@@ -93,8 +95,9 @@ Widget personalScorecardTile(
   PersonalMatch match, {
   VoidCallback? onTap,
 }) {
-  final state = context.read<LocalSportikaRepository>();
-  final progress = state.progressOfPersonal(match);
+  final progress = context.read<PersonalGamesController>().progressOfPersonal(
+    match,
+  );
   final completed = match.status == PersonalMatchStatus.completed;
 
   String? homeScore;

@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
@@ -22,15 +24,18 @@ class OrganizerDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final me = state.currentAccount;
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
+    final me = context.read<ProfileController>().currentAccount;
     final mine = state.tournamentsForOrganizer(me?.id);
     final pending = <Entry>[
       for (final t in mine) ...state.pendingEntriesFor(t.id),
     ];
-    final review = state.fixturesAwaitingReview;
-    final disputes = state.myOrganizerDisputes;
-    final live = state.myOrganizerFixtures
+    final review = context.read<FixturesController>().fixturesAwaitingReview;
+    final disputes = context.read<FixturesController>().myOrganizerDisputes;
+    final live = context
+        .read<FixturesController>()
+        .myOrganizerFixtures
         .where((f) => f.status == FixtureStatus.live)
         .toList();
 
@@ -171,7 +176,7 @@ class _PendingEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
     final tournament = state.tournamentById(entry.tournamentId);
 
     return SurfaceCard(
@@ -214,6 +219,7 @@ class _PendingEntryCard extends StatelessWidget {
                   small: true,
                   tone: SportikaColors.mint,
                   onPressed: () {
+                    final state = context.read<TournamentsController>();
                     state.decideEntry(entry.id, approve: true);
                     showSnack(context, '${entry.label} confirmed');
                   },
@@ -226,6 +232,7 @@ class _PendingEntryCard extends StatelessWidget {
                   tone: SportikaColors.danger,
                   expand: true,
                   onPressed: () {
+                    final state = context.read<TournamentsController>();
                     state.decideEntry(
                       entry.id,
                       approve: false,
@@ -250,10 +257,15 @@ class _OrganizerTournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
     final pending = state.pendingEntriesFor(tournament.id).length;
-    final fixtures = state.fixturesFor(tournament.id);
-    final review = state.fixturesAwaitingReview
+    final fixtures = context.read<FixturesController>().fixturesFor(
+      tournament.id,
+    );
+    final review = context
+        .read<FixturesController>()
+        .fixturesAwaitingReview
         .where((f) => f.tournamentId == tournament.id)
         .length;
     final confirmed = state.confirmedCountFor(tournament);
@@ -303,6 +315,7 @@ class _OrganizerTournamentCard extends StatelessWidget {
                 expand: true,
                 onPressed: () async {
                   if (fixtures.isEmpty) {
+                    final state = context.read<TournamentsController>();
                     final count = await state.generateDraw(tournament.id);
                     if (!context.mounted) return;
                     showSnack(
@@ -336,9 +349,9 @@ class _OrganizerDisputeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final tournament = state.tournamentOf(fixture);
-    final sides = state.sideLabelsOf(fixture);
+    context.watch<TournamentsController>();
+    final tournament = context.read<FixturesController>().tournamentOf(fixture);
+    final sides = context.read<FixturesController>().sideLabelsOf(fixture);
 
     return SurfaceCard(
       borderColor: SportikaColors.danger.withValues(alpha: 0.35),
@@ -383,7 +396,7 @@ class _OrganizerDisputeCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Raised by ${state.accountById(fixture.disputeRaisedBy)?.displayName ?? 'player'}'
+            'Raised by ${context.read<SessionController>().accountById(fixture.disputeRaisedBy)?.displayName ?? 'player'}'
             '${fixture.result == null ? '' : ' · published: ${fixture.result!.headline}'}',
             style: const TextStyle(
               fontSize: 10.5,

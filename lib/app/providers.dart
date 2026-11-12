@@ -28,9 +28,7 @@ Widget buildAppProviders({
         create: (_) => NotificationsController(repository),
       ),
       ChangeNotifierProvider(create: (_) => GamesController(repository)),
-      ChangeNotifierProvider(
-        create: (_) => TournamentsController(repository),
-      ),
+      ChangeNotifierProvider(create: (_) => TournamentsController(repository)),
       ChangeNotifierProvider(create: (_) => FixturesController(repository)),
       ChangeNotifierProvider(create: (_) => TeamsController(repository)),
       ChangeNotifierProvider(

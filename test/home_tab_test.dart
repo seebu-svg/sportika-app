@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sportika/app/providers.dart';
 import 'package:sportika/features/home/screens/home_tab.dart';
 import 'package:sportika/shared/data/local_storage.dart';
 import 'package:sportika/core/data/local_sportika_repository.dart';
@@ -21,8 +21,8 @@ void main() {
       await state.load();
       await state.signIn('acc-seebu');
       await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: state,
+        buildAppProviders(
+          repository: state,
           child: MaterialApp(
             theme: buildSportikaTheme(),
             home: const Scaffold(body: HomeTab()),

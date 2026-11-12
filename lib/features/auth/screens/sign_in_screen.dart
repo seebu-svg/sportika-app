@@ -47,7 +47,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<AuthFlowController>();
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<SessionController>();
     final demos = [
       state.accountById('acc-seebu'),
       state.accountById('acc-yasir'),

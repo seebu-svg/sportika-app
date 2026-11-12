@@ -55,7 +55,7 @@ class _SessionVerificationScreenState extends State<SessionVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final flow = context.read<AuthFlowController>();
-    final account = context.watch<LocalSportikaRepository>().currentAccount;
+    final account = context.watch<ProfileController>().currentAccount;
     final name = account?.displayName ?? 'Athlete';
 
     return Scaffold(

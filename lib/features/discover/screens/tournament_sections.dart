@@ -5,7 +5,9 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/tournament_engine.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -19,8 +21,11 @@ class TournamentFixturesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final fixtures = state.fixturesFor(tournament.id);
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
+    final fixtures = context.read<FixturesController>().fixturesFor(
+      tournament.id,
+    );
     if (fixtures.isEmpty) {
       return EmptyState(
         title: tournament.status == TournamentStatus.open
@@ -78,8 +83,8 @@ class TournamentBracket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    if (state.fixturesFor(tournament.id).isEmpty) {
+    context.watch<TournamentsController>();
+    if (context.read<FixturesController>().fixturesFor(tournament.id).isEmpty) {
       return const EmptyState(
         title: 'Nothing to show yet',
         body: 'The bracket or table fills in as soon as the draw is published.',
@@ -101,7 +106,8 @@ class _StandingsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
     final rows = state.standingsFor(tournament);
     if (rows.isEmpty) {
       return const EmptyState(
@@ -266,7 +272,8 @@ class _Bracket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
     final rounds = state.roundsFor(tournament);
 
     return SingleChildScrollView(
@@ -316,8 +323,8 @@ class _BracketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final sides = state.sideLabelsOf(fixture);
+    context.watch<TournamentsController>();
+    final sides = context.read<FixturesController>().sideLabelsOf(fixture);
     final result = fixture.result;
     final winner = result?.winnerIndex ?? -1;
     final scores = result?.sideScores ?? const <String>[];
@@ -405,7 +412,8 @@ class TournamentEntriesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
+    context.watch<TournamentsController>();
     final entries = state.entriesFor(tournament.id);
     if (entries.isEmpty) {
       return const EmptyState(
@@ -511,9 +519,11 @@ class _EntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
     final members = entry.memberAccountIds
-        .map((id) => state.accountById(id)?.displayName)
+        .map(
+          (id) =>
+              context.read<SessionController>().accountById(id)?.displayName,
+        )
         .whereType<String>()
         .toList();
 
@@ -572,6 +582,7 @@ class _EntryCard extends StatelessWidget {
                     small: true,
                     tone: SportikaColors.mint,
                     onPressed: () {
+                      final state = context.read<TournamentsController>();
                       state.decideEntry(entry.id, approve: true);
                       showSnack(context, '${entry.label} confirmed');
                     },
@@ -584,6 +595,7 @@ class _EntryCard extends StatelessWidget {
                     tone: SportikaColors.danger,
                     expand: true,
                     onPressed: () {
+                      final state = context.read<TournamentsController>();
                       state.decideEntry(
                         entry.id,
                         approve: false,

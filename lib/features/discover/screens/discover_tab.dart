@@ -25,7 +25,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<ProfileController>();
     return Column(
       children: [
         TabHeader(
@@ -69,7 +69,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
     );
   }
 
-  Future<void> _showCreateSheet(LocalSportikaRepository state) async {
+  Future<void> _showCreateSheet(ProfileController state) async {
     final me = state.currentAccount;
     await showModalBottomSheet<void>(
       context: context,
@@ -94,7 +94,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
                 pushScreen(context, const CreateGameScreen());
               },
             ),
-            if (state.canOrganize)
+            if (context.read<SessionController>().canOrganize)
               SheetOption(
                 icon: Icons.emoji_events_outlined,
                 title: 'Tournament',

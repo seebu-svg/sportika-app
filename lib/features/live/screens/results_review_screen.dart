@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/core/state/session_controller.dart';
 
 /// The organizer review queue. Nothing here changes a bracket until the
 /// organizer publishes (spec §4.5, §6).
@@ -19,7 +21,7 @@ class ResultsReviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<FixturesController>();
     final submitted = state.fixturesAwaitingReview
         .where((f) => tournamentId == null || f.tournamentId == tournamentId)
         .toList();
@@ -39,7 +41,7 @@ class ResultsReviewScreen extends StatelessWidget {
 
     final tournament = tournamentId == null
         ? null
-        : state.tournamentById(tournamentId!);
+        : context.read<TournamentsController>().tournamentById(tournamentId!);
 
     return Scaffold(
       appBar: sportikaAppBar(
@@ -111,7 +113,7 @@ class _ReviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.read<FixturesController>();
     final progress = state.progressOfFixture(fixture);
     final sides = state.sideLabelsOf(fixture);
     final tournament = state.tournamentOf(fixture);
@@ -159,7 +161,7 @@ class _ReviewItem extends StatelessWidget {
               Text(
                 '${progress.scoreDisplay.length >= 2 ? progress.scoreDisplay.join('  ·  ') : ''}'
                 ' · ${fixture.events.length} entries'
-                ' · submitted by ${state.accountById(fixture.submittedByScorerId)?.displayName ?? 'scorer'}',
+                ' · submitted by ${context.read<SessionController>().accountById(fixture.submittedByScorerId)?.displayName ?? 'scorer'}',
                 style: const TextStyle(
                   fontSize: 11,
                   color: SportikaColors.textMuted,

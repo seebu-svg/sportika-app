@@ -5,7 +5,9 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
@@ -18,11 +20,14 @@ class TeamsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final squads = state.mySquads;
-    final me = state.currentAccount;
+    final state = context.watch<SessionController>();
+    context.watch<SessionController>();
+    final squads = context.read<TeamsController>().mySquads;
+    final me = context.read<ProfileController>().currentAccount;
     final entries =
-        state.entries
+        context
+            .read<TournamentsController>()
+            .entries
             .where(
               (e) =>
                   me != null &&
@@ -94,7 +99,10 @@ class TeamsTab extends StatelessWidget {
     );
   }
 
-  Future<void> _createSquad(BuildContext context, LocalSportikaRepository state) async {
+  Future<void> _createSquad(
+    BuildContext context,
+    SessionController state,
+  ) async {
     final name = TextEditingController();
     var sport = Sport.padel;
     var type = SportEngines.defaultEntryType(sport);
@@ -163,7 +171,7 @@ class TeamsTab extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              for (final player in state.otherPlayers)
+              for (final player in context.read<TeamsController>().otherPlayers)
                 CheckboxListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
@@ -210,8 +218,9 @@ class TeamsTab extends StatelessWidget {
       ),
     );
 
+    if (!context.mounted) return;
     if (created == true && name.text.trim().isNotEmpty) {
-      state.createSquad(
+      context.read<TeamsController>().createSquad(
         name: name.text,
         sport: sport,
         type: type,
@@ -269,7 +278,7 @@ class _SquadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.watch<SessionController>();
     final tone = sportColor(squad.sport);
     final memberNames = squad.memberAccountIds
         .map((id) => state.accountById(id)?.displayName)
@@ -340,7 +349,7 @@ class _SquadCard extends StatelessWidget {
     );
   }
 
-  void _showSquad(BuildContext context, LocalSportikaRepository state, Squad squad) {
+  void _showSquad(BuildContext context, SessionController state, Squad squad) {
     showAppSheet(
       context,
       AppSheet(
@@ -397,8 +406,9 @@ class _SquadCard extends StatelessWidget {
                           size: 17,
                           color: SportikaColors.danger,
                         ),
-                        onPressed: () =>
-                            state.removeSquadMember(squad.id, member),
+                        onPressed: () => context
+                            .read<TeamsController>()
+                            .removeSquadMember(squad.id, member),
                       ),
                   ],
                 ),
@@ -423,8 +433,10 @@ class _EntryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final tournament = state.tournamentById(entry.tournamentId);
+    context.watch<SessionController>();
+    final tournament = context.read<TournamentsController>().tournamentById(
+      entry.tournamentId,
+    );
 
     return SurfaceCard(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),

@@ -7,7 +7,8 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/community_game.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/games_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 
@@ -29,8 +30,10 @@ class _GamesTabState extends State<GamesTab> {
   String myScope = 'All';
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final games = state.games
+    final state = context.watch<ProfileController>();
+    final games = context
+        .read<GamesController>()
+        .games
         .where(
           (g) =>
               (sport == null || g.sport == sport) &&
@@ -429,7 +432,7 @@ class GameDetailScreen extends StatelessWidget {
   final CommunityGame game;
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<ProfileController>();
     final joined = game.members.contains(state.currentAccount?.id);
     return Scaffold(
       appBar: AppBar(title: const Text('Match details')),
@@ -443,7 +446,7 @@ class GameDetailScreen extends StatelessWidget {
           Text(game.description),
           const SizedBox(height: 20),
           Text(
-            'Organizer · ${state.accountById(game.organizerId)?.displayName ?? 'Sportika community'}',
+            'Organizer · ${context.read<SessionController>().accountById(game.organizerId)?.displayName ?? 'Sportika community'}',
           ),
           Text('Visibility · ${game.visibility}'),
           const SizedBox(height: 20),
@@ -455,8 +458,15 @@ class GameDetailScreen extends StatelessWidget {
             ListTile(
               leading: const CircleAvatar(child: Icon(Icons.person_outline)),
               title: Text(
-                state.accountById(game.members[i])?.displayName ??
-                    state.accounts[(i + 1) % state.accounts.length].displayName,
+                context
+                        .read<SessionController>()
+                        .accountById(game.members[i])
+                        ?.displayName ??
+                    context
+                        .read<SessionController>()
+                        .accounts[(i + 1) %
+                            context.read<SessionController>().accounts.length]
+                        .displayName,
               ),
               subtitle: Text(i == 0 ? 'Captain' : 'Confirmed player'),
             ),
@@ -465,7 +475,7 @@ class GameDetailScreen extends StatelessWidget {
             onPressed: !joined && game.full
                 ? null
                 : () {
-                    state.toggleGameJoin(game);
+                    context.read<GamesController>().toggleGameJoin(game);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -638,8 +648,8 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
                 );
                 return;
               }
-              final state = context.read<LocalSportikaRepository>();
-              state.publishGame(
+              final state = context.read<ProfileController>();
+              context.read<GamesController>().publishGame(
                 CommunityGame(
                   id: DateTime.now().microsecondsSinceEpoch.toString(),
                   title: title.text.trim(),

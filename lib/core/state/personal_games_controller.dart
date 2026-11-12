@@ -36,8 +36,7 @@ class PersonalGamesController extends FeatureController {
   }) => repo.updatePersonalDetails(id, details, sides: sides);
   void setPersonalStatus(String id, PersonalMatchStatus status) =>
       repo.setPersonalStatus(id, status);
-  void deletePersonalMatch(String matchId) =>
-      repo.deletePersonalMatch(matchId);
+  void deletePersonalMatch(String matchId) => repo.deletePersonalMatch(matchId);
   MatchProgress progressOfPersonal(PersonalMatch m) =>
       repo.progressOfPersonal(m);
 }

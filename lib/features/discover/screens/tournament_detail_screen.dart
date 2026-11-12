@@ -4,7 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/results_review_screen.dart';
@@ -26,7 +29,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<TournamentsController>();
     final tournament = state.tournamentById(widget.id);
     if (tournament == null) {
       return Scaffold(
@@ -41,13 +44,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       );
     }
 
-    final me = state.currentAccount;
+    final me = context.read<ProfileController>().currentAccount;
     final isOwner = me != null && tournament.organizerId == me.id;
-    final fixtures = state.fixturesFor(tournament.id);
+    final fixtures = context.read<FixturesController>().fixturesFor(
+      tournament.id,
+    );
     final entries = state.entriesFor(tournament.id);
     final pendingEntries = state.pendingEntriesFor(tournament.id);
     final reviewCount = isOwner
-        ? state.fixturesAwaitingReview
+        ? context
+              .read<FixturesController>()
+              .fixturesAwaitingReview
               .where((f) => f.tournamentId == tournament.id)
               .length
         : 0;
@@ -179,7 +186,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               context,
                               ResultsReviewScreen(
                                 tournamentId: tournament.id,
-                                highlightId: state
+                                highlightId: context
+                                    .read<FixturesController>()
                                     .fixturesAwaitingReview
                                     .firstOrNull
                                     ?.id,
@@ -228,7 +236,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
 
   Future<void> _generateDraw(
     BuildContext context,
-    LocalSportikaRepository state,
+    TournamentsController state,
     Tournament tournament,
   ) async {
     final count = await state.generateDraw(tournament.id);
@@ -243,7 +251,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
 
   Future<void> _register(BuildContext context, Tournament tournament) async {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.read<TournamentsController>();
 
     if (tournament.entryType == EntryType.individual) {
       final ok = await showDialog<bool>(
@@ -272,7 +280,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       return;
     }
 
-    final squads = state.squadsFor(tournament.sport, tournament.entryType);
+    final squads = context.read<TeamsController>().squadsFor(
+      tournament.sport,
+      tournament.entryType,
+    );
     String? selected = squads.firstOrNull?.id;
 
     final confirmed = await showModalBottomSheet<bool>(
@@ -338,7 +349,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                                 Text(
                                   squad.memberAccountIds
                                       .map(
-                                        (id) => state
+                                        (id) => context
+                                            .read<SessionController>()
                                             .accountById(id)
                                             ?.displayName
                                             .split(' ')
@@ -398,7 +410,9 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final confirmed = context.watch<LocalSportikaRepository>().confirmedCountFor(tournament);
+    final confirmed = context.watch<TournamentsController>().confirmedCountFor(
+      tournament,
+    );
     final limit = tournament.registrationLimit;
     final fill = limit == 0 ? 0.0 : (confirmed / limit).clamp(0.0, 1.0);
 
@@ -513,7 +527,7 @@ class _MyEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
+    final state = context.read<TournamentsController>();
     final tone = statusColor(entry.status.key);
 
     return SurfaceCard(

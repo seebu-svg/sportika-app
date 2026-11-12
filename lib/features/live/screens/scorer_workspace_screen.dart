@@ -16,7 +16,7 @@ class ScorerWorkspaceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<FixturesController>();
     final assigned = state.myScoringFixtures;
     final inPlay = assigned
         .where((f) => f.status != FixtureStatus.submitted)
@@ -76,7 +76,7 @@ class _ScorerFixtureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<FixturesController>();
     final tournament = state.tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
     final sides = state.sideLabelsOf(fixture);

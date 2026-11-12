@@ -6,7 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/games_controller.dart';
+import 'package:sportika/core/state/personal_games_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -42,20 +46,22 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
-    final me = state.currentAccount;
+    final state = context.watch<FixturesController>();
+    final me = context.read<ProfileController>().currentAccount;
     if (me == null) return const SizedBox.shrink();
 
     bool inSport(Fixture f) =>
         _sport == null || state.tournamentOf(f)?.sport == _sport;
 
-    final resume = state.myPersonalInProgress;
+    final resume = context.read<PersonalGamesController>().myPersonalInProgress;
     final upcoming = state.myFixtures
         .where((f) => f.status == FixtureStatus.upcoming && inSport(f))
         .take(2)
         .toList();
     final live = state.liveFixtures.where(inSport).take(2).toList();
-    final discover = state.liveTournaments
+    final discover = context
+        .read<TournamentsController>()
+        .liveTournaments
         .where(
           (t) =>
               (t.status == TournamentStatus.open ||
@@ -76,7 +82,7 @@ class _HomeTabState extends State<HomeTab> {
         .length;
 
     final tools = [
-      if (state.canOrganize)
+      if (context.read<SessionController>().canOrganize)
         (
           icon: Icons.dashboard_customize_outlined,
           title: 'Organizer dashboard',
@@ -84,7 +90,7 @@ class _HomeTabState extends State<HomeTab> {
           tone: SportikaColors.mint,
           open: () => pushScreen(context, const OrganizerDashboardScreen()),
         ),
-      if (state.hasRole(UserRole.scorer))
+      if (context.read<SessionController>().hasRole(UserRole.scorer))
         (
           icon: Icons.sports_score,
           title: 'Scorer workspace',
@@ -108,7 +114,12 @@ class _HomeTabState extends State<HomeTab> {
               BrandMetricStrip(
                 metrics: [
                   (
-                    value: _pad(state.officialMatchesPlayed().length),
+                    value: _pad(
+                      context
+                          .read<ProfileController>()
+                          .officialMatchesPlayed()
+                          .length,
+                    ),
                     label: 'Matches played',
                   ),
                   (value: _pad(wins), label: 'Victories'),
@@ -262,7 +273,9 @@ class _HomeTabState extends State<HomeTab> {
                 onAction: () => openHomeTab(context, 1),
               ),
               const SizedBox(height: 12),
-              if (!state.games.any((g) => _sport == null || g.sport == _sport))
+              if (!context.read<GamesController>().games.any(
+                (g) => _sport == null || g.sport == _sport,
+              ))
                 const EmptyState(
                   title: 'Find your next game',
                   body: 'New community games will appear here.',
@@ -277,13 +290,20 @@ class _HomeTabState extends State<HomeTab> {
                     pushScreen(context, const NotificationsScreen()),
               ),
               const SizedBox(height: 12),
-              if (state.myNotifications.isEmpty)
+              if (context
+                  .read<NotificationsController>()
+                  .myNotifications
+                  .isEmpty)
                 const EmptyState(
                   title: 'You’re all caught up',
                   body: 'Match updates and community news will appear here.',
                   icon: Icons.check_circle_outline,
                 ),
-              for (final notification in state.myNotifications.take(3))
+              for (final notification
+                  in context
+                      .read<NotificationsController>()
+                      .myNotifications
+                      .take(3))
                 _activity(context, notification),
               if (tools.isNotEmpty) ...[
                 const SizedBox(height: 30),
@@ -658,7 +678,11 @@ class _HomeTabState extends State<HomeTab> {
 
   // --------------------------------------------------------------- fixture --
 
-  Widget _upcomingMatch(BuildContext context, LocalSportikaRepository state, Fixture fixture) {
+  Widget _upcomingMatch(
+    BuildContext context,
+    FixturesController state,
+    Fixture fixture,
+  ) {
     final tournament = state.tournamentOf(fixture);
     final sport = tournament?.sport ?? Sport.cricket;
     final venue = [
@@ -775,7 +799,11 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Broadcast-style scoreboard: dark floor, big condensed numerals, one
   /// live indicator and the situation label the scoring engine provides.
-  Widget _liveScore(BuildContext context, LocalSportikaRepository state, Fixture fixture) {
+  Widget _liveScore(
+    BuildContext context,
+    FixturesController state,
+    Fixture fixture,
+  ) {
     final progress = state.progressOfFixture(fixture);
     final home = progress.scoreDisplay.isNotEmpty
         ? progress.scoreDisplay[0]
@@ -935,10 +963,12 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _discoverCard(
     BuildContext context,
-    LocalSportikaRepository state,
+    FixturesController state,
     Tournament tournament,
   ) {
-    final confirmed = state.confirmedCountFor(tournament);
+    final confirmed = context.read<TournamentsController>().confirmedCountFor(
+      tournament,
+    );
     final left = (tournament.registrationLimit - confirmed).clamp(0, 999);
 
     return _surface(
@@ -1065,8 +1095,10 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Horizontal, image-backed discovery cards - photography first, one line
   /// of condensed title and the availability state.
-  Widget _gameRail(BuildContext context, LocalSportikaRepository state) {
-    final games = state.games
+  Widget _gameRail(BuildContext context, FixturesController state) {
+    final games = context
+        .read<GamesController>()
+        .games
         .where((g) => _sport == null || g.sport == _sport)
         .take(6)
         .toList();
@@ -1384,10 +1416,12 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   /// Index of the side the signed-in account plays for, or -1.
-  int _mySide(LocalSportikaRepository state, Fixture fixture) {
-    final me = state.currentAccount?.id;
+  int _mySide(FixturesController state, Fixture fixture) {
+    final me = context.read<ProfileController>().currentAccount?.id;
     if (me == null) return -1;
-    final myEntryIds = state.entries
+    final myEntryIds = context
+        .read<TournamentsController>()
+        .entries
         .where((e) => e.memberAccountIds.contains(me))
         .map((e) => e.id)
         .toSet();

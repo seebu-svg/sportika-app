@@ -5,7 +5,9 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
-import 'package:sportika/core/data/local_sportika_repository.dart';
+import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -21,7 +23,8 @@ class FixtureDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<LocalSportikaRepository>();
+    final state = context.watch<FixturesController>();
+    context.watch<FixturesController>();
     final fixture = state.fixtureById(fixtureId);
     if (fixture == null) {
       return Scaffold(
@@ -38,7 +41,7 @@ class FixtureDetailScreen extends StatelessWidget {
     final progress = state.progressOfFixture(fixture);
     final result = fixture.result;
     final sides = state.sideLabelsOf(fixture);
-    final me = state.currentAccount;
+    final me = context.read<ProfileController>().currentAccount;
     final isOrganizer = tournament != null && tournament.organizerId == me?.id;
     final isScorer = me != null && fixture.scorerAccountIds.contains(me.id);
     final locked =
@@ -54,7 +57,10 @@ class FixtureDetailScreen extends StatelessWidget {
     final headline = result?.headline ?? progress.headline;
 
     final scorerNames = fixture.scorerAccountIds
-        .map((id) => state.accountById(id)?.displayName)
+        .map(
+          (id) =>
+              context.read<SessionController>().accountById(id)?.displayName,
+        )
         .whereType<String>()
         .toList();
 
@@ -174,9 +180,9 @@ class FixtureDetailScreen extends StatelessWidget {
             _DisputeCard(
               fixture: fixture,
               canResolve:
-                  state.canOrganize &&
+                  context.read<SessionController>().canOrganize &&
                   state.tournamentOf(fixture)?.organizerId ==
-                      state.currentAccount?.id,
+                      context.read<ProfileController>().currentAccount?.id,
               sides: sides,
             ),
           ],
@@ -244,7 +250,11 @@ class FixtureDetailScreen extends StatelessWidget {
           ],
           if (locked &&
               me != null &&
-              _isParticipant(state, fixture, me.id)) ...[
+              _isParticipant(
+                context.read<TournamentsController>(),
+                fixture,
+                me.id,
+              )) ...[
             const SizedBox(height: 10),
             GhostButton(
               label: 'Dispute this result',
@@ -296,7 +306,7 @@ class FixtureDetailScreen extends StatelessWidget {
                   KeyValueRow(
                     'Published',
                     '${timeAgo(result.publishedAt)} by '
-                        '${state.accountById(result.publishedById)?.displayName ?? 'organizer'}',
+                        '${context.read<SessionController>().accountById(result.publishedById)?.displayName ?? 'organizer'}',
                   ),
                 ],
               ),
@@ -343,7 +353,7 @@ class FixtureDetailScreen extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         '${timeAgo(correction.at)} · '
-                        '${state.accountById(correction.byAccountId)?.displayName ?? 'organizer'}',
+                        '${context.read<SessionController>().accountById(correction.byAccountId)?.displayName ?? 'organizer'}',
                         style: const TextStyle(
                           fontSize: 10.5,
                           color: SportikaColors.textDim,
@@ -374,12 +384,12 @@ class FixtureDetailScreen extends StatelessWidget {
   }
 
   static bool _isParticipant(
-    LocalSportikaRepository state,
+    TournamentsController tournaments,
     Fixture fixture,
     String accountId,
   ) {
-    final home = state.entriesById[fixture.home.entryId];
-    final away = state.entriesById[fixture.away.entryId];
+    final home = tournaments.entriesById[fixture.home.entryId];
+    final away = tournaments.entriesById[fixture.away.entryId];
     return (home?.memberAccountIds.contains(accountId) ?? false) ||
         (away?.memberAccountIds.contains(accountId) ?? false);
   }
@@ -453,7 +463,6 @@ class _DisputeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<LocalSportikaRepository>();
     final resolved = fixture.disputeResolved;
 
     return SurfaceCard(
@@ -503,7 +512,7 @@ class _DisputeCard extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            'Raised by ${state.accountById(fixture.disputeRaisedBy)?.displayName ?? 'player'}',
+            'Raised by ${context.read<SessionController>().accountById(fixture.disputeRaisedBy)?.displayName ?? 'player'}',
             style: const TextStyle(
               fontSize: 10.5,
               color: SportikaColors.textDim,
@@ -531,14 +540,18 @@ class _Roster extends StatelessWidget {
     required this.sides,
   });
 
-  final LocalSportikaRepository state;
+  final FixturesController state;
   final Fixture fixture;
   final List<String> sides;
 
   @override
   Widget build(BuildContext context) {
-    final home = state.entriesById[fixture.home.entryId];
-    final away = state.entriesById[fixture.away.entryId];
+    final home = context
+        .read<TournamentsController>()
+        .entriesById[fixture.home.entryId];
+    final away = context
+        .read<TournamentsController>()
+        .entriesById[fixture.away.entryId];
 
     if (home == null && away == null) {
       return const EmptyState(
@@ -567,7 +580,7 @@ class _EntryRoster extends StatelessWidget {
 
   final String label;
   final Entry? entry;
-  final LocalSportikaRepository state;
+  final FixturesController state;
 
   @override
   Widget build(BuildContext context) {
@@ -606,7 +619,12 @@ class _EntryRoster extends StatelessWidget {
               children: [
                 for (final memberId in entry.memberAccountIds)
                   _MemberChip(
-                    name: state.accountById(memberId)?.displayName ?? 'Player',
+                    name:
+                        context
+                            .read<SessionController>()
+                            .accountById(memberId)
+                            ?.displayName ??
+                        'Player',
                   ),
               ],
             ),
