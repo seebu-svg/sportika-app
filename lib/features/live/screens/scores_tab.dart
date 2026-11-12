@@ -7,6 +7,7 @@ import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/app/routes.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 class ScoresTab extends StatefulWidget {
   const ScoresTab({super.key});
@@ -38,15 +39,16 @@ class _ScoresTabState extends State<ScoresTab> {
           ],
         ),
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Live Scores')),
-              ButtonSegment(value: 1, label: Text('Results')),
-              ButtonSegment(value: 2, label: Text('Personal')),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          child: FilterChipRow<int>(
+            label: 'Scores section',
+            selected: tab,
+            onChanged: (v) => setState(() => tab = v),
+            choices: const [
+              FilterChoice(0, 'Live Scores'),
+              FilterChoice(1, 'Results'),
+              FilterChoice(2, 'Personal'),
             ],
-            selected: {tab},
-            onSelectionChanged: (v) => setState(() => tab = v.first),
           ),
         ),
         if (tab != 2)

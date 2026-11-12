@@ -14,6 +14,7 @@ import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 /// All routes here resolve only the signed-in account's private scorecard.
 PersonalMatch? privateMatch(BuildContext context, String id) {
@@ -217,15 +218,15 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
               ),
             if (racket) ...[
               const SectionTitle('Discipline'),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'singles', label: Text('Singles')),
-                  ButtonSegment(value: 'doubles', label: Text('Doubles')),
+              FilterChipRow<String>(
+                label: 'Discipline',
+                selected: discipline,
+                enabled: !locked,
+                onChanged: (v) => setState(() => discipline = v),
+                choices: const [
+                  FilterChoice('singles', 'Singles'),
+                  FilterChoice('doubles', 'Doubles'),
                 ],
-                selected: {discipline},
-                onSelectionChanged: locked
-                    ? null
-                    : (v) => setState(() => discipline = v.first),
               ),
               const SizedBox(height: 12),
               if (m.sport == Sport.padel)
@@ -245,15 +246,15 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
                 onChanged: locked ? null : (v) => setState(() => toss = v!),
               ),
               const SizedBox(height: 12),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'bat', label: Text('Bat first')),
-                  ButtonSegment(value: 'bowl', label: Text('Bowl first')),
+              FilterChipRow<String>(
+                label: 'Toss decision',
+                selected: decision,
+                enabled: !locked,
+                onChanged: (v) => setState(() => decision = v),
+                choices: const [
+                  FilterChoice('bat', 'Bat first'),
+                  FilterChoice('bowl', 'Bowl first'),
                 ],
-                selected: {decision},
-                onSelectionChanged: locked
-                    ? null
-                    : (v) => setState(() => decision = v.first),
               ),
               const SizedBox(height: 12),
             ],

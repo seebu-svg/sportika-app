@@ -11,6 +11,7 @@ import 'package:sportika/core/state/games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/app/routes.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 /// Games board for the Discover tab: pickup matches you can find or manage.
 class GamesTab extends StatefulWidget {
@@ -65,32 +66,28 @@ class _GamesTabState extends State<GamesTab> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: SegmentedButton<int>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-              textStyle: const TextStyle(fontSize: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-            ),
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Find Games')),
-              ButtonSegment(value: 1, label: Text('My Games')),
+          child: FilterChipRow<int>(
+            label: 'Game list',
+            selected: tab,
+            onChanged: (v) => setState(() => tab = v),
+            choices: const [
+              FilterChoice(0, 'Find Games'),
+              FilterChoice(1, 'My Games'),
             ],
-            selected: {tab},
-            onSelectionChanged: (v) => setState(() => tab = v.first),
           ),
         ),
         if (tab == 1)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                for (final scope in ['All', 'Joined', 'Organized'])
-                  ChoiceChip(
-                    label: Text(scope),
-                    selected: myScope == scope,
-                    onSelected: (_) => setState(() => myScope = scope),
-                  ),
+            padding: const EdgeInsets.only(top: 4),
+            child: FilterChipRow<String>(
+              label: 'My games filter',
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              selected: myScope,
+              onChanged: (v) => setState(() => myScope = v),
+              choices: const [
+                FilterChoice('All', 'All'),
+                FilterChoice('Joined', 'Joined'),
+                FilterChoice('Organized', 'Organized'),
               ],
             ),
           ),

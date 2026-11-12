@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:sportika/features/personal_games/scoring/engine.dart'
     as scoring;
+import 'package:sportika/shared/theme/typography.dart';
 
 /// Sportika design tokens - layered navy surfaces with athletic accents. Accent roles stay disciplined: blue for action, mint for
 /// live/active, gold for achievement, and navy for hero surfaces.
@@ -54,6 +55,28 @@ class SportikaSpacing {
   static const double md = 14;
   static const double lg = 20;
   static const double xl = 28;
+}
+
+/// Corner radii. Anything below [pill] must match a real container; [pill] is
+/// the fully rounded chip/avatar shape.
+class SportikaRadius {
+  SportikaRadius._();
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 24;
+  static const double pill = 999;
+}
+
+/// Shared motion vocabulary so transitions feel like one product.
+class SportikaMotion {
+  SportikaMotion._();
+  static const Duration fast = Duration(milliseconds: 120);
+  static const Duration base = Duration(milliseconds: 220);
+  static const Duration slow = Duration(milliseconds: 380);
+  static const Curve standard = Curves.easeOutCubic;
+  static const Curve emphasized = Curves.easeInOutCubicEmphasized;
+  static const Curve exit = Curves.easeInCubic;
 }
 
 /// Maps a scoring engine action style onto brand colours.
@@ -202,11 +225,7 @@ ThemeData buildSportikaTheme() {
             letterSpacing: -0.5,
             color: SportikaColors.text,
           ),
-          titleLarge: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 19,
-            color: SportikaColors.text,
-          ),
+          titleLarge: SportikaType.headline,
           titleMedium: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 15.5,
@@ -221,12 +240,7 @@ ThemeData buildSportikaTheme() {
             color: SportikaColors.textMuted,
             height: 1.3,
           ),
-          labelSmall: const TextStyle(
-            color: SportikaColors.textDim,
-            fontSize: 10.5,
-            letterSpacing: 1.1,
-            fontWeight: FontWeight.w700,
-          ),
+          labelSmall: SportikaType.label,
         ),
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: SportikaColors.deepest,

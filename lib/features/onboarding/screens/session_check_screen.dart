@@ -84,106 +84,129 @@ class _SessionVerificationScreenState extends State<SessionVerificationScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(26, 12, 26, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const BrandMark(size: 26),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'SPORTIKA',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.6,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'SESSION',
-                        style: authDisplay(
-                          10,
-                          color: SportikaColors.mint,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Center(
-                    child: Column(
-                      children: [
-                        AuthAvatar(
-                          initials: _initials(name),
-                          avatarId: account?.avatar ?? 'midnight',
-                          size: 86,
-                        ),
-                        const SizedBox(height: 22),
-                        const AuthEyebrow('SESSION FOUND'),
-                        const SizedBox(height: 12),
-                        AuthHeadline(
-                          'WELCOME BACK,',
-                          accent:
-                              '${name.split(RegExp(r'\s+')).first.toUpperCase()}.',
-                          size: 38,
-                        ),
-                        const SizedBox(height: 12),
-                        AuthLead(
-                          'Signing you back in as $name. Nothing to type.',
-                          maxWidth: 280,
-                        ),
-                      ],
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: SportikaColors.surface.withValues(alpha: .62),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: SportikaColors.borderSubtle),
-                    ),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < _steps.length; i++)
-                          _StepLine(
-                            label: _steps[i],
-                            state: i < _step
-                                ? _StepState.done
-                                : i == _step
-                                ? _StepState.active
-                                : _StepState.waiting,
-                          ),
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: 1),
-                            duration: const Duration(milliseconds: 1650),
-                            curve: Curves.easeInOutCubic,
-                            builder: (context, value, _) =>
-                                LinearProgressIndicator(
-                                  value: value,
-                                  minHeight: 2.5,
-                                  backgroundColor: SportikaColors.border,
-                                  valueColor: const AlwaysStoppedAnimation(
-                                    SportikaColors.mint,
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const BrandMark(size: 26),
+                              const SizedBox(width: 10),
+                              const Flexible(
+                                child: Text(
+                                  'SPORTIKA',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2.6,
                                   ),
                                 ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'SESSION',
+                                style: authDisplay(
+                                  10,
+                                  color: SportikaColors.mint,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const Spacer(),
+                          Center(
+                            child: Column(
+                              children: [
+                                AuthAvatar(
+                                  initials: _initials(name),
+                                  avatarId: account?.avatar ?? 'midnight',
+                                  size: 86,
+                                ),
+                                const SizedBox(height: 22),
+                                const AuthEyebrow('SESSION FOUND'),
+                                const SizedBox(height: 12),
+                                AuthHeadline(
+                                  'WELCOME BACK,',
+                                  accent:
+                                      '${name.split(RegExp(r'\s+')).first.toUpperCase()}.',
+                                  size: 38,
+                                ),
+                                const SizedBox(height: 12),
+                                AuthLead(
+                                  'Signing you back in as $name. Nothing to type.',
+                                  maxWidth: 280,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: SportikaColors.surface.withValues(
+                                alpha: .62,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: SportikaColors.borderSubtle,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                for (var i = 0; i < _steps.length; i++)
+                                  _StepLine(
+                                    label: _steps[i],
+                                    state: i < _step
+                                        ? _StepState.done
+                                        : i == _step
+                                        ? _StepState.active
+                                        : _StepState.waiting,
+                                  ),
+                                const SizedBox(height: 10),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: TweenAnimationBuilder<double>(
+                                    tween: Tween(begin: 0, end: 1),
+                                    duration: const Duration(
+                                      milliseconds: 1650,
+                                    ),
+                                    curve: Curves.easeInOutCubic,
+                                    builder: (context, value, _) =>
+                                        LinearProgressIndicator(
+                                          value: value,
+                                          minHeight: 2.5,
+                                          backgroundColor:
+                                              SportikaColors.border,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation(
+                                                SportikaColors.mint,
+                                              ),
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          AuthAction(
+                            label: 'NOT YOU? SWITCH ACCOUNT',
+                            ghost: true,
+                            icon: Icons.swap_horiz,
+                            onPressed: flow.cancelSession,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  AuthAction(
-                    label: 'NOT YOU? SWITCH ACCOUNT',
-                    ghost: true,
-                    icon: Icons.swap_horiz,
-                    onPressed: flow.cancelSession,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

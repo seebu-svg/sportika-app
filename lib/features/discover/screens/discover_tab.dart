@@ -6,6 +6,7 @@ import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
 import 'package:sportika/features/discover/screens/games_tab.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/features/discover/screens/players_tab.dart';
@@ -43,19 +44,15 @@ class _DiscoverTabState extends State<DiscoverTab> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
-          child: SegmentedButton<int>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-              textStyle: const TextStyle(fontSize: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            segments: const [
-              ButtonSegment(value: 0, label: Text('Games')),
-              ButtonSegment(value: 1, label: Text('Tournaments')),
-              ButtonSegment(value: 2, label: Text('Players')),
+          child: FilterChipRow<int>(
+            label: 'Discover section',
+            selected: _segment,
+            onChanged: (v) => setState(() => _segment = v),
+            choices: const [
+              FilterChoice(0, 'Games'),
+              FilterChoice(1, 'Tournaments'),
+              FilterChoice(2, 'Players'),
             ],
-            selected: {_segment},
-            onSelectionChanged: (v) => setState(() => _segment = v.first),
           ),
         ),
         Expanded(

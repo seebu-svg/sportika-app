@@ -27,13 +27,19 @@ Future<LocalSportikaRepository> freshState({bool onboardingSeen = true}) async {
 }
 
 /// Pumps the real app at a phone-sized surface and resolves the splash.
+///
+/// [textScale] drives the platform text scale factor so the layout matrix can
+/// exercise the 1.3 ceiling the app clamps to.
 Future<LocalSportikaRepository> pumpApp(
   WidgetTester tester, {
   LocalSportikaRepository? state,
   Size size = const Size(400, 844),
+  double textScale = 1.0,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   final appState = state ?? await freshState();
   await tester.pumpWidget(
     ChangeNotifierProvider<LocalSportikaRepository>.value(

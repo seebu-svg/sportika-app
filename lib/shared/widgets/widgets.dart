@@ -4,6 +4,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 /// Brand tint per sport, used consistently across cards, chips and charts.
 Color sportColor(Sport sport) => switch (sport) {
@@ -997,6 +998,8 @@ class TabHeader extends StatelessWidget {
 }
 
 /// Horizontal sport filter shared by Home, Match Center and Tournaments.
+/// Delegates to [FilterChipRow] so every sport filter in the app has the same
+/// 48 dp targets and scroll behaviour.
 class SportFilterBar extends StatelessWidget {
   const SportFilterBar({
     super.key,
@@ -1009,54 +1012,10 @@ class SportFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: [
-          _chip('All sports', null),
-          for (final s in Sport.values) _chip(s.label, s),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(String label, Sport? sport) {
-    final active = selected == sport;
-    const tone = SportikaColors.mint;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: active
-            ? tone.withValues(alpha: 0.18)
-            : SportikaColors.surfaceSunken,
-        borderRadius: BorderRadius.circular(999),
-        child: InkWell(
-          onTap: () => onChanged(sport),
-          borderRadius: BorderRadius.circular(999),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: active
-                    ? tone.withValues(alpha: 0.6)
-                    : SportikaColors.border,
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: active ? tone : SportikaColors.textBody,
-              ),
-            ),
-          ),
-        ),
-      ),
+    return SportFilterRow(
+      selected: selected,
+      onChanged: onChanged,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
     );
   }
 }
