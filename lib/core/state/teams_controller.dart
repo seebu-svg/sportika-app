@@ -13,6 +13,8 @@ class TeamsController extends FeatureController<TeamRepository> {
       repo.squadsFor(sport, type);
   List<Squad> squadsOf(String accountId) => repo.squadsOf(accountId);
 
+  String? get currentAccountId => repo.currentAccountId;
+
   List<Account> get accounts => repo.accounts;
   List<Account> get otherPlayers => repo.otherPlayers;
 
@@ -32,4 +34,43 @@ class TeamsController extends FeatureController<TeamRepository> {
       repo.addSquadMember(squadId, accountId);
   void removeSquadMember(String squadId, String accountId) =>
       repo.removeSquadMember(squadId, accountId);
+
+  Squad? squadById(String id) => repo.squadById(id);
+
+  /// Squads this account has been invited to and has not answered yet.
+  List<Squad> get myInvites {
+    final me = repo.currentAccountId;
+    if (me == null) return const [];
+    return repo.squads.where((s) => s.invitedAccountIds.contains(me)).toList();
+  }
+
+  void invite(String squadId, String accountId) =>
+      repo.inviteToSquad(squadId, accountId);
+  void cancelInvite(String squadId, String accountId) =>
+      repo.cancelSquadInvite(squadId, accountId);
+  void respondToInvite(String squadId, {required bool accept}) {
+    final me = repo.currentAccountId;
+    if (me == null) return;
+    repo.respondToSquadInvite(squadId, me, accept: accept);
+  }
+
+  void transferCaptain(String squadId, String accountId) =>
+      repo.transferCaptain(squadId, accountId);
+  void leaveSquad(String squadId) => repo.leaveSquad(squadId);
+  void deleteSquad(String squadId) => repo.deleteSquad(squadId);
+
+  /// Players who are not on [squadId], filtered by a search term.
+  List<Account> inviteCandidates(String squadId, String query) {
+    final squad = repo.squadById(squadId);
+    final known = {...?squad?.memberAccountIds, ...?squad?.invitedAccountIds};
+    final term = query.trim().toLowerCase();
+    return repo.accounts
+        .where((a) => !known.contains(a.id))
+        .where(
+          (a) =>
+              term.isEmpty ||
+              '${a.displayName} ${a.city}'.toLowerCase().contains(term),
+        )
+        .toList();
+  }
 }

@@ -109,6 +109,10 @@ class Squad {
   final Sport sport;
   final EntryType type;
   List<String> memberAccountIds;
+
+  /// Players invited but not yet in [memberAccountIds]. Persisted so an invite
+  /// survives a restart while it waits for the other player.
+  final List<String> invitedAccountIds;
   final DateTime createdAt;
 
   Squad({
@@ -118,8 +122,13 @@ class Squad {
     required this.sport,
     required this.type,
     required this.memberAccountIds,
+    List<String>? invitedAccountIds,
     required this.createdAt,
-  });
+  }) : invitedAccountIds = invitedAccountIds ?? [];
+
+  String get captainId => ownerId;
+
+  int get size => memberAccountIds.length;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -128,6 +137,7 @@ class Squad {
     'sport': sport.key,
     'type': type.key,
     'memberAccountIds': memberAccountIds,
+    'invitedAccountIds': invitedAccountIds,
     'createdAt': createdAt.toIso8601String(),
   };
 
@@ -138,6 +148,9 @@ class Squad {
     sport: SportX.fromKey(j['sport'] as String),
     type: EntryTypeX.fromKey(j['type'] as String),
     memberAccountIds: (j['memberAccountIds'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    invitedAccountIds: (j['invitedAccountIds'] as List<dynamic>? ?? [])
         .map((e) => e as String)
         .toList(),
     createdAt: DateTime.parse(j['createdAt'] as String),

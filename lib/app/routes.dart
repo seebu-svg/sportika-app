@@ -12,6 +12,8 @@ import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
 import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
+import 'package:sportika/features/teams/screens/create_team_screen.dart';
+import 'package:sportika/features/teams/screens/team_detail_screen.dart';
 import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
 import 'package:sportika/shared/models/community_game.dart';
 import 'package:sportika/shared/theme/theme.dart';
@@ -26,6 +28,9 @@ abstract final class AppRoute {
   static const String notifications = '/notifications';
   static const String editProfile = '/me/edit';
   static const String matchHistory = '/me/history';
+
+  static const String teamDetail = '/team/detail';
+  static const String createTeam = '/team/create';
 
   static const String createGame = '/discover/games/create';
   static const String gameDetail = '/discover/games/detail';
@@ -56,6 +61,14 @@ class FixtureDetailArgs {
   const FixtureDetailArgs(this.fixtureId);
 
   final String fixtureId;
+}
+
+/// Arguments for [AppRoute.teamDetail].
+@immutable
+class TeamDetailArgs {
+  const TeamDetailArgs(this.squadId);
+
+  final String squadId;
 }
 
 /// Arguments for [AppRoute.gameDetail].
@@ -95,6 +108,11 @@ Widget Function(Object? args) _builderFor(String name) {
       return (_) => const EditProfileScreen();
     case AppRoute.matchHistory:
       return (_) => const MatchHistoryScreen();
+    case AppRoute.teamDetail:
+      return (args) =>
+          TeamDetailScreen(squadId: (args as TeamDetailArgs).squadId);
+    case AppRoute.createTeam:
+      return (_) => const CreateTeamScreen();
     case AppRoute.createGame:
       return (_) => const CreateGameScreen();
     case AppRoute.gameDetail:

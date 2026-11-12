@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
@@ -38,6 +37,7 @@ class TeamsTab extends StatelessWidget {
     final players = state.accounts
         .where((a) => a.has(UserRole.player))
         .toList();
+    final invites = context.read<TeamsController>().myInvites;
 
     return Column(
       children: [
@@ -51,11 +51,19 @@ class TeamsTab extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             children: [
+              if (invites.isNotEmpty) ...[
+                const SectionTitle('Invitations'),
+                for (final invite in invites)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _InviteCard(squad: invite),
+                  ),
+              ],
               PrimaryButton(
                 label: 'Create a team or pair',
                 icon: Icons.group_add_outlined,
                 tone: SportikaColors.mint,
-                onPressed: () => _createSquad(context, state),
+                onPressed: () => pushRoute(context, AppRoute.createTeam),
               ),
               const SectionTitle('My squads'),
               if (squads.isEmpty)
@@ -97,177 +105,6 @@ class TeamsTab extends StatelessWidget {
       ],
     );
   }
-
-  Future<void> _createSquad(
-    BuildContext context,
-    SessionController state,
-  ) async {
-    final name = TextEditingController();
-    var sport = Sport.padel;
-    var type = SportEngines.defaultEntryType(sport);
-    final members = <String>{};
-
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: SportikaColors.surfaceElevated,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => AppSheet(
-          title: 'New squad',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Squad name',
-                  hintText: 'e.g. Karachi Strikers',
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  for (final s in Sport.values)
-                    _PickChip(
-                      label: s.label,
-                      active: s == sport,
-                      tone: sportColor(s),
-                      onTap: () => setSheetState(() {
-                        sport = s;
-                        type = SportEngines.defaultEntryType(s);
-                      }),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 7,
-                children: [
-                  for (final t in EntryType.values)
-                    _PickChip(
-                      label: t.label,
-                      active: t == type,
-                      tone: SportikaColors.blueBright,
-                      onTap: () => setSheetState(() => type = t),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'INVITE PLAYERS',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w800,
-                  color: SportikaColors.textDim,
-                ),
-              ),
-              const SizedBox(height: 6),
-              for (final player in context.read<TeamsController>().otherPlayers)
-                CheckboxListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: members.contains(player.id),
-                  activeColor: SportikaColors.mint,
-                  title: Text(
-                    player.displayName,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: SportikaColors.text,
-                    ),
-                  ),
-                  subtitle: Text(
-                    player.city,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: SportikaColors.textDim,
-                    ),
-                  ),
-                  onChanged: (checked) => setSheetState(() {
-                    if (checked == true) {
-                      members.add(player.id);
-                    } else {
-                      members.remove(player.id);
-                    }
-                  }),
-                ),
-              const SizedBox(height: 12),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: name,
-                builder: (_, value, _) => PrimaryButton(
-                  label: 'Create squad',
-                  icon: Icons.check,
-                  tone: SportikaColors.mint,
-                  onPressed: value.text.trim().isEmpty
-                      ? null
-                      : () => Navigator.pop(sheetContext, true),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (!context.mounted) return;
-    if (created == true && name.text.trim().isNotEmpty) {
-      context.read<TeamsController>().createSquad(
-        name: name.text,
-        sport: sport,
-        type: type,
-        memberIds: members.toList(),
-      );
-      if (context.mounted) showSnack(context, '${name.text.trim()} created');
-    }
-    name.dispose();
-  }
-}
-
-class _PickChip extends StatelessWidget {
-  const _PickChip({
-    required this.label,
-    required this.active,
-    required this.tone,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool active;
-  final Color tone;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: active
-              ? tone.withValues(alpha: 0.16)
-              : SportikaColors.surfaceSunken,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: active ? tone : SportikaColors.border),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: active ? tone : SportikaColors.textBody,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _SquadCard extends StatelessWidget {
@@ -285,7 +122,11 @@ class _SquadCard extends StatelessWidget {
         .toList();
 
     return SurfaceCard(
-      onTap: () => _showSquad(context, state, squad),
+      onTap: () => pushRoute(
+        context,
+        AppRoute.teamDetail,
+        args: TeamDetailArgs(squad.id),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -344,82 +185,6 @@ class _SquadCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  void _showSquad(BuildContext context, SessionController state, Squad squad) {
-    showAppSheet(
-      context,
-      AppSheet(
-        title: squad.name,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                SportTag(squad.sport),
-                const SizedBox(width: 8),
-                Text(
-                  squad.type.label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: SportikaColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            for (final member in squad.memberAccountIds)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    AccountAvatar(
-                      account:
-                          state.accountById(member) ??
-                          Account(
-                            id: member,
-                            displayName: 'Player',
-                            email: '',
-                            city: '',
-                            roles: const [],
-                          ),
-                      size: 30,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        state.accountById(member)?.displayName ?? 'Player',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: SportikaColors.text,
-                        ),
-                      ),
-                    ),
-                    if (member != squad.ownerId)
-                      IconButton(
-                        icon: const Icon(
-                          Icons.person_remove_outlined,
-                          size: 17,
-                          color: SportikaColors.danger,
-                        ),
-                        onPressed: () => context
-                            .read<TeamsController>()
-                            .removeSquadMember(squad.id, member),
-                      ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 6),
-            InfoBanner(
-              text:
-                  'Enter a ${squad.sport.label} tournament from the Tournaments tab and '
-                  'pick ${squad.name} as your entry.',
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -536,4 +301,76 @@ class TeamsScreen extends StatelessWidget {
     appBar: AppBar(title: const Text('My teams')),
     body: const TeamsTab(),
   );
+}
+
+/// A squad that invited the current account, with the two answers available
+/// straight from the Team tab.
+class _InviteCard extends StatelessWidget {
+  const _InviteCard({required this.squad});
+
+  final Squad squad;
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = context.read<TeamsController>();
+    final captain = context.read<SessionController>().accountById(
+      squad.ownerId,
+    );
+    return SurfaceCard(
+      borderColor: SportikaColors.gold.withValues(alpha: .35),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SportTag(squad.sport, compact: true),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  squad.name,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: SportikaColors.text,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            captain == null
+                ? 'Invitation pending'
+                : '${captain.displayName} invited you',
+            style: const TextStyle(
+              fontSize: 11.5,
+              color: SportikaColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              GhostButton(
+                label: 'Decline',
+                onPressed: () => teams.respondToInvite(squad.id, accept: false),
+              ),
+              const SizedBox(width: 8),
+              GhostButton(
+                label: 'Join squad',
+                icon: Icons.check,
+                tone: SportikaColors.mint,
+                onPressed: () {
+                  teams.respondToInvite(squad.id, accept: true);
+                  showSnack(context, 'Joined ${squad.name}');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

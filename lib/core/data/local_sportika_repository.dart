@@ -610,6 +610,83 @@ class LocalSportikaRepository extends ChangeNotifier
     _commit();
   }
 
+  Squad? squadById(String id) => squads.where((s) => s.id == id).firstOrNull;
+
+  String? get currentAccountId => currentAccount?.id;
+
+  /// Invites a player. The invite is persisted separately from membership so
+  /// the captain can see who has not answered yet.
+  void inviteToSquad(String squadId, String accountId) {
+    final s = squadById(squadId);
+    if (s == null || s.memberAccountIds.contains(accountId)) return;
+    if (s.invitedAccountIds.contains(accountId)) return;
+    s.invitedAccountIds.add(accountId);
+    _commit();
+  }
+
+  void cancelSquadInvite(String squadId, String accountId) {
+    final s = squadById(squadId);
+    if (s == null) return;
+    s.invitedAccountIds.remove(accountId);
+    _commit();
+  }
+
+  /// Answers an invite addressed to [accountId]. Accepting joins the roster.
+  void respondToSquadInvite(
+    String squadId,
+    String accountId, {
+    required bool accept,
+  }) {
+    final s = squadById(squadId);
+    if (s == null || !s.invitedAccountIds.contains(accountId)) return;
+    s.invitedAccountIds.remove(accountId);
+    if (accept && !s.memberAccountIds.contains(accountId)) {
+      s.memberAccountIds.add(accountId);
+    }
+    _commit();
+  }
+
+  /// Hands the captaincy over; the old captain stays on the roster.
+  void transferCaptain(String squadId, String accountId) {
+    final s = squadById(squadId);
+    if (s == null || !s.memberAccountIds.contains(accountId)) return;
+    final index = squads.indexOf(s);
+    squads[index] = Squad(
+      id: s.id,
+      ownerId: accountId,
+      name: s.name,
+      sport: s.sport,
+      type: s.type,
+      memberAccountIds: s.memberAccountIds,
+      invitedAccountIds: s.invitedAccountIds,
+      createdAt: s.createdAt,
+    );
+    _commit();
+  }
+
+  /// Removes the current account from the roster. A captain cannot leave while
+  /// other members remain: the squad would be unmanageable.
+  void leaveSquad(String squadId) {
+    final me = currentAccount;
+    final s = squadById(squadId);
+    if (me == null || s == null) return;
+    if (s.ownerId == me.id && s.memberAccountIds.length > 1) {
+      throw StateError('Transfer the captaincy before leaving this squad');
+    }
+    s.memberAccountIds.remove(me.id);
+    s.invitedAccountIds.remove(me.id);
+    if (s.memberAccountIds.isEmpty) squads.remove(s);
+    _commit();
+  }
+
+  /// Captains can delete their own squad outright.
+  void deleteSquad(String squadId) {
+    final s = squadById(squadId);
+    if (s == null) return;
+    squads.remove(s);
+    _commit();
+  }
+
   // ── Tournaments & entries ──────────────────────────────────────────────
 
   Tournament? tournamentById(String id) =>

@@ -161,6 +161,7 @@ abstract class TeamRepository extends SportikaRepository {
   List<Squad> squadsOf(String accountId);
   List<Account> get accounts;
   List<Account> get otherPlayers;
+  String? get currentAccountId;
   Squad createSquad({
     required String name,
     required Sport sport,
@@ -169,6 +170,17 @@ abstract class TeamRepository extends SportikaRepository {
   });
   void addSquadMember(String squadId, String accountId);
   void removeSquadMember(String squadId, String accountId);
+  Squad? squadById(String id);
+  void inviteToSquad(String squadId, String accountId);
+  void cancelSquadInvite(String squadId, String accountId);
+  void respondToSquadInvite(
+    String squadId,
+    String accountId, {
+    required bool accept,
+  });
+  void transferCaptain(String squadId, String accountId);
+  void leaveSquad(String squadId);
+  void deleteSquad(String squadId);
 }
 
 /// Read/write surface for the tournament feature.
