@@ -1,14 +1,16 @@
 import 'package:sportika/shared/widgets/editorial.dart';
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/teams_controller.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Players discovery for the Discover tab: the community directory, filtered
@@ -23,6 +25,23 @@ class PlayersTab extends StatefulWidget {
 class _PlayersTabState extends State<PlayersTab> {
   Sport? sport;
   String query = '';
+
+  /// Typing debounce: the directory is rebuilt only after the athlete pauses,
+  /// which keeps the list from re-filtering on every keystroke.
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => query = value);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +74,7 @@ class _PlayersTabState extends State<PlayersTab> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
           child: TextField(
-            onChanged: (v) => setState(() => query = v),
+            onChanged: _onQueryChanged,
             textInputAction: TextInputAction.search,
             decoration: const InputDecoration(
               hintText: 'Search players by name or city',
@@ -101,12 +120,10 @@ class _PlayerCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => showAppSheet(
+        onTap: () => pushRoute(
           context,
-          AppSheet(
-            title: account.displayName,
-            child: _PlayerSheet(account: account, state: state),
-          ),
+          AppRoute.playerProfile,
+          args: PlayerProfileArgs(account.id),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -169,157 +186,6 @@ class _PlayerCard extends StatelessWidget {
   }
 }
 
-class _PlayerSheet extends StatelessWidget {
-  const _PlayerSheet({required this.account, required this.state});
-
-  final Account account;
-  final ProfileController state;
-
-  @override
-  Widget build(BuildContext context) {
-    final sports = state.sportsPlayedBy(account.id);
-    final appearances = state.appearancesOf(account.id)
-      ..sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
-    final teams = context.read<TeamsController>().squadsOf(account.id);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            AccountAvatar(account: account, size: 54),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    account.city.isEmpty ? 'Karachi, Pakistan' : account.city,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: SportikaColors.textBody,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final role in account.roles)
-                        StatusPill(
-                          role.label,
-                          color: role == UserRole.organizer
-                              ? SportikaColors.mint
-                              : role == UserRole.scorer
-                              ? SportikaColors.blueBright
-                              : SportikaColors.gold,
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            _Stat(value: appearances.length.toString(), label: 'Matches'),
-            _Stat(value: sports.length.toString(), label: 'Sports'),
-            _Stat(value: teams.length.toString(), label: 'Teams'),
-          ],
-        ),
-        if (sports.isNotEmpty) ...[
-          const SectionTitle('Plays'),
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [for (final s in sports) _SportTag(sport: s)],
-          ),
-        ],
-        if (teams.isNotEmpty) ...[
-          const SectionTitle('Teams'),
-          for (final team in teams)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              leading: Icon(
-                sportGlyph(team.sport),
-                color: SportikaColors.mint,
-                size: 18,
-              ),
-              title: Text(team.name),
-              subtitle: Text(
-                '${team.sport.label} · ${team.memberAccountIds.length} players',
-              ),
-            ),
-        ],
-        if (appearances.isNotEmpty) ...[
-          const SectionTitle('Recent official matches'),
-          for (final fixture in appearances.take(3))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _AppearanceRow(fixture: fixture, state: state),
-            ),
-        ],
-        const SizedBox(height: 8),
-      ],
-    );
-  }
-}
-
-class _AppearanceRow extends StatelessWidget {
-  const _AppearanceRow({required this.fixture, required this.state});
-
-  final Fixture fixture;
-  final ProfileController state;
-
-  @override
-  Widget build(BuildContext context) {
-    final sides = context.read<FixturesController>().sideLabelsOf(fixture);
-    final tournament = context.read<FixturesController>().tournamentOf(fixture);
-    return SurfaceCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${sides[0]}  vs  ${sides[1]}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${tournament?.name ?? 'Community match'} · '
-                  '${dayLabel(fixture.scheduledAt)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: SportikaColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          StatusPill(
-            fixture.status.label,
-            color: statusColor(fixture.status.key),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SportTag extends StatelessWidget {
   const _SportTag({required this.sport});
 
@@ -357,35 +223,6 @@ class _Tag extends StatelessWidget {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             color: SportikaColors.textBody,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 9,
-            letterSpacing: 1.2,
-            fontWeight: FontWeight.w800,
-            color: SportikaColors.textMuted,
           ),
         ),
       ],

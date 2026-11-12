@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sportika/features/discover/screens/create_tournament_screen.dart';
 import 'package:sportika/features/discover/screens/games_tab.dart';
 import 'package:sportika/features/discover/screens/organizer_dashboard_screen.dart';
+import 'package:sportika/features/discover/screens/player_profile_screen.dart';
 import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
 import 'package:sportika/features/live/screens/match_history_screen.dart';
@@ -30,6 +31,8 @@ abstract final class AppRoute {
   static const String editProfile = '/me/edit';
   static const String matchHistory = '/me/history';
   static const String settings = '/me/settings';
+
+  static const String playerProfile = '/discover/players/profile';
 
   static const String teamDetail = '/team/detail';
   static const String createTeam = '/team/create';
@@ -63,6 +66,14 @@ class FixtureDetailArgs {
   const FixtureDetailArgs(this.fixtureId);
 
   final String fixtureId;
+}
+
+/// Arguments for [AppRoute.playerProfile].
+@immutable
+class PlayerProfileArgs {
+  const PlayerProfileArgs(this.accountId);
+
+  final String accountId;
 }
 
 /// Arguments for [AppRoute.teamDetail].
@@ -112,6 +123,9 @@ Widget Function(Object? args) _builderFor(String name) {
       return (_) => const MatchHistoryScreen();
     case AppRoute.settings:
       return (_) => const SettingsScreen();
+    case AppRoute.playerProfile:
+      return (args) =>
+          PlayerProfileScreen(accountId: (args as PlayerProfileArgs).accountId);
     case AppRoute.teamDetail:
       return (args) =>
           TeamDetailScreen(squadId: (args as TeamDetailArgs).squadId);
