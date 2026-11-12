@@ -5,8 +5,12 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/app/routes.dart';
+import 'package:sportika/shared/widgets/layout.dart';
+import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/features/live/widgets/live_clock.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 
 /// Scorer home (spec §4.4): every fixture assigned to the account, with a
@@ -17,6 +21,29 @@ class ScorerWorkspaceScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<FixturesController>();
+    final session = context.watch<SessionController>();
+
+    if (!session.ready) {
+      return const ScreenScaffold(
+        title: 'Scorer workspace',
+        child: LoadingSkeleton(rows: 3, label: 'Loading assigned fixtures'),
+      );
+    }
+    if (!session.hasRole(UserRole.scorer)) {
+      return ScreenScaffold(
+        title: 'Scorer workspace',
+        child: ErrorState(
+          title: 'Scorers only',
+          message:
+              'An organizer has to assign the scorer role before you can keep '
+              'score for a fixture.',
+          icon: Icons.sports_score,
+          retryLabel: 'Go back',
+          onRetry: () => Navigator.of(context).maybePop(),
+        ),
+      );
+    }
+
     final assigned = state.myScoringFixtures;
     final inPlay = assigned
         .where((f) => f.status != FixtureStatus.submitted)
@@ -25,45 +52,53 @@ class ScorerWorkspaceScreen extends StatelessWidget {
         .where((f) => f.status == FixtureStatus.submitted)
         .toList();
 
-    return Scaffold(
-      appBar: sportikaAppBar(
-        'Scorer workspace',
-        subtitle: '${assigned.length} fixtures assigned',
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
-        children: [
-          const InfoBanner(
-            icon: Icons.swap_horiz,
-            tone: SportikaColors.blueBright,
-            text:
-                'If an organizer transfers this fixture to another scorer, everything '
-                'recorded so far carries over. Your log is saved after every entry.',
+    return LiveClock(
+      child: Scaffold(
+        appBar: sportikaAppBar(
+          'Scorer workspace',
+          subtitle: '${assigned.length} fixtures assigned',
+        ),
+        body: RefreshIndicator(
+          onRefresh: state.reload,
+          color: SportikaColors.mint,
+          backgroundColor: SportikaColors.surface,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+            children: [
+              const InfoBanner(
+                icon: Icons.swap_horiz,
+                tone: SportikaColors.blueBright,
+                text:
+                    'If an organizer transfers this fixture to another scorer, everything '
+                    'recorded so far carries over. Your log is saved after every entry.',
+              ),
+              SectionTitle('To score (${inPlay.length})'),
+              if (inPlay.isEmpty)
+                const EmptyState(
+                  title: 'No fixtures assigned',
+                  body:
+                      'Organizers assign scorers when they publish the draw. You will get '
+                      'a notification when one lands.',
+                  icon: Icons.sports_score,
+                )
+              else
+                for (final fixture in inPlay)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ScorerFixtureCard(fixture: fixture),
+                  ),
+              if (awaiting.isNotEmpty) ...[
+                SectionTitle('Submitted, in review (${awaiting.length})'),
+                for (final fixture in awaiting)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ScorerFixtureCard(fixture: fixture),
+                  ),
+              ],
+            ],
           ),
-          SectionTitle('To score (${inPlay.length})'),
-          if (inPlay.isEmpty)
-            const EmptyState(
-              title: 'No fixtures assigned',
-              body:
-                  'Organizers assign scorers when they publish the draw. You will get '
-                  'a notification when one lands.',
-              icon: Icons.sports_score,
-            )
-          else
-            for (final fixture in inPlay)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _ScorerFixtureCard(fixture: fixture),
-              ),
-          if (awaiting.isNotEmpty) ...[
-            SectionTitle('Submitted, in review (${awaiting.length})'),
-            for (final fixture in awaiting)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _ScorerFixtureCard(fixture: fixture),
-              ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -84,13 +119,10 @@ class _ScorerFixtureCard extends StatelessWidget {
     final submitted = fixture.status == FixtureStatus.submitted;
     final notStarted =
         fixture.status == FixtureStatus.upcoming && fixture.events.isEmpty;
+    final live = fixture.status == FixtureStatus.live;
 
     return SurfaceCard(
-      onTap: () => pushRoute(
-        context,
-        AppRoute.scorecard,
-        args: ScorecardArgs(fixture.id, ScorecardMode.official),
-      ),
+      onTap: () => _openScorecard(context, sides),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -130,19 +162,25 @@ class _ScorerFixtureCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(
-                Icons.schedule,
-                size: 12,
-                color: SportikaColors.textDim,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                dateShort(fixture.scheduledAt),
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: SportikaColors.textMuted,
+              // A live card counts up from the first entry instead of showing
+              // the kick-off date, so the row keeps the same width.
+              if (live && fixture.startedAt != null)
+                LiveElapsed(since: fixture.startedAt!)
+              else ...[
+                const Icon(
+                  Icons.schedule,
+                  size: 12,
+                  color: SportikaColors.textDim,
                 ),
-              ),
+                const SizedBox(width: 4),
+                Text(
+                  dateShort(fixture.scheduledAt),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: SportikaColors.textMuted,
+                  ),
+                ),
+              ],
               const Dot(),
               Text(
                 '${fixture.events.length} entries',
@@ -178,6 +216,40 @@ class _ScorerFixtureCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Resuming a card that already has entries is the one tap on this screen
+  /// that can add a stray event, so the count is shown before opening it.
+  Future<void> _openScorecard(BuildContext context, List<String> sides) async {
+    if (fixture.status == FixtureStatus.live && fixture.events.isNotEmpty) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Resume this scorecard?'),
+          content: Text(
+            '${fixture.events.length} entries are already recorded for '
+            '${sides[0]} vs ${sides[1]}. The card opens where you left it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Resume'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+      if (!context.mounted) return;
+    }
+    await pushRoute(
+      context,
+      AppRoute.scorecard,
+      args: ScorecardArgs(fixture.id, ScorecardMode.official),
     );
   }
 

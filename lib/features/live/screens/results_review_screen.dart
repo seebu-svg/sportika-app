@@ -7,7 +7,9 @@ import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
+import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
+import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/core/state/session_controller.dart';
 
@@ -22,6 +24,29 @@ class ResultsReviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<FixturesController>();
+    final session = context.watch<SessionController>();
+
+    if (!session.ready) {
+      return const ScreenScaffold(
+        title: 'Results review',
+        child: LoadingSkeleton(rows: 2, label: 'Loading the review queue'),
+      );
+    }
+    if (!session.canOrganize) {
+      return ScreenScaffold(
+        title: 'Results review',
+        child: ErrorState(
+          title: 'Organizers only',
+          message:
+              'Only the organizer of a tournament can publish its '
+              'results. Ask them to review the submission.',
+          icon: Icons.verified_outlined,
+          retryLabel: 'Go back',
+          onRetry: () => Navigator.of(context).maybePop(),
+        ),
+      );
+    }
+
     final submitted = state.fixturesAwaitingReview
         .where((f) => tournamentId == null || f.tournamentId == tournamentId)
         .toList();
@@ -43,63 +68,82 @@ class ResultsReviewScreen extends StatelessWidget {
         ? null
         : context.read<TournamentsController>().tournamentById(tournamentId!);
 
+    if (tournamentId != null && tournament == null) {
+      return ScreenScaffold(
+        title: 'Results review',
+        child: ErrorState(
+          title: 'Tournament not found',
+          message: 'This event is no longer in your organizer list.',
+          retryLabel: 'Go back',
+          onRetry: () => Navigator.of(context).maybePop(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: sportikaAppBar(
         'Results review',
         subtitle: tournament?.name ?? 'All your tournaments',
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
-        children: [
-          const InfoBanner(
-            icon: Icons.account_tree_outlined,
-            tone: SportikaColors.mint,
-            text:
-                'Publishing moves the bracket or table. Scorer submissions stay locked '
-                'until you decide.',
-          ),
-          SectionTitle('Awaiting publication (${submitted.length})'),
-          if (submitted.isEmpty)
-            const EmptyState(
-              title: 'Queue is clear',
-              body: 'Fixtures appear here the moment a scorer submits a score.',
-              icon: Icons.done_all,
-            )
-          else
-            for (final fixture in submitted)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ReviewItem(
-                  fixture: fixture,
-                  highlight: fixture.id == highlightId,
+      body: RefreshIndicator(
+        onRefresh: state.reload,
+        color: SportikaColors.mint,
+        backgroundColor: SportikaColors.surface,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+          children: [
+            const InfoBanner(
+              icon: Icons.account_tree_outlined,
+              tone: SportikaColors.mint,
+              text:
+                  'Publishing moves the bracket or table. Scorer submissions stay locked '
+                  'until you decide.',
+            ),
+            SectionTitle('Awaiting publication (${submitted.length})'),
+            if (submitted.isEmpty)
+              const EmptyState(
+                title: 'Queue is clear',
+                body:
+                    'Fixtures appear here the moment a scorer submits a score.',
+                icon: Icons.done_all,
+              )
+            else
+              for (final fixture in submitted)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _ReviewItem(
+                    fixture: fixture,
+                    highlight: fixture.id == highlightId,
+                  ),
                 ),
-              ),
-          const SectionTitle('Published results'),
-          if (published.isEmpty)
-            const EmptyState(
-              title: 'No published results yet',
-              body: 'Publish a submitted score to start moving the draw.',
-              icon: Icons.verified_outlined,
-            )
-          else
-            for (final fixture in published.take(8))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  children: [
-                    officialFixtureTile(context, fixture),
-                    const SizedBox(height: 6),
-                    GhostButton(
-                      label: 'Publish a correction',
-                      icon: Icons.edit_note,
-                      expand: true,
-                      tone: SportikaColors.gold,
-                      onPressed: () => publishFixture(context, fixture),
-                    ),
-                  ],
+            const SectionTitle('Published results'),
+            if (published.isEmpty)
+              const EmptyState(
+                title: 'No published results yet',
+                body: 'Publish a submitted score to start moving the draw.',
+                icon: Icons.verified_outlined,
+              )
+            else
+              for (final fixture in published.take(8))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    children: [
+                      officialFixtureTile(context, fixture),
+                      const SizedBox(height: 6),
+                      GhostButton(
+                        label: 'Publish a correction',
+                        icon: Icons.edit_note,
+                        expand: true,
+                        tone: SportikaColors.gold,
+                        onPressed: () => publishFixture(context, fixture),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-        ],
+          ],
+        ),
       ),
     );
   }

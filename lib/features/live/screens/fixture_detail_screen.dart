@@ -11,6 +11,7 @@ import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/features/live/widgets/live_clock.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 
 /// Match page for one official fixture: live score, result, scorers, roster,
@@ -63,323 +64,340 @@ class FixtureDetailScreen extends StatelessWidget {
         .whereType<String>()
         .toList();
 
-    return Scaffold(
-      appBar: sportikaAppBar(
-        '${sides[0]} vs ${sides[1]}',
-        subtitle: '${tournament?.name ?? 'Fixture'} · ${fixture.stage}',
-        actions: [
-          if (isOrganizer)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              color: SportikaColors.surfaceElevated,
-              onSelected: (value) async {
-                switch (value) {
-                  case 'schedule':
-                    await editFixtureSchedule(context, fixture);
-                  case 'scorers':
-                    await assignScorerSheet(context, fixture);
-                  case 'walkover':
-                    await recordWalkoverFor(context, fixture);
-                  case 'dispute':
-                    await raiseDisputeFor(context, fixture);
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'schedule',
-                  child: Text('Edit venue & time'),
-                ),
-                PopupMenuItem(value: 'scorers', child: Text('Assign scorers')),
-                PopupMenuItem(
-                  value: 'walkover',
-                  child: Text('Record walkover'),
-                ),
-                PopupMenuItem(value: 'dispute', child: Text('Raise a dispute')),
-              ],
-            ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-        children: [
-          SurfaceCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    SportTag(sport),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        fixture.stage,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: SportikaColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    StatusPill(
-                      fixture.status.label,
-                      color: statusColor(fixture.status.key),
-                      icon: statusIcon(fixture.status.key),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                for (var i = 0; i < 2; i++) ...[
-                  _SideScoreRow(
-                    label: sides[i],
-                    score: i < scores.length ? scores[i] : '',
-                    leading: winner == i,
-                    tone: i == 0 ? sportColor(sport) : SportikaColors.mint,
+    return LiveClock(
+      child: Scaffold(
+        appBar: sportikaAppBar(
+          '${sides[0]} vs ${sides[1]}',
+          subtitle: '${tournament?.name ?? 'Fixture'} · ${fixture.stage}',
+          actions: [
+            if (isOrganizer)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                color: SportikaColors.surfaceElevated,
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'schedule':
+                      await editFixtureSchedule(context, fixture);
+                    case 'scorers':
+                      await assignScorerSheet(context, fixture);
+                    case 'walkover':
+                      await recordWalkoverFor(context, fixture);
+                    case 'dispute':
+                      await raiseDisputeFor(context, fixture);
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'schedule',
+                    child: Text('Edit venue & time'),
                   ),
-                  if (i == 0) const SizedBox(height: 8),
-                ],
-                if (headline.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    headline,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      color: result != null || progress.isComplete
-                          ? SportikaColors.mint
-                          : SportikaColors.textBody,
-                    ),
+                  PopupMenuItem(
+                    value: 'scorers',
+                    child: Text('Assign scorers'),
                   ),
-                ],
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 8),
-                KeyValueRow('Scheduled', dateShort(fixture.scheduledAt)),
-                KeyValueRow(
-                  'Venue',
-                  fixture.venue.isEmpty ? '-' : fixture.venue,
-                ),
-                KeyValueRow(
-                  'Rules',
-                  tournament == null
-                      ? SportEngines.describeRules(sport, fixture.rules)
-                      : tournament.matchRules,
-                ),
-                KeyValueRow(
-                  'Scorers',
-                  scorerNames.isEmpty ? 'Not assigned' : scorerNames.join(', '),
-                ),
-                KeyValueRow('Entries recorded', '${fixture.events.length}'),
-              ],
-            ),
-          ),
-          if (fixture.disputeNote != null) ...[
-            const SizedBox(height: 10),
-            _DisputeCard(
-              fixture: fixture,
-              canResolve:
-                  context.read<SessionController>().canOrganize &&
-                  state.tournamentOf(fixture)?.organizerId ==
-                      context.read<ProfileController>().currentAccount?.id,
-              sides: sides,
-            ),
-          ],
-          if (!locked) ...[
-            const SizedBox(height: 12),
-            if (isScorer || isOrganizer)
-              PrimaryButton(
-                label: fixture.events.isEmpty
-                    ? 'Start scoring'
-                    : 'Open scorecard',
-                icon: Icons.sports_score,
-                tone: sportColor(sport),
-                onPressed: () => pushRoute(
-                  context,
-                  AppRoute.scorecard,
-                  args: ScorecardArgs(fixture.id, ScorecardMode.official),
-                ),
-              ),
-            if (!isScorer && isOrganizer) ...[
-              const SizedBox(height: 8),
-              InfoBanner(
-                icon: Icons.person_add_alt,
-                text: scorerNames.isEmpty
-                    ? 'No scorer assigned yet. Assign yourself or another scorer '
-                          'before the match starts.'
-                    : 'You are not assigned to score this fixture. Assign yourself from '
-                          'the menu to take over.',
-              ),
-            ],
-            if (isOrganizer) ...[
-              const SizedBox(height: 10),
-              if (fixture.status == FixtureStatus.submitted ||
-                  fixture.result != null ||
-                  fixture.events.isNotEmpty)
-                PrimaryButton(
-                  label: fixture.result == null
-                      ? 'Review & publish'
-                      : 'Publish correction',
-                  icon: Icons.verified_outlined,
-                  tone: SportikaColors.mint,
-                  onPressed: () => publishFixture(context, fixture),
-                ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: GhostButton(
-                      label: 'Walkover',
-                      icon: Icons.flag_outlined,
-                      expand: true,
-                      onPressed: () => recordWalkoverFor(context, fixture),
-                    ),
+                  PopupMenuItem(
+                    value: 'walkover',
+                    child: Text('Record walkover'),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GhostButton(
-                      label: 'Scorers',
-                      icon: Icons.swap_horiz,
-                      expand: true,
-                      onPressed: () => assignScorerSheet(context, fixture),
-                    ),
+                  PopupMenuItem(
+                    value: 'dispute',
+                    child: Text('Raise a dispute'),
                   ),
                 ],
               ),
-            ],
           ],
-          if (locked &&
-              me != null &&
-              _isParticipant(
-                context.read<TournamentsController>(),
-                fixture,
-                me.id,
-              )) ...[
-            const SizedBox(height: 10),
-            GhostButton(
-              label: 'Dispute this result',
-              icon: Icons.gavel,
-              tone: SportikaColors.danger,
-              expand: true,
-              onPressed: () => raiseDisputeFor(context, fixture),
-            ),
-          ],
-          if (result != null) ...[
-            const SectionTitle('Official result'),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+          children: [
             SurfaceCard(
-              borderColor: SportikaColors.mint.withValues(alpha: 0.3),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        result.walkover ? Icons.flag_outlined : Icons.verified,
-                        size: 16,
-                        color: SportikaColors.mint,
-                      ),
-                      const SizedBox(width: 7),
+                      SportTag(sport),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          result.headline,
+                          fixture.stage,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: SportikaColors.mint,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: SportikaColors.textMuted,
                           ),
                         ),
                       ),
+                      StatusPill(
+                        fixture.status.label,
+                        color: statusColor(fixture.status.key),
+                        icon: statusIcon(fixture.status.key),
+                      ),
+                      if (fixture.status == FixtureStatus.live &&
+                          fixture.startedAt != null) ...[
+                        const SizedBox(width: 8),
+                        LiveElapsed(since: fixture.startedAt!, prefix: ''),
+                      ],
                     ],
                   ),
-                  if (result.detail.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                  const SizedBox(height: 14),
+                  for (var i = 0; i < 2; i++) ...[
+                    _SideScoreRow(
+                      label: sides[i],
+                      score: i < scores.length ? scores[i] : '',
+                      leading: winner == i,
+                      tone: i == 0 ? sportColor(sport) : SportikaColors.mint,
+                    ),
+                    if (i == 0) const SizedBox(height: 8),
+                  ],
+                  if (headline.isNotEmpty) ...[
+                    const SizedBox(height: 12),
                     Text(
-                      result.detail,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        height: 1.4,
-                        color: SportikaColors.textMuted,
+                      headline,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: result != null || progress.isComplete
+                            ? SportikaColors.mint
+                            : SportikaColors.textBody,
                       ),
                     ),
                   ],
+                  const SizedBox(height: 12),
+                  const Divider(),
                   const SizedBox(height: 8),
+                  KeyValueRow('Scheduled', dateShort(fixture.scheduledAt)),
                   KeyValueRow(
-                    'Published',
-                    '${timeAgo(result.publishedAt)} by '
-                        '${context.read<SessionController>().accountById(result.publishedById)?.displayName ?? 'organizer'}',
+                    'Venue',
+                    fixture.venue.isEmpty ? '-' : fixture.venue,
                   ),
+                  KeyValueRow(
+                    'Rules',
+                    tournament == null
+                        ? SportEngines.describeRules(sport, fixture.rules)
+                        : tournament.matchRules,
+                  ),
+                  KeyValueRow(
+                    'Scorers',
+                    scorerNames.isEmpty
+                        ? 'Not assigned'
+                        : scorerNames.join(', '),
+                  ),
+                  KeyValueRow('Entries recorded', '${fixture.events.length}'),
                 ],
               ),
             ),
-          ],
-          if (fixture.corrections.isNotEmpty) ...[
-            const SectionTitle('Correction history'),
-            for (final correction in fixture.corrections.reversed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SurfaceCard(
-                  padding: const EdgeInsets.all(13),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.edit_note,
-                            size: 15,
-                            color: SportikaColors.gold,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              correction.reason,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                                color: SportikaColors.text,
-                              ),
+            if (fixture.disputeNote != null) ...[
+              const SizedBox(height: 10),
+              _DisputeCard(
+                fixture: fixture,
+                canResolve:
+                    context.read<SessionController>().canOrganize &&
+                    state.tournamentOf(fixture)?.organizerId ==
+                        context.read<ProfileController>().currentAccount?.id,
+                sides: sides,
+              ),
+            ],
+            if (!locked) ...[
+              const SizedBox(height: 12),
+              if (isScorer || isOrganizer)
+                PrimaryButton(
+                  label: fixture.events.isEmpty
+                      ? 'Start scoring'
+                      : 'Open scorecard',
+                  icon: Icons.sports_score,
+                  tone: sportColor(sport),
+                  onPressed: () => pushRoute(
+                    context,
+                    AppRoute.scorecard,
+                    args: ScorecardArgs(fixture.id, ScorecardMode.official),
+                  ),
+                ),
+              if (!isScorer && isOrganizer) ...[
+                const SizedBox(height: 8),
+                InfoBanner(
+                  icon: Icons.person_add_alt,
+                  text: scorerNames.isEmpty
+                      ? 'No scorer assigned yet. Assign yourself or another scorer '
+                            'before the match starts.'
+                      : 'You are not assigned to score this fixture. Assign yourself from '
+                            'the menu to take over.',
+                ),
+              ],
+              if (isOrganizer) ...[
+                const SizedBox(height: 10),
+                if (fixture.status == FixtureStatus.submitted ||
+                    fixture.result != null ||
+                    fixture.events.isNotEmpty)
+                  PrimaryButton(
+                    label: fixture.result == null
+                        ? 'Review & publish'
+                        : 'Publish correction',
+                    icon: Icons.verified_outlined,
+                    tone: SportikaColors.mint,
+                    onPressed: () => publishFixture(context, fixture),
+                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GhostButton(
+                        label: 'Walkover',
+                        icon: Icons.flag_outlined,
+                        expand: true,
+                        onPressed: () => recordWalkoverFor(context, fixture),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GhostButton(
+                        label: 'Scorers',
+                        icon: Icons.swap_horiz,
+                        expand: true,
+                        onPressed: () => assignScorerSheet(context, fixture),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+            if (locked &&
+                me != null &&
+                _isParticipant(
+                  context.read<TournamentsController>(),
+                  fixture,
+                  me.id,
+                )) ...[
+              const SizedBox(height: 10),
+              GhostButton(
+                label: 'Dispute this result',
+                icon: Icons.gavel,
+                tone: SportikaColors.danger,
+                expand: true,
+                onPressed: () => raiseDisputeFor(context, fixture),
+              ),
+            ],
+            if (result != null) ...[
+              const SectionTitle('Official result'),
+              SurfaceCard(
+                borderColor: SportikaColors.mint.withValues(alpha: 0.3),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          result.walkover
+                              ? Icons.flag_outlined
+                              : Icons.verified,
+                          size: 16,
+                          color: SportikaColors.mint,
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            result.headline,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: SportikaColors.mint,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
+                        ),
+                      ],
+                    ),
+                    if (result.detail.isNotEmpty) ...[
+                      const SizedBox(height: 6),
                       Text(
-                        '${correction.previous.headline} → ${correction.current.headline}',
+                        result.detail,
                         style: const TextStyle(
                           fontSize: 11.5,
+                          height: 1.4,
                           color: SportikaColors.textMuted,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${timeAgo(correction.at)} · '
-                        '${context.read<SessionController>().accountById(correction.byAccountId)?.displayName ?? 'organizer'}',
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: SportikaColors.textDim,
-                        ),
-                      ),
                     ],
-                  ),
+                    const SizedBox(height: 8),
+                    KeyValueRow(
+                      'Published',
+                      '${timeAgo(result.publishedAt)} by '
+                          '${context.read<SessionController>().accountById(result.publishedById)?.displayName ?? 'organizer'}',
+                    ),
+                  ],
                 ),
               ),
-          ],
-          const SectionTitle('Roster'),
-          _Roster(state: state, fixture: fixture, sides: sides),
-          if (tournament != null) ...[
-            const SizedBox(height: 16),
-            GhostButton(
-              label: 'Open ${tournament.name}',
-              icon: Icons.emoji_events_outlined,
-              expand: true,
-              onPressed: () => pushRoute(
-                context,
-                AppRoute.tournamentDetail,
-                args: TournamentDetailArgs(tournament.id),
+            ],
+            if (fixture.corrections.isNotEmpty) ...[
+              const SectionTitle('Correction history'),
+              for (final correction in fixture.corrections.reversed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SurfaceCard(
+                    padding: const EdgeInsets.all(13),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.edit_note,
+                              size: 15,
+                              color: SportikaColors.gold,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                correction.reason,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: SportikaColors.text,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${correction.previous.headline} → ${correction.current.headline}',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: SportikaColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${timeAgo(correction.at)} · '
+                          '${context.read<SessionController>().accountById(correction.byAccountId)?.displayName ?? 'organizer'}',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: SportikaColors.textDim,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+            const SectionTitle('Roster'),
+            _Roster(state: state, fixture: fixture, sides: sides),
+            if (tournament != null) ...[
+              const SizedBox(height: 16),
+              GhostButton(
+                label: 'Open ${tournament.name}',
+                icon: Icons.emoji_events_outlined,
+                expand: true,
+                onPressed: () => pushRoute(
+                  context,
+                  AppRoute.tournamentDetail,
+                  args: TournamentDetailArgs(tournament.id),
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
