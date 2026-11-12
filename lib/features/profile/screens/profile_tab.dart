@@ -13,6 +13,7 @@ import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
+import 'package:sportika/features/profile/widgets/achievements.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 
 /// Profile, roles, history entry points and the demo-data controls.
@@ -185,26 +186,8 @@ class ProfileTab extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => openHomeTab(context, 3),
                 ),
-              const SectionTitle('Achievements'),
-              SurfaceCard(
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.emoji_events_outlined,
-                      color: SportikaColors.gold,
-                      size: 32,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        official.isEmpty
-                            ? 'Your story starts here. Play an official match to unlock your first milestone.'
-                            : '${official.length} official matches · $wins victories. Keep chasing your next milestone.',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const AchievementsSection(),
+              const SportStatisticsSection(),
               SectionTitle(
                 'Official match history',
                 action: 'View all',
@@ -229,6 +212,12 @@ class ProfileTab extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
+                    SheetOption(
+                      icon: Icons.settings_outlined,
+                      title: 'Settings',
+                      subtitle: 'Notifications, privacy and local data',
+                      onTap: () => pushRoute(context, AppRoute.settings),
+                    ),
                     SheetOption(
                       icon: Icons.badge_outlined,
                       title: 'Edit profile',
@@ -288,98 +277,6 @@ class ProfileTab extends StatelessWidget {
                   ),
                 ),
               ],
-              const SectionTitle('Preferences'),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Match reminders'),
-                subtitle: const Text('Local demo preference'),
-                value: context.read<PreferencesController>().preference(
-                  'reminders',
-                ),
-                onChanged: (v) => context
-                    .read<PreferencesController>()
-                    .setPreference('reminders', v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Community invitations'),
-                value: context.read<PreferencesController>().preference(
-                  'invites',
-                ),
-                onChanged: (v) => context
-                    .read<PreferencesController>()
-                    .setPreference('invites', v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Show sports profile'),
-                subtitle: const Text(
-                  'Demo visibility preference; personal scores always stay private.',
-                ),
-                value: context.read<PreferencesController>().preference(
-                  'publicProfile',
-                ),
-                onChanged: (v) => context
-                    .read<PreferencesController>()
-                    .setPreference('publicProfile', v),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.badge_outlined),
-                title: const Text('My roles'),
-                subtitle: Text(me.roles.map((r) => r.label).join(' · ')),
-                onTap: () => showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Your Sportika roles'),
-                    content: Text(
-                      'Active roles: ${me.roles.map((r) => r.label).join(', ')}. Use Switch account to try another demo role. Official scoring requires an assignment, and organizer tools unlock with the organizer role.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: const Text('Got it'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.help_outline),
-                title: const Text('Help and support'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => showDialog<void>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Get into the game'),
-                    content: const Text(
-                      'Games: discover a match and reserve your spot. Events: enter competitions and follow fixtures. Scores: follow official results or keep private scorecards. All data is fictional and stored on this device. Reset demo data restores the original world.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SectionTitle('Session'),
-              GhostButton(
-                label: 'Switch account',
-                icon: Icons.logout,
-                expand: true,
-                onPressed: state.signOut,
-              ),
-              const SizedBox(height: 8),
-              GhostButton(
-                label: 'Reset demo data',
-                icon: Icons.restart_alt,
-                tone: SportikaColors.danger,
-                expand: true,
-                onPressed: () => _resetDemo(context, state),
-              ),
               const SectionTitle('About'),
               const InfoBanner(
                 icon: Icons.info_outline,
@@ -393,34 +290,5 @@ class ProfileTab extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _resetDemo(BuildContext context, SessionController state) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reset demo data?'),
-        content: const Text(
-          'Every scorecard, entry and result recorded in this prototype is replaced '
-          'with the original demo world.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Reset',
-              style: TextStyle(color: SportikaColors.danger),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    await state.resetDemoData();
-    if (context.mounted) showSnack(context, 'Demo data restored');
   }
 }

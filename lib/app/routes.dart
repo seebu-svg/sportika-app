@@ -15,6 +15,7 @@ import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 import 'package:sportika/features/teams/screens/create_team_screen.dart';
 import 'package:sportika/features/teams/screens/team_detail_screen.dart';
 import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
+import 'package:sportika/features/profile/screens/settings_screen.dart';
 import 'package:sportika/shared/models/community_game.dart';
 import 'package:sportika/shared/theme/theme.dart';
 
@@ -28,6 +29,7 @@ abstract final class AppRoute {
   static const String notifications = '/notifications';
   static const String editProfile = '/me/edit';
   static const String matchHistory = '/me/history';
+  static const String settings = '/me/settings';
 
   static const String teamDetail = '/team/detail';
   static const String createTeam = '/team/create';
@@ -108,6 +110,8 @@ Widget Function(Object? args) _builderFor(String name) {
       return (_) => const EditProfileScreen();
     case AppRoute.matchHistory:
       return (_) => const MatchHistoryScreen();
+    case AppRoute.settings:
+      return (_) => const SettingsScreen();
     case AppRoute.teamDetail:
       return (args) =>
           TeamDetailScreen(squadId: (args as TeamDetailArgs).squadId);
