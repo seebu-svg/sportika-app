@@ -39,6 +39,16 @@ class LocalSportikaRepository extends ChangeNotifier
 
   bool ready = false;
 
+  String? _storageNotice;
+
+  /// A one-time message about the persisted document (corrupt payload or a
+  /// migration). Reading it clears it so the shell shows it exactly once.
+  String? takeStorageNotice() {
+    final notice = _storageNotice;
+    _storageNotice = null;
+    return notice;
+  }
+
   /// Device-level flag so onboarding only plays once. Returning accounts never
   /// see it again, even after signing out.
   bool onboardingSeen = false;
@@ -84,12 +94,18 @@ class LocalSportikaRepository extends ChangeNotifier
     final raw = _storage.readState();
     if (raw == null) {
       _adopt(buildSeed());
+      if (_storage.recoveredFromCorruption) {
+        _storageNotice =
+            'Saved data could not be read, so the demo world was rebuilt.';
+      }
     } else {
       try {
         _decode(raw);
       } catch (_) {
         // A corrupt document should never brick the prototype.
         _adopt(buildSeed());
+        _storageNotice =
+            'Saved data could not be read, so the demo world was rebuilt.';
       }
     }
     final sessionId = _storage.readSessionAccountId();
@@ -259,6 +275,15 @@ class LocalSportikaRepository extends ChangeNotifier
     _adopt(buildSeed());
     final keep = currentAccount?.id;
     currentAccount = accountById(keep) ?? accounts.first;
+    _commit();
+  }
+
+  /// Wipes the persisted document, the stored session and the onboarding flag.
+  Future<void> clearLocalData() async {
+    await _storage.clearAll();
+    currentAccount = null;
+    onboardingSeen = false;
+    _adopt(buildSeed());
     _commit();
   }
 

@@ -5,9 +5,8 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/core/state/personal_games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
 
 /// Profile-linked history: private scorecards (resume any unfinished card) and
 /// the official matches the account took part in.
@@ -34,8 +33,7 @@ class MatchHistoryScreen extends StatelessWidget {
           IconButton(
             tooltip: 'New scorecard',
             icon: const Icon(Icons.add),
-            onPressed: () =>
-                pushScreen(context, const NewPersonalMatchScreen()),
+            onPressed: () => pushRoute(context, AppRoute.newPersonalMatch),
           ),
           const SizedBox(width: 6),
         ],
@@ -73,7 +71,7 @@ class MatchHistoryScreen extends StatelessWidget {
           SectionTitle(
             'Personal scorecards',
             action: 'New',
-            onAction: () => pushScreen(context, const NewPersonalMatchScreen()),
+            onAction: () => pushRoute(context, AppRoute.newPersonalMatch),
           ),
           if (inProgress.isEmpty)
             const EmptyState(

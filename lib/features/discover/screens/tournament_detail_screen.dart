@@ -10,7 +10,7 @@ import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/live/screens/results_review_screen.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/features/discover/screens/tournament_sections.dart';
 
 /// Tournament page: rules, registration, organizer tools, fixtures, bracket or
@@ -182,9 +182,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                             label: 'Review results',
                             icon: Icons.fact_check_outlined,
                             expand: true,
-                            onPressed: () => pushScreen(
+                            onPressed: () => pushRoute(
                               context,
-                              ResultsReviewScreen(
+                              AppRoute.resultsReview,
+                              args: ResultsReviewArgs(
                                 tournamentId: tournament.id,
                                 highlightId: context
                                     .read<FixturesController>()

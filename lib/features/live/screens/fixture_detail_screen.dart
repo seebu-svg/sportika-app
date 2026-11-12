@@ -8,11 +8,10 @@ import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 
 /// Match page for one official fixture: live score, result, scorers, roster,
 /// correction audit trail and every organizer workflow action.
@@ -195,9 +194,10 @@ class FixtureDetailScreen extends StatelessWidget {
                     : 'Open scorecard',
                 icon: Icons.sports_score,
                 tone: sportColor(sport),
-                onPressed: () => pushScreen(
+                onPressed: () => pushRoute(
                   context,
-                  ScorecardScreen(id: fixture.id, mode: ScorecardMode.official),
+                  AppRoute.scorecard,
+                  args: ScorecardArgs(fixture.id, ScorecardMode.official),
                 ),
               ),
             if (!isScorer && isOrganizer) ...[
@@ -372,9 +372,10 @@ class FixtureDetailScreen extends StatelessWidget {
               label: 'Open ${tournament.name}',
               icon: Icons.emoji_events_outlined,
               expand: true,
-              onPressed: () => pushScreen(
+              onPressed: () => pushRoute(
                 context,
-                TournamentDetailScreen(id: tournament.id),
+                AppRoute.tournamentDetail,
+                args: TournamentDetailArgs(tournament.id),
               ),
             ),
           ],

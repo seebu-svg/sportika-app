@@ -105,6 +105,8 @@ abstract class SessionRepository extends SportikaRepository {
   Future<void> signOut();
   Future<void> markOnboardingSeen();
   Future<void> resetDemoData();
+  Future<void> clearLocalData();
+  String? takeStorageNotice();
   Future<Account> createAccount({
     required String displayName,
     required String email,

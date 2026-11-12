@@ -8,11 +8,9 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/discover/screens/create_tournament_screen.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 
 /// Tournaments board for the Discover tab: every event, filtered by sport, or
 /// just the ones the account has entered.
@@ -97,10 +95,8 @@ class _TournamentsTabState extends State<TournamentsTab> {
                         ? GhostButton(
                             label: 'Create a tournament',
                             icon: Icons.add,
-                            onPressed: () => pushScreen(
-                              context,
-                              const CreateTournamentScreen(),
-                            ),
+                            onPressed: () =>
+                                pushRoute(context, AppRoute.createTournament),
                           )
                         : null,
                   ),
@@ -116,9 +112,10 @@ class _TournamentsTabState extends State<TournamentsTab> {
                         subtitle: items.first.name,
                         accent: SportikaColors.gold,
                         action: 'Explore tournament',
-                        onAction: () => pushScreen(
+                        onAction: () => pushRoute(
                           context,
-                          TournamentDetailScreen(id: items.first.id),
+                          AppRoute.tournamentDetail,
+                          args: TournamentDetailArgs(items.first.id),
                         ),
                       ),
                       const SizedBox(height: 18),

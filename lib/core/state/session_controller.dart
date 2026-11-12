@@ -24,6 +24,12 @@ class SessionController extends FeatureController<SessionRepository> {
   Future<void> markOnboardingSeen() => repo.markOnboardingSeen();
   Future<void> resetDemoData() => repo.resetDemoData();
 
+  /// Wipes every persisted byte, including the stored session.
+  Future<void> clearLocalData() => repo.clearLocalData();
+
+  /// One-time message about the persisted document; clears as it is read.
+  String? takeStorageNotice() => repo.takeStorageNotice();
+
   Future<Account> createAccount({
     required String displayName,
     required String email,

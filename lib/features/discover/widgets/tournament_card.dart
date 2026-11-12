@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Tournament summary card shared by Home, Tournaments and the organizer lists.
@@ -31,7 +30,11 @@ class TournamentCard extends StatelessWidget {
     return SurfaceCard(
       onTap:
           onTap ??
-          () => pushScreen(context, TournamentDetailScreen(id: tournament.id)),
+          () => pushRoute(
+            context,
+            AppRoute.tournamentDetail,
+            args: TournamentDetailArgs(tournament.id),
+          ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

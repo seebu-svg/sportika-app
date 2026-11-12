@@ -12,15 +12,10 @@ import 'package:sportika/core/state/personal_games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/discover/screens/games_tab.dart';
-import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
-import 'package:sportika/features/live/screens/match_history_screen.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
-import 'package:sportika/features/discover/screens/organizer_dashboard_screen.dart';
-import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 
 /// Home and discovery (spec §5): greet the player, filter by sport, resume a
 /// private card, follow live matches, see your own fixtures and find a
@@ -88,7 +83,7 @@ class _HomeTabState extends State<HomeTab> {
           title: 'Organizer dashboard',
           subtitle: 'Entries, draws, results to review',
           tone: SportikaColors.mint,
-          open: () => pushScreen(context, const OrganizerDashboardScreen()),
+          open: () => pushRoute(context, AppRoute.organizerDashboard),
         ),
       if (context.read<SessionController>().hasRole(UserRole.scorer))
         (
@@ -96,7 +91,7 @@ class _HomeTabState extends State<HomeTab> {
           title: 'Scorer workspace',
           subtitle: 'Fixtures assigned to you',
           tone: SportikaColors.blueBright,
-          open: () => pushScreen(context, const ScorerWorkspaceScreen()),
+          open: () => pushRoute(context, AppRoute.scorerWorkspace),
         ),
     ];
 
@@ -152,8 +147,7 @@ class _HomeTabState extends State<HomeTab> {
                 _title(
                   'Continue scoring',
                   action: 'All cards',
-                  onAction: () =>
-                      pushScreen(context, const MatchHistoryScreen()),
+                  onAction: () => pushRoute(context, AppRoute.matchHistory),
                 ),
                 const SizedBox(height: 12),
                 for (final match in resume.take(2))
@@ -212,7 +206,7 @@ class _HomeTabState extends State<HomeTab> {
               _title(
                 'Upcoming match',
                 action: 'My matches',
-                onAction: () => pushScreen(context, const MatchHistoryScreen()),
+                onAction: () => pushRoute(context, AppRoute.matchHistory),
               ),
               const SizedBox(height: 12),
               if (upcoming.isEmpty)
@@ -286,8 +280,7 @@ class _HomeTabState extends State<HomeTab> {
               _title(
                 'Recent activity',
                 action: 'View all',
-                onAction: () =>
-                    pushScreen(context, const NotificationsScreen()),
+                onAction: () => pushRoute(context, AppRoute.notifications),
               ),
               const SizedBox(height: 12),
               if (context
@@ -607,12 +600,12 @@ class _HomeTabState extends State<HomeTab> {
       (
         label: 'Create match',
         icon: Icons.add_circle_outline_rounded,
-        open: () => pushScreen(context, const CreateGameScreen()),
+        open: () => pushRoute(context, AppRoute.createGame),
       ),
       (
         label: 'Personal score',
         icon: Icons.edit_note_rounded,
-        open: () => pushScreen(context, const MatchHistoryScreen()),
+        open: () => pushRoute(context, AppRoute.matchHistory),
       ),
       (
         label: 'My teams',
@@ -783,9 +776,10 @@ class _HomeTabState extends State<HomeTab> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () => pushScreen(
+              onPressed: () => pushRoute(
                 context,
-                FixtureDetailScreen(fixtureId: fixture.id),
+                AppRoute.fixtureDetail,
+                args: FixtureDetailArgs(fixture.id),
               ),
               child: const Text('View details →'),
             ),
@@ -890,9 +884,10 @@ class _HomeTabState extends State<HomeTab> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: () => pushScreen(
+              onPressed: () => pushRoute(
                 context,
-                FixtureDetailScreen(fixtureId: fixture.id),
+                AppRoute.fixtureDetail,
+                args: FixtureDetailArgs(fixture.id),
               ),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
@@ -1060,9 +1055,10 @@ class _HomeTabState extends State<HomeTab> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => pushScreen(
+                    onPressed: () => pushRoute(
                       context,
-                      TournamentDetailScreen(id: tournament.id),
+                      AppRoute.tournamentDetail,
+                      args: TournamentDetailArgs(tournament.id),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: SportikaColors.blue,
@@ -1114,7 +1110,11 @@ class _HomeTabState extends State<HomeTab> {
           final game = games[i];
           return InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () => pushScreen(context, GameDetailScreen(game: game)),
+            onTap: () => pushRoute(
+              context,
+              AppRoute.gameDetail,
+              args: GameDetailArgs(game),
+            ),
             child: SizedBox(
               width: 240,
               child: Stack(
@@ -1265,7 +1265,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _activity(BuildContext context, AppNotification notification) =>
       InkWell(
-        onTap: () => pushScreen(context, const NotificationsScreen()),
+        onTap: () => pushRoute(context, AppRoute.notifications),
         child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,

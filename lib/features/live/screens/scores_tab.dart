@@ -6,9 +6,7 @@ import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
-import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
-import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
+import 'package:sportika/app/routes.dart';
 
 class ScoresTab extends StatefulWidget {
   const ScoresTab({super.key});
@@ -35,8 +33,7 @@ class _ScoresTabState extends State<ScoresTab> {
               IconButton(
                 tooltip: 'Scorer assignments',
                 icon: const Icon(Icons.assignment_outlined),
-                onPressed: () =>
-                    pushScreen(context, const ScorerWorkspaceScreen()),
+                onPressed: () => pushRoute(context, AppRoute.scorerWorkspace),
               ),
           ],
         ),
@@ -68,8 +65,7 @@ class _ScoresTabState extends State<ScoresTab> {
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
-                  onPressed: () =>
-                      pushScreen(context, const PersonalGamesScreen()),
+                  onPressed: () => pushRoute(context, AppRoute.personalGames),
                   icon: const Icon(Icons.sports_score),
                   label: const Text('My personal games'),
                 ),

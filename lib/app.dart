@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/app/providers.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/theme/theme.dart';
@@ -36,6 +37,7 @@ class SportikaApp extends StatelessWidget {
         title: 'Sportika',
         debugShowCheckedModeBanner: false,
         theme: buildSportikaTheme(),
+        onGenerateRoute: onGenerateRoute,
         home: ChangeNotifierProvider<AuthFlowController>(
           create: (context) =>
               AuthFlowController(context.read<SessionController>())..begin(),
@@ -52,8 +54,30 @@ class SportikaApp extends StatelessWidget {
 /// [AuthStage.home], so returning users never see onboarding or authentication
 /// again. Everything else is a single stage of [AuthFlowController], swapped
 /// with a short editorial cross-fade.
-class RootGate extends StatelessWidget {
+class RootGate extends StatefulWidget {
   const RootGate({super.key});
+
+  @override
+  State<RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<RootGate> {
+  bool _noticeShown = false;
+
+  /// A rebuilt (corrupt or migrated) document is announced exactly once, the
+  /// first time the shell is on screen, so the player knows why their saved
+  /// scorecards are gone instead of silently seeing demo data.
+  void _maybeShowStorageNotice(SessionController session) {
+    if (_noticeShown) return;
+    _noticeShown = true;
+    final notice = session.takeStorageNotice();
+    if (notice == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(notice)));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +85,7 @@ class RootGate extends StatelessWidget {
     final flow = context.watch<AuthFlowController>();
 
     if (!state.ready) return const SplashScreen();
+    _maybeShowStorageNotice(state);
 
     final stage = flow.stage;
     final screen = switch (stage) {

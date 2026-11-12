@@ -8,14 +8,10 @@ import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/discover/screens/create_tournament_screen.dart';
-import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
-import 'package:sportika/features/live/screens/results_review_screen.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 
 /// Organizer home (spec §4, §5): what needs a decision now, plus every event
 /// the organizer runs.
@@ -47,8 +43,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Create tournament',
             icon: const Icon(Icons.add_circle_outline),
-            onPressed: () =>
-                pushScreen(context, const CreateTournamentScreen()),
+            onPressed: () => pushRoute(context, AppRoute.createTournament),
           ),
           const SizedBox(width: 6),
         ],
@@ -87,8 +82,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
           PrimaryButton(
             label: 'Create a tournament',
             icon: Icons.emoji_events_outlined,
-            onPressed: () =>
-                pushScreen(context, const CreateTournamentScreen()),
+            onPressed: () => pushRoute(context, AppRoute.createTournament),
           ),
           const SectionTitle('Needs your decision'),
           if (pending.isEmpty && review.isEmpty)
@@ -286,9 +280,10 @@ class _OrganizerTournamentCard extends StatelessWidget {
                 label: 'Entries ($confirmed)',
                 icon: Icons.people_outline,
                 expand: true,
-                onPressed: () => pushScreen(
+                onPressed: () => pushRoute(
                   context,
-                  TournamentDetailScreen(id: tournament.id),
+                  AppRoute.tournamentDetail,
+                  args: TournamentDetailArgs(tournament.id),
                 ),
               ),
             ),
@@ -301,9 +296,10 @@ class _OrganizerTournamentCard extends StatelessWidget {
                 tone: review > 0
                     ? SportikaColors.mint
                     : SportikaColors.textBody,
-                onPressed: () => pushScreen(
+                onPressed: () => pushRoute(
                   context,
-                  ResultsReviewScreen(tournamentId: tournament.id),
+                  AppRoute.resultsReview,
+                  args: ResultsReviewArgs(tournamentId: tournament.id),
                 ),
               ),
             ),
@@ -326,9 +322,10 @@ class _OrganizerTournamentCard extends StatelessWidget {
                       error: count == 0,
                     );
                   } else {
-                    pushScreen(
+                    pushRoute(
                       context,
-                      TournamentDetailScreen(id: tournament.id),
+                      AppRoute.tournamentDetail,
+                      args: TournamentDetailArgs(tournament.id),
                     );
                   }
                 },
@@ -411,9 +408,10 @@ class _OrganizerDisputeCard extends StatelessWidget {
                   label: 'Open fixture',
                   icon: Icons.open_in_new,
                   expand: true,
-                  onPressed: () => pushScreen(
+                  onPressed: () => pushRoute(
                     context,
-                    FixtureDetailScreen(fixtureId: fixture.id),
+                    AppRoute.fixtureDetail,
+                    args: FixtureDetailArgs(fixture.id),
                   ),
                 ),
               ),

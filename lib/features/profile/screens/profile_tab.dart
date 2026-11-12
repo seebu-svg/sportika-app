@@ -8,13 +8,10 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/profile/screens/edit_profile_screen.dart';
-import 'package:sportika/features/live/screens/match_history_screen.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
-import 'package:sportika/features/discover/screens/organizer_dashboard_screen.dart';
-import 'package:sportika/features/live/screens/scorer_workspace_screen.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 
@@ -109,8 +106,7 @@ class ProfileTab extends StatelessWidget {
                     IconButton(
                       tooltip: 'Edit profile',
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      onPressed: () =>
-                          pushScreen(context, const EditProfileScreen()),
+                      onPressed: () => pushRoute(context, AppRoute.editProfile),
                     ),
                   ],
                 ),
@@ -212,7 +208,7 @@ class ProfileTab extends StatelessWidget {
               SectionTitle(
                 'Official match history',
                 action: 'View all',
-                onAction: () => pushScreen(context, const MatchHistoryScreen()),
+                onAction: () => pushRoute(context, AppRoute.matchHistory),
               ),
               if (official.isEmpty)
                 const EmptyState(
@@ -237,16 +233,14 @@ class ProfileTab extends StatelessWidget {
                       icon: Icons.badge_outlined,
                       title: 'Edit profile',
                       subtitle: 'Name, city and email',
-                      onTap: () =>
-                          pushScreen(context, const EditProfileScreen()),
+                      onTap: () => pushRoute(context, AppRoute.editProfile),
                     ),
                     SheetOption(
                       icon: Icons.history,
                       title: 'Match history',
                       subtitle: 'Resume private cards, see official results',
                       tone: SportikaColors.mint,
-                      onTap: () =>
-                          pushScreen(context, const MatchHistoryScreen()),
+                      onTap: () => pushRoute(context, AppRoute.matchHistory),
                     ),
                     SheetOption(
                       icon: Icons.notifications_none,
@@ -257,8 +251,7 @@ class ProfileTab extends StatelessWidget {
                           ? 'All caught up'
                           : '${context.read<NotificationsController>().unreadCount} unread',
                       tone: SportikaColors.gold,
-                      onTap: () =>
-                          pushScreen(context, const NotificationsScreen()),
+                      onTap: () => pushRoute(context, AppRoute.notifications),
                     ),
                   ],
                 ),
@@ -278,10 +271,8 @@ class ProfileTab extends StatelessWidget {
                           title: 'Organizer dashboard',
                           subtitle: 'Events, entries, draws, result review',
                           tone: SportikaColors.mint,
-                          onTap: () => pushScreen(
-                            context,
-                            const OrganizerDashboardScreen(),
-                          ),
+                          onTap: () =>
+                              pushRoute(context, AppRoute.organizerDashboard),
                         ),
                       if (state.hasRole(UserRole.scorer))
                         SheetOption(
@@ -290,10 +281,8 @@ class ProfileTab extends StatelessWidget {
                           subtitle:
                               '${context.read<FixturesController>().myScoringFixtures.length} fixtures assigned',
                           tone: SportikaColors.blueBright,
-                          onTap: () => pushScreen(
-                            context,
-                            const ScorerWorkspaceScreen(),
-                          ),
+                          onTap: () =>
+                              pushRoute(context, AppRoute.scorerWorkspace),
                         ),
                     ],
                   ),

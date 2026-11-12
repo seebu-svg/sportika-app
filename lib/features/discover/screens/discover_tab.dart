@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/discover/screens/create_tournament_screen.dart';
 import 'package:sportika/features/discover/screens/games_tab.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/features/discover/screens/players_tab.dart';
@@ -91,7 +91,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
               tone: SportikaColors.blueBright,
               onTap: () {
                 Navigator.pop(sheetContext);
-                pushScreen(context, const CreateGameScreen());
+                pushRoute(context, AppRoute.createGame);
               },
             ),
             if (context.read<SessionController>().canOrganize)
@@ -103,7 +103,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
                 tone: SportikaColors.mint,
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  pushScreen(context, const CreateTournamentScreen());
+                  pushRoute(context, AppRoute.createTournament);
                 },
               ),
             if (me != null)

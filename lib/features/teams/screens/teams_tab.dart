@@ -8,10 +8,9 @@ import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
-import 'package:sportika/features/discover/screens/tournament_detail_screen.dart';
 
 /// Teams & registration (spec §5): form a pair or team, manage the roster,
 /// then enter tournaments with it.
@@ -442,8 +441,11 @@ class _EntryRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       onTap: tournament == null
           ? null
-          : () =>
-                pushScreen(context, TournamentDetailScreen(id: tournament.id)),
+          : () => pushRoute(
+              context,
+              AppRoute.tournamentDetail,
+              args: TournamentDetailArgs(tournament.id),
+            ),
       child: Row(
         children: [
           Expanded(

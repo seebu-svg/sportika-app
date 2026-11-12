@@ -6,8 +6,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/personal_games_controller.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
-import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -85,7 +84,11 @@ Widget officialFixtureTile(
         : null,
     onTap:
         onTap ??
-        () => pushScreen(context, FixtureDetailScreen(fixtureId: fixture.id)),
+        () => pushRoute(
+          context,
+          AppRoute.fixtureDetail,
+          args: FixtureDetailArgs(fixture.id),
+        ),
   );
 }
 
@@ -148,9 +151,10 @@ Widget personalScorecardTile(
     ),
     onTap:
         onTap ??
-        () => pushScreen(
+        () => pushRoute(
           context,
-          ScorecardScreen(id: match.id, mode: ScorecardMode.personal),
+          AppRoute.scorecard,
+          args: ScorecardArgs(match.id, ScorecardMode.personal),
         ),
   );
 }

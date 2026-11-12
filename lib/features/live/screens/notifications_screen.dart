@@ -5,6 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -176,7 +177,7 @@ class NotificationBell extends StatelessWidget {
             color: SportikaColors.surfaceAlt,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
-              onTap: () => pushScreen(context, const NotificationsScreen()),
+              onTap: () => pushRoute(context, AppRoute.notifications),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 height: 38,

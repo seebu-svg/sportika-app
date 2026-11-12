@@ -9,9 +9,8 @@ import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/live/screens/fixture_detail_screen.dart';
 
 /// Fixtures for a tournament, grouped by bracket round or by group letter.
 class TournamentFixturesSection extends StatelessWidget {
@@ -330,8 +329,11 @@ class _BracketCard extends StatelessWidget {
     final scores = result?.sideScores ?? const <String>[];
 
     return SurfaceCard(
-      onTap: () =>
-          pushScreen(context, FixtureDetailScreen(fixtureId: fixture.id)),
+      onTap: () => pushRoute(
+        context,
+        AppRoute.fixtureDetail,
+        args: FixtureDetailArgs(fixture.id),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
       borderColor: fixture.status == FixtureStatus.published
           ? SportikaColors.mint.withValues(alpha: 0.35)

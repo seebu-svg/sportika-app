@@ -5,7 +5,7 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 
@@ -86,9 +86,10 @@ class _ScorerFixtureCard extends StatelessWidget {
         fixture.status == FixtureStatus.upcoming && fixture.events.isEmpty;
 
     return SurfaceCard(
-      onTap: () => pushScreen(
+      onTap: () => pushRoute(
         context,
-        ScorecardScreen(id: fixture.id, mode: ScorecardMode.official),
+        AppRoute.scorecard,
+        args: ScorecardArgs(fixture.id, ScorecardMode.official),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

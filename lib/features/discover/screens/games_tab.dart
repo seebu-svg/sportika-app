@@ -10,7 +10,7 @@ import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/core/state/games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/app/routes.dart';
 
 /// Games board for the Discover tab: pickup matches you can find or manage.
 class GamesTab extends StatefulWidget {
@@ -255,7 +255,11 @@ class GameCard extends StatelessWidget {
     clipBehavior: Clip.antiAlias,
     child: InkWell(
       onTap: openable
-          ? () => pushScreen(context, GameDetailScreen(game: game))
+          ? () => pushRoute(
+              context,
+              AppRoute.gameDetail,
+              args: GameDetailArgs(game),
+            )
           : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

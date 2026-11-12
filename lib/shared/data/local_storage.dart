@@ -14,24 +14,58 @@ class LocalStorage {
   static const String dataKey = 'sportika.state.v1';
   static const String sessionKey = 'sportika.session_account';
   static const String onboardingKey = 'sportika.onboarding_seen.v1';
+  static const String schemaKey = 'sportika.schema_version';
+
+  /// Bumped whenever the persisted shape changes. [migrateState] upgrades an
+  /// older document in place, so an existing install keeps its scorecards.
+  static const int schemaVersion = 2;
 
   final SharedPreferences _prefs;
 
+  /// Set when a stored document could not be decoded. The repository surfaces
+  /// this once so the player knows the demo world was rebuilt.
+  bool recoveredFromCorruption = false;
+
   static Future<LocalStorage> open() async =>
       LocalStorage(await SharedPreferences.getInstance());
+
+  int get storedSchemaVersion => _prefs.getInt(schemaKey) ?? 1;
 
   Map<String, dynamic>? readState() {
     final raw = _prefs.getString(dataKey);
     if (raw == null || raw.isEmpty) return null;
     try {
-      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) throw const FormatException('not an object');
+      final state = Map<String, dynamic>.from(decoded);
+      return migrateState(state, from: storedSchemaVersion);
     } catch (_) {
+      recoveredFromCorruption = true;
       return null;
     }
   }
 
-  Future<void> writeState(Map<String, dynamic> state) =>
-      _prefs.setString(dataKey, jsonEncode(state));
+  /// Forward-only migrations. Each step is additive so an old document can
+  /// always be lifted to the current shape without losing recorded scores.
+  Map<String, dynamic> migrateState(
+    Map<String, dynamic> state, {
+    required int from,
+  }) {
+    var version = from;
+    if (version < 2) {
+      state['preferences'] ??= <String, bool>{};
+      state['notifications'] ??= <String>[];
+      version = 2;
+    }
+    return state;
+  }
+
+  Future<void> writeState(Map<String, dynamic> state) async {
+    await _prefs.setString(dataKey, jsonEncode(state));
+    if (storedSchemaVersion != schemaVersion) {
+      await _prefs.setInt(schemaKey, schemaVersion);
+    }
+  }
 
   String? readSessionAccountId() => _prefs.getString(sessionKey);
 
@@ -50,9 +84,10 @@ class LocalStorage {
     }
   }
 
-  Future<void> clear() async {
+  Future<void> clearAll() async {
     await _prefs.remove(dataKey);
     await _prefs.remove(sessionKey);
     await _prefs.remove(onboardingKey);
+    await _prefs.remove(schemaKey);
   }
 }
