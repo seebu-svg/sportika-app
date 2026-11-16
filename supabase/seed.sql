@@ -1,0 +1,9 @@
+-- Sportika local seed.
+--
+-- Intentionally empty of members. Accounts are created through Supabase Auth so
+-- the on_auth_user_created trigger builds their profile rows; inserting fake
+-- users here would put loginable demo identities into a real database, which is
+-- exactly the production risk the audit raised.
+--
+-- Reference data (the four sports) lives in migrations/0001_schema.sql, not here,
+-- so it exists in every environment including production.

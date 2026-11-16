@@ -50,3 +50,6 @@ app.*.map.json
 # Local scratch
 .tmp/
 .refactor_backup/
+
+# Supabase CLI session state (auth tokens); the backend tree itself is tracked.
+supabase/.temp/

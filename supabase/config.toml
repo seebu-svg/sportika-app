@@ -1,0 +1,10 @@
+# Sportika Supabase CLI configuration.
+#
+# Deliberately minimal: local development runs through the scratch postgres
+# container on 127.0.0.1:55432 (.tmp/local_pg/apply.sh), and deployment targets
+# the linked project passed explicitly with `--linked`. This file exists so CLI
+# commands run from the repo root resolve the project layout (migrations,
+# tests, functions) instead of guessing, and so `supabase db push` picks up
+# supabase/migrations by default.
+
+project_id = "sportika"
