@@ -16,9 +16,19 @@ class LocalStorage {
   static const String onboardingKey = 'sportika.onboarding_seen.v1';
   static const String schemaKey = 'sportika.schema_version';
 
+  /// Scoring actions recorded while the server was unreachable. They are kept
+  /// apart from the main document because they belong to the server, not to the
+  /// demo world, and they must survive a rebuild of that document.
+  static const String matchOutboxKey = 'sportika.match_outbox';
+
+  /// Demo-only billing records (plans come from the seed, purchases and
+  /// entitlements are written by the simulated operator). A live build never
+  /// reads this key: its billing comes from PostgreSQL alone.
+  static const String billingKey = 'sportika.billing.v1';
+
   /// Bumped whenever the persisted shape changes. [migrateState] upgrades an
   /// older document in place, so an existing install keeps its scorecards.
-  static const int schemaVersion = 2;
+  static const int schemaVersion = 3;
 
   final SharedPreferences _prefs;
 
@@ -57,7 +67,59 @@ class LocalStorage {
       state['notifications'] ??= <String>[];
       version = 2;
     }
+    if (version < 3) {
+      // Standalone official matches are a new aggregate; an older document
+      // simply has none yet and the demo matches are seeded on first read.
+      state['matches'] ??= <Map<String, dynamic>>[];
+      version = 3;
+    }
     return state;
+  }
+
+  // ── match outbox ──────────────────────────────────────────────────────────
+
+  /// Scoring actions still waiting for the server, oldest first.
+  List<Map<String, dynamic>> readMatchOutbox() {
+    final raw = _prefs.getString(matchOutboxKey);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      // A corrupt queue must never block scoring: drop it and carry on.
+      return [];
+    }
+  }
+
+  Future<void> writeMatchOutbox(List<Map<String, dynamic>> entries) async {
+    if (entries.isEmpty) {
+      await _prefs.remove(matchOutboxKey);
+      return;
+    }
+    await _prefs.setString(matchOutboxKey, jsonEncode(entries));
+  }
+
+  /// The simulated billing ledger of a device-only build. A corrupt document is
+  /// dropped rather than throwing: billing must never block the app from
+  /// starting.
+  Map<String, dynamic>? readBilling() {
+    final raw = _prefs.getString(billingKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeBilling(Map<String, dynamic> billing) async {
+    await _prefs.setString(billingKey, jsonEncode(billing));
   }
 
   Future<void> writeState(Map<String, dynamic> state) async {
@@ -88,6 +150,8 @@ class LocalStorage {
     await _prefs.remove(dataKey);
     await _prefs.remove(sessionKey);
     await _prefs.remove(onboardingKey);
+    await _prefs.remove(matchOutboxKey);
+    await _prefs.remove(billingKey);
     await _prefs.remove(schemaKey);
   }
 }

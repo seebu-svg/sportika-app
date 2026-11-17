@@ -1,12 +1,13 @@
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/onboarding.dart';
+import 'package:sportika/shared/models/profile_setup.dart';
 
 /// A stable identifier generator that does not depend on Flutter.
 String newId(String prefix) =>
     '$prefix-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
     '-${(DateTime.now().microsecondsSinceEpoch ~/ 1000 % 997).toRadixString(36)}';
 
-/// One Sportika account. A single account can hold several roles at once
+/// One universal Sportika account. Legacy roles remain for local compatibility
 /// (spec §1), for example player + scorer.
 class Account {
   final String id;
@@ -18,14 +19,29 @@ class Account {
   /// Public @handle chosen during profile setup.
   String handle;
   String bio;
+  DateTime? dateOfBirth;
+  ProfileGender? gender;
+  Map<String, String> playingPositions;
+  bool playingPreferencesSkipped;
 
   /// Sports the account says it plays, plus the level claimed for each.
   Set<Sport> sports;
   Map<String, PlayingLevel> levels;
   PlayStyle playStyle;
 
-  /// Id of the gradient avatar preset; no binary uploads in the prototype.
+  /// Id of the gradient avatar preset, used whenever no photo is set.
   String avatar;
+
+  /// Absolute path of the picture the player imported, written by the profile
+  /// photo store. Only the reference is persisted; the bytes stay in the app's
+  /// support directory. Null means the preset avatar is shown.
+  String? photoPath;
+
+  /// Public URL of the same picture once it has been uploaded. A server-backed
+  /// account always has one after a photo change; the on-device store never sets
+  /// it. [photoPath] stays the fast path and this is the fallback, so a fresh
+  /// install still shows the member's face.
+  String? photoUrl;
 
   /// False while a freshly created account is still inside profile setup.
   bool setupComplete;
@@ -38,18 +54,35 @@ class Account {
     required this.roles,
     this.handle = '',
     this.bio = '',
+    this.dateOfBirth,
+    this.gender,
+    Map<String, String>? playingPositions,
+    this.playingPreferencesSkipped = false,
     Set<Sport>? sports,
     Map<String, PlayingLevel>? levels,
     this.playStyle = PlayStyle.weekly,
     this.avatar = 'midnight',
+    this.photoPath,
+    this.photoUrl,
     this.setupComplete = true,
   }) : sports = sports ?? {},
-       levels = levels ?? {};
+       levels = levels ?? {},
+       playingPositions = playingPositions ?? {};
 
   bool has(UserRole role) => roles.contains(role);
 
+  /// Whether there is a picture to paint instead of initials.
+  bool get hasPhoto =>
+      (photoPath != null && photoPath!.isNotEmpty) ||
+      (photoUrl != null && photoUrl!.isNotEmpty);
+
+  /// Avatar letters for the name. A profile can arrive from the server with no
+  /// display name yet, and the avatar still has to paint something, so an empty
+  /// name falls back to the same neutral `?` that [initialsOf] uses rather than
+  /// slicing an empty string.
   String get initials {
     final parts = displayName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
         .toUpperCase();
@@ -70,10 +103,16 @@ class Account {
     'roles': roles.map((r) => r.key).toList(),
     'handle': handle,
     'bio': bio,
+    'dateOfBirth': dateOfBirth?.toIso8601String(),
+    'gender': gender?.name,
+    'playingPositions': Map<String, String>.of(playingPositions),
+    'playingPreferencesSkipped': playingPreferencesSkipped,
     'sports': sports.map((s) => s.key).toList(),
     'levels': levels.map((key, value) => MapEntry(key, value.key)),
     'playStyle': playStyle.key,
     'avatar': avatar,
+    'photoPath': photoPath,
+    'photoUrl': photoUrl,
     'setupComplete': setupComplete,
   };
 
@@ -88,6 +127,14 @@ class Account {
         .toList(),
     handle: j['handle'] as String? ?? '',
     bio: j['bio'] as String? ?? '',
+    dateOfBirth: DateTime.tryParse(j['dateOfBirth'] as String? ?? ''),
+    gender: ProfileGender.values
+        .where((g) => g.name == j['gender'])
+        .firstOrNull,
+    playingPositions: Map<String, String>.from(
+      j['playingPositions'] as Map? ?? {},
+    ),
+    playingPreferencesSkipped: j['playingPreferencesSkipped'] as bool? ?? false,
     sports: (j['sports'] as List<dynamic>? ?? [])
         .map((e) => SportX.fromKey(e as String))
         .toSet(),
@@ -97,6 +144,8 @@ class Account {
     ),
     playStyle: PlayStyleX.fromKey(j['playStyle'] as String?),
     avatar: j['avatar'] as String? ?? 'midnight',
+    photoPath: j['photoPath'] as String?,
+    photoUrl: j['photoUrl'] as String?,
     setupComplete: j['setupComplete'] as bool? ?? true,
   );
 }
@@ -115,6 +164,10 @@ class Squad {
   final List<String> invitedAccountIds;
   final DateTime createdAt;
 
+  /// True when the team was created for preview/testing. Demo content is
+  /// deletable without touching a member's own rows.
+  final bool isDemo;
+
   Squad({
     required this.id,
     required this.ownerId,
@@ -124,6 +177,7 @@ class Squad {
     required this.memberAccountIds,
     List<String>? invitedAccountIds,
     required this.createdAt,
+    this.isDemo = false,
   }) : invitedAccountIds = invitedAccountIds ?? [];
 
   String get captainId => ownerId;
@@ -139,6 +193,7 @@ class Squad {
     'memberAccountIds': memberAccountIds,
     'invitedAccountIds': invitedAccountIds,
     'createdAt': createdAt.toIso8601String(),
+    'isDemo': isDemo,
   };
 
   factory Squad.fromJson(Map<String, dynamic> j) => Squad(
@@ -154,6 +209,7 @@ class Squad {
         .map((e) => e as String)
         .toList(),
     createdAt: DateTime.parse(j['createdAt'] as String),
+    isDemo: j['isDemo'] as bool? ?? false,
   );
 }
 
@@ -178,8 +234,15 @@ class Tournament {
   /// Key rules the scoring engines read, e.g. overs / sets / half length.
   Map<String, dynamic> rules;
 
+  /// Where the organizer uploaded a card image, if they did. A tournament card
+  /// falls back to the bundled sport photograph when this is null.
+  final String? bannerUrl;
+
   TournamentStatus status;
   final DateTime createdAt;
+
+  /// True when the record was created for preview/testing.
+  final bool isDemo;
 
   Tournament({
     required this.id,
@@ -198,6 +261,8 @@ class Tournament {
     required this.rules,
     required this.status,
     required this.createdAt,
+    this.bannerUrl,
+    this.isDemo = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -215,8 +280,10 @@ class Tournament {
     'entryFee': entryFee,
     'matchRules': matchRules,
     'rules': rules,
+    'bannerUrl': bannerUrl,
     'status': status.key,
     'createdAt': createdAt.toIso8601String(),
+    'isDemo': isDemo,
   };
 
   factory Tournament.fromJson(Map<String, dynamic> j) => Tournament(
@@ -234,9 +301,11 @@ class Tournament {
     entryFee: j['entryFee'] as String? ?? 'PKR 0',
     matchRules: j['matchRules'] as String? ?? '',
     rules: Map<String, dynamic>.from(j['rules'] as Map? ?? const {}),
+    bannerUrl: j['bannerUrl'] as String?,
     status: TournamentStatusX.fromKey(j['status'] as String? ?? 'draft'),
     createdAt:
         DateTime.tryParse(j['createdAt'] as String? ?? '') ?? DateTime.now(),
+    isDemo: j['isDemo'] as bool? ?? false,
   );
 }
 
@@ -254,6 +323,9 @@ class Entry {
   final DateTime submittedAt;
   String? decisionNote;
 
+  /// True when the entry was created for preview/testing.
+  final bool isDemo;
+
   Entry({
     required this.id,
     required this.tournamentId,
@@ -264,6 +336,7 @@ class Entry {
     required this.status,
     required this.submittedAt,
     this.decisionNote,
+    this.isDemo = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -276,6 +349,7 @@ class Entry {
     'status': status.key,
     'submittedAt': submittedAt.toIso8601String(),
     'decisionNote': decisionNote,
+    'isDemo': isDemo,
   };
 
   factory Entry.fromJson(Map<String, dynamic> j) => Entry(
@@ -291,6 +365,7 @@ class Entry {
     submittedAt:
         DateTime.tryParse(j['submittedAt'] as String? ?? '') ?? DateTime.now(),
     decisionNote: j['decisionNote'] as String?,
+    isDemo: j['isDemo'] as bool? ?? false,
   );
 }
 
@@ -624,6 +699,27 @@ class AppNotification {
   final bool read;
   final DateTime at;
 
+  /// The server event type, for example `match_invite`. Empty for the device
+  /// store, which has no server vocabulary.
+  final String type;
+
+  /// What the notification points at: `match`, `result`, `dispute`,
+  /// `tournament`, `fixture`, `account` or `team`.
+  final String? entityType;
+
+  /// The id of that entity, as the server wrote it.
+  final String? entityId;
+
+  /// The structured navigation payload. The server sends ids and a tab hint,
+  /// never a path: the app decides what a notification opens.
+  final Map<String, dynamic> payload;
+
+  /// Who caused the event, when the server could tell.
+  final String? actorId;
+
+  /// When the notification stops being relevant.
+  final DateTime? expiresAt;
+
   AppNotification({
     required this.id,
     required this.accountId,
@@ -633,6 +729,12 @@ class AppNotification {
     this.route,
     required this.read,
     required this.at,
+    this.type = '',
+    this.entityType,
+    this.entityId,
+    this.payload = const {},
+    this.actorId,
+    this.expiresAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -644,6 +746,12 @@ class AppNotification {
     'route': route,
     'read': read,
     'at': at.toIso8601String(),
+    'type': type,
+    'entityType': entityType,
+    'entityId': entityId,
+    'payload': payload,
+    'actorId': actorId,
+    'expiresAt': expiresAt?.toIso8601String(),
   };
 
   factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
@@ -655,5 +763,83 @@ class AppNotification {
     route: j['route'] as String?,
     read: j['read'] as bool? ?? false,
     at: DateTime.tryParse(j['at'] as String? ?? '') ?? DateTime.now(),
+    type: j['type'] as String? ?? '',
+    entityType: j['entityType'] as String?,
+    entityId: j['entityId'] as String?,
+    payload: Map<String, dynamic>.from(j['payload'] as Map? ?? const {}),
+    actorId: j['actorId'] as String?,
+    expiresAt: DateTime.tryParse(j['expiresAt'] as String? ?? ''),
+  );
+}
+
+/// Which families of notification a member wants to receive.
+///
+/// These live in PostgreSQL and are enforced while the notification is
+/// generated, so a switch is a promise the server keeps rather than a filter
+/// the client applies after the fact.
+class NotificationPreferences {
+  const NotificationPreferences({
+    this.matchActivity = true,
+    this.tournamentUpdates = true,
+    this.teamActivity = true,
+    this.scorerAssignments = true,
+    this.platformAnnouncements = true,
+  });
+
+  /// Invitations, schedule changes, cancellations, results and disputes.
+  final bool matchActivity;
+
+  /// Registrations, draws, fixtures and tournament announcements.
+  final bool tournamentUpdates;
+
+  /// Squad invitations and roster changes.
+  final bool teamActivity;
+
+  /// Assignments to score, and reminders about them.
+  final bool scorerAssignments;
+
+  /// News from Sportika itself.
+  final bool platformAnnouncements;
+
+  /// Reads the preferences from a server row or from the device document.
+  ///
+  /// The server speaks snake_case and the device document speaks camelCase, so
+  /// both are accepted and the switch is only off when a source says so.
+  factory NotificationPreferences.fromJson(Map<String, dynamic> j) {
+    bool flag(String serverKey, String deviceKey) =>
+        j[serverKey] as bool? ?? j[deviceKey] as bool? ?? true;
+
+    return NotificationPreferences(
+      matchActivity: flag('match_activity', 'matchActivity'),
+      tournamentUpdates: flag('tournament_updates', 'tournamentUpdates'),
+      teamActivity: flag('team_activity', 'teamActivity'),
+      scorerAssignments: flag('scorer_assignments', 'scorerAssignments'),
+      platformAnnouncements: flag(
+        'platform_announcements',
+        'platformAnnouncements',
+      ),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'match_activity': matchActivity,
+    'tournament_updates': tournamentUpdates,
+    'team_activity': teamActivity,
+    'scorer_assignments': scorerAssignments,
+    'platform_announcements': platformAnnouncements,
+  };
+
+  NotificationPreferences copyWith({
+    bool? matchActivity,
+    bool? tournamentUpdates,
+    bool? teamActivity,
+    bool? scorerAssignments,
+    bool? platformAnnouncements,
+  }) => NotificationPreferences(
+    matchActivity: matchActivity ?? this.matchActivity,
+    tournamentUpdates: tournamentUpdates ?? this.tournamentUpdates,
+    teamActivity: teamActivity ?? this.teamActivity,
+    scorerAssignments: scorerAssignments ?? this.scorerAssignments,
+    platformAnnouncements: platformAnnouncements ?? this.platformAnnouncements,
   );
 }

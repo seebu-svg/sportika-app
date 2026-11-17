@@ -353,7 +353,6 @@ class _OfficialScorecard extends StatelessWidget {
     final canScore =
         !locked &&
         fixture.status != FixtureStatus.submitted &&
-        context.read<SessionController>().hasRole(UserRole.scorer) &&
         fixture.scorerAccountIds.contains(
           context.read<ProfileController>().currentAccount?.id,
         );
@@ -510,10 +509,9 @@ class _OfficialFooter extends StatelessWidget {
       );
     }
 
-    if (!context.read<SessionController>().hasRole(UserRole.scorer) ||
-        !fixture.scorerAccountIds.contains(
-          context.read<ProfileController>().currentAccount?.id,
-        )) {
+    if (!fixture.scorerAccountIds.contains(
+      context.read<ProfileController>().currentAccount?.id,
+    )) {
       return const InfoBanner(
         icon: Icons.lock_outline,
         text: 'Official match center · scoring is managed by the assigned scorer.',

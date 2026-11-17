@@ -7,6 +7,15 @@ import 'package:sportika/core/data/repositories.dart';
 class TeamsController extends FeatureController<TeamRepository> {
   TeamsController(super.repo);
 
+  /// True while the roster read is in flight.
+  bool get loading => repo.loading;
+
+  /// Why the last read failed, or null while it is healthy.
+  String? get lastError => repo.lastError;
+
+  /// Re-reads every squad and the player directory it invites from.
+  Future<void> refresh() => repo.refresh();
+
   List<Squad> get squads => repo.squads;
   List<Squad> get mySquads => repo.mySquads;
   List<Squad> squadsFor(Sport sport, EntryType type) =>

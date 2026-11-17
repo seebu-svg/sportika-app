@@ -94,19 +94,11 @@ class PlayerProfileScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SportikaSpacing.md),
-          Wrap(
+          const Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final role in account.roles)
-                StatusPill(
-                  role.label,
-                  color: role == UserRole.organizer
-                      ? SportikaColors.mint
-                      : role == UserRole.scorer
-                      ? SportikaColors.blueBright
-                      : SportikaColors.gold,
-                ),
+              StatusPill('Sportika member', color: SportikaColors.blueBright),
             ],
           ),
           if (account.bio.isNotEmpty) ...[

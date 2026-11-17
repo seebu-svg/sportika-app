@@ -134,18 +134,16 @@ class AuthErrorScreen extends StatelessWidget {
               const SizedBox(height: 13),
               const Divider(color: SportikaColors.borderSubtle, height: 1),
               const SizedBox(height: 12),
-              const _CheckLine('Your account and scorecards are safe.'),
-              const _CheckLine('Nothing was charged, published or deleted.'),
-              const _CheckLine(
-                'Demo accounts sign in instantly if time is short.',
-              ),
+              const _CheckLine('Check your connection and try again.'),
+              const _CheckLine('Check your email address for typing errors.'),
+              const _CheckLine('You can return to sign in at any time.'),
             ],
           ),
         ),
         const SizedBox(height: 16),
         const AuthMicro(
-          'If this keeps happening, sign in with a demo account from the Sign In '
-          'screen to keep exploring the prototype.',
+          'If this keeps happening, try again later. Your session must be verified '
+          'before you can open your account.',
           icon: Icons.support_agent,
         ),
         const SizedBox(height: 8),

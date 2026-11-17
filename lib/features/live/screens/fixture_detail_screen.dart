@@ -13,6 +13,7 @@ import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/live/widgets/live_clock.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
+import 'package:sportika/core/state/match_controller.dart';
 
 /// Match page for one official fixture: live score, result, scorers, roster,
 /// correction audit trail and every organizer workflow action.
@@ -44,6 +45,10 @@ class FixtureDetailScreen extends StatelessWidget {
     final me = context.read<ProfileController>().currentAccount;
     final isOrganizer = tournament != null && tournament.organizerId == me?.id;
     final isScorer = me != null && fixture.scorerAccountIds.contains(me.id);
+    final linkedMatch = context.watch<MatchController>().matchOfFixture(
+      fixture.tournamentId,
+      fixture.id,
+    );
     final locked =
         fixture.status == FixtureStatus.published ||
         fixture.status == FixtureStatus.walkover;
@@ -200,11 +205,38 @@ class FixtureDetailScreen extends StatelessWidget {
                 sides: sides,
               ),
             ],
-            if (!locked) ...[
+            if (sport == Sport.futsal &&
+                (linkedMatch != null ||
+                    (isOrganizer && fixture.events.isEmpty && !locked))) ...[
+              const SizedBox(height: 12),
+              PrimaryButton(
+                label: linkedMatch == null
+                    ? 'Set up Futsal Match Center'
+                    : 'Open Futsal Match Center',
+                icon: Icons.sports_soccer,
+                onPressed: () => linkedMatch == null
+                    ? pushRoute(
+                        context,
+                        AppRoute.createMatch,
+                        args: CreateMatchArgs(
+                          tournamentId: fixture.tournamentId,
+                          fixtureId: fixture.id,
+                        ),
+                      )
+                    : pushRoute(
+                        context,
+                        AppRoute.matchDetail,
+                        args: MatchArgs(linkedMatch.id),
+                      ),
+              ),
+            ],
+            if (!locked && linkedMatch == null) ...[
               const SizedBox(height: 12),
               if (isScorer || isOrganizer)
                 PrimaryButton(
-                  label: fixture.events.isEmpty
+                  label: !isScorer
+                      ? 'View scorecard'
+                      : fixture.events.isEmpty
                       ? 'Start scoring'
                       : 'Open scorecard',
                   icon: Icons.sports_score,
@@ -638,6 +670,7 @@ class _EntryRoster extends StatelessWidget {
               children: [
                 for (final memberId in entry.memberAccountIds)
                   _MemberChip(
+                    accountId: memberId,
                     name:
                         context
                             .read<SessionController>()
@@ -655,16 +688,23 @@ class _EntryRoster extends StatelessWidget {
 }
 
 class _MemberChip extends StatelessWidget {
-  const _MemberChip({required this.name});
+  const _MemberChip({required this.accountId, required this.name});
 
+  final String accountId;
   final String name;
 
   @override
   Widget build(BuildContext context) {
+    final account = context.read<SessionController>().accountById(accountId);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PlayerAvatar(initials: initialsOf(name), size: 24),
+        // The same face the player directory shows, so a teammate who set a
+        // picture looks the same on a match sheet.
+        if (account != null)
+          AccountAvatar(account: account, size: 24)
+        else
+          PlayerAvatar(initials: initialsOf(name), size: 24),
         const SizedBox(width: 6),
         Text(
           name,

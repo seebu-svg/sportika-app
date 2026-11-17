@@ -1,29 +1,39 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:sportika/features/auth/services/authentication_service.dart';
+
+import 'helpers/auth_service_fixture.dart';
 
 import 'helpers/harness.dart';
 
 void main() {
-  testWidgets('the sign-in gate lists the demo accounts', (tester) async {
-    await pumpApp(tester);
-
-    expect(find.text('DEMO ACCESS'), findsOneWidget);
-    expect(find.text('Seebu Ali'), findsOneWidget);
-    expect(find.text('Yasir Malik'), findsOneWidget);
+  testWidgets('sign-in has no seeded-account bypass', (tester) async {
+    await pumpApp(
+      tester,
+      authenticationService: UnavailableAuthenticationService(),
+    );
+    expect(find.text('DEMO ACCESS'), findsNothing);
+    expect(find.text('Seebu Ali'), findsNothing);
+    expect(find.text('SIGN IN'), findsWidgets);
+    expect(find.textContaining('temporarily unavailable'), findsOneWidget);
   });
 
-  testWidgets('signing in opens the five-tab shell', (tester) async {
-    await pumpApp(tester);
-
-    // The demo row sits below the fold on a phone-sized surface.
-    await tapVisible(tester, find.text('Seebu Ali'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Home'), findsWidgets);
-    expect(find.text('Discover'), findsWidgets);
-    expect(find.text('Live'), findsWidgets);
-    expect(find.text('Team'), findsWidgets);
-    expect(find.text('Me'), findsWidgets);
+  testWidgets('verified service sign-in opens the five-tab shell', (
+    tester,
+  ) async {
+    final state = await pumpApp(tester);
+    await tester.enterText(
+      find.byType(TextField).at(0),
+      state.accountById('acc-seebu')!.email,
+    );
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      AuthServiceFixture.validPassword,
+    );
+    await tapVisible(tester, find.text('SIGN IN').last);
+    for (final tab in ['Home', 'Tournament', 'Match', 'Team', 'Me']) {
+      expect(find.text(tab), findsWidgets);
+    }
   });
 
   testWidgets('a personal scorecard can be opened from the shell', (

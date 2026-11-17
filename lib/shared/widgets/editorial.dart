@@ -110,37 +110,41 @@ class SportPhoto extends StatelessWidget {
   final double height, radius;
   final Alignment alignment;
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(radius),
-    child: SizedBox(
-      height: height,
-      width: double.infinity,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final decodeWidth =
-              (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
-                  .round()
-                  .clamp(1, 1600);
-          return Image.asset(
-            'assets/images/sports/${sport.name}.jpg',
-            fit: BoxFit.cover,
-            alignment: alignment,
-            cacheWidth: decodeWidth,
-            semanticLabel: '${sport.label} sports photography',
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, _, _) => Image.network(
-              SportPhotography.forSport(sport),
+  Widget build(BuildContext context) => RepaintBoundary(
+    // Photographs never change while a card animates open, so isolating them
+    // keeps a scroll or a hover from re-decoding a 1600px bitmap.
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final decodeWidth =
+                (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
+                    .round()
+                    .clamp(1, 1600);
+            return Image.asset(
+              'assets/images/sports/${sport.name}.jpg',
               fit: BoxFit.cover,
               alignment: alignment,
               cacheWidth: decodeWidth,
               semanticLabel: '${sport.label} sports photography',
               filterQuality: FilterQuality.medium,
-              loadingBuilder: (_, child, progress) =>
-                  progress == null ? child : _placeholder(loading: true),
-              errorBuilder: (_, _, _) => _placeholder(loading: false),
-            ),
-          );
-        },
+              errorBuilder: (_, _, _) => Image.network(
+                SportPhotography.forSport(sport),
+                fit: BoxFit.cover,
+                alignment: alignment,
+                cacheWidth: decodeWidth,
+                semanticLabel: '${sport.label} sports photography',
+                filterQuality: FilterQuality.medium,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _placeholder(loading: true),
+                errorBuilder: (_, _, _) => _placeholder(loading: false),
+              ),
+            );
+          },
+        ),
       ),
     ),
   );
@@ -292,14 +296,16 @@ class EditorialBanner extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          action!,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
+                        Flexible(
+                          child: Text(
+                            action!,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        const SizedBox(width: 12),
                         const Icon(Icons.arrow_forward, size: 17),
                       ],
                     ),
@@ -319,12 +325,14 @@ class BrandMetricStrip extends StatelessWidget {
     super.key,
     required this.metrics,
     this.accent = SportikaColors.mint,
+    this.compact = false,
   });
   final List<({String value, String label})> metrics;
   final Color accent;
+  final bool compact;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 20),
+    padding: EdgeInsets.symmetric(vertical: compact ? 14 : 20),
     decoration: const BoxDecoration(
       border: Border.symmetric(
         horizontal: BorderSide(color: SportikaColors.border),
@@ -342,7 +350,7 @@ class BrandMetricStrip extends StatelessWidget {
                   metrics[i].value,
                   style: TextStyle(
                     fontFamily: 'Barlow Condensed',
-                    fontSize: 32,
+                    fontSize: compact ? 26 : 32,
                     height: 1,
                     fontWeight: FontWeight.w800,
                     letterSpacing: .3,

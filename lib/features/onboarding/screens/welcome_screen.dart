@@ -23,20 +23,21 @@ class WelcomeScreen extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           AuthAction(
-            label: 'GET STARTED',
+            label: 'CREATE ACCOUNT',
             onPressed: flow.openCreateAccount,
             tone: SportikaColors.blue,
           ),
           const SizedBox(height: 10),
           AuthAction(
-            label: 'I ALREADY HAVE AN ACCOUNT',
+            label: 'SIGN IN',
             onPressed: flow.openSignIn,
             ghost: true,
             icon: Icons.login,
           ),
           const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text(
                 'By continuing you agree to our ',
@@ -51,8 +52,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           const AuthMicro(
-            'Private scorecards and official results are separate records. '
-            'Everything stays on this device.',
+            'Private scorecards and official results are separate records.',
             icon: Icons.shield_outlined,
           ),
         ],
@@ -64,8 +64,8 @@ class WelcomeScreen extends StatelessWidget {
         AuthHeadline('THE GAME', accent: 'CONNECTS US.', size: 48),
         SizedBox(height: 16),
         AuthLead(
-          'Premium scorekeeping, real tournaments and a sporting community — '
-          'in one calm, fast app. Built for the way Karachi plays.',
+          'Discover games, find your people and bring a tournament to life. '
+          'One account for Cricket, Padel, Futsal and Badminton.',
           maxWidth: 330,
         ),
         SizedBox(height: 26),
@@ -78,7 +78,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
             _MetricDivider(),
             Expanded(
-              child: _Metric(value: '12', label: 'LIVE FIXTURES'),
+              child: _Metric(value: '01', label: 'COMMUNITY'),
             ),
             _MetricDivider(),
             Expanded(

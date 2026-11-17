@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/filter_chip_row.dart';
+import 'package:sportika/features/discover/screens/players_tab.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/session_controller.dart';
@@ -9,16 +11,21 @@ import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/live/screens/notifications_screen.dart';
 
 /// Teams & registration (spec §5): form a pair or team, manage the roster,
 /// then enter tournaments with it.
-class TeamsTab extends StatelessWidget {
+class TeamsTab extends StatefulWidget {
   const TeamsTab({super.key});
 
   @override
+  State<TeamsTab> createState() => _TeamsTabState();
+}
+
+class _TeamsTabState extends State<TeamsTab> {
+  int _section = 0;
+
+  @override
   Widget build(BuildContext context) {
-    final state = context.watch<SessionController>();
     context.watch<SessionController>();
     final squads = context.read<TeamsController>().mySquads;
     final me = context.read<ProfileController>().currentAccount;
@@ -34,71 +41,91 @@ class TeamsTab extends StatelessWidget {
             )
             .toList()
           ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
-    final players = state.accounts
-        .where((a) => a.has(UserRole.player))
-        .toList();
     final invites = context.read<TeamsController>().myInvites;
 
     return Column(
       children: [
-        TabHeader(
-          title: 'Team',
-          subtitle:
-              '${squads.length} squads · ${entries.length} tournament entries',
-          actions: const [NotificationBell(), SizedBox(width: 16)],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
+          child: FilterChipRow<int>(
+            label: 'Team section',
+            selected: _section,
+            onChanged: (value) => setState(() => _section = value),
+            choices: const [
+              FilterChoice(0, 'My teams'),
+              FilterChoice(1, 'Find teams'),
+              FilterChoice(2, 'Players'),
+            ],
+          ),
         ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+          child: IndexedStack(
+            index: _section,
             children: [
-              if (invites.isNotEmpty) ...[
-                const SectionTitle('Invitations'),
-                for (final invite in invites)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _InviteCard(squad: invite),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                children: [
+                  if (invites.isNotEmpty) ...[
+                    const SectionTitle('Invitations'),
+                    for (final invite in invites)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _InviteCard(squad: invite),
+                      ),
+                  ],
+                  PrimaryButton(
+                    label: 'Create a team or pair',
+                    icon: Icons.group_add_outlined,
+                    tone: SportikaColors.mint,
+                    onPressed: () => pushRoute(context, AppRoute.createTeam),
                   ),
-              ],
-              PrimaryButton(
-                label: 'Create a team or pair',
-                icon: Icons.group_add_outlined,
-                tone: SportikaColors.mint,
-                onPressed: () => pushRoute(context, AppRoute.createTeam),
+                  const SectionTitle('My squads'),
+                  if (squads.isEmpty)
+                    const EmptyState(
+                      title: 'No squads yet',
+                      body:
+                          'Build a pair for padel or badminton, or a team for cricket and '
+                          'futsal, then enter a tournament with it.',
+                      icon: Icons.groups_outlined,
+                    )
+                  else
+                    for (final squad in squads)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _SquadCard(squad: squad),
+                      ),
+                  const SectionTitle('My entries'),
+                  if (entries.isEmpty)
+                    const EmptyState(
+                      title: 'No tournament entries',
+                      body: 'Registration status and organizer decisions appear here.',
+                      icon: Icons.how_to_reg_outlined,
+                    )
+                  else
+                    for (final entry in entries)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _EntryRow(entry: entry),
+                      ),
+                ],
               ),
-              const SectionTitle('My squads'),
-              if (squads.isEmpty)
-                const EmptyState(
-                  title: 'No squads yet',
-                  body:
-                      'Build a pair for padel or badminton, or a team for cricket and '
-                      'futsal, then enter a tournament with it.',
-                  icon: Icons.groups_outlined,
-                )
-              else
-                for (final squad in squads)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _SquadCard(squad: squad),
-                  ),
-              const SectionTitle('My entries'),
-              if (entries.isEmpty)
-                const EmptyState(
-                  title: 'No tournament entries',
-                  body: 'Registration status and organizer decisions appear here.',
-                  icon: Icons.how_to_reg_outlined,
-                )
-              else
-                for (final entry in entries)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _EntryRow(entry: entry),
-                  ),
-              const SectionTitle('Players'),
-              for (final player in players)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _PlayerRow(player: player),
-                ),
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                children: [
+                  if (context.watch<TeamsController>().squads.isEmpty)
+                    const EmptyState(
+                      title: 'No teams yet',
+                      body: 'Community teams and pairs will appear here.',
+                      icon: Icons.groups_outlined,
+                    ),
+                  for (final squad in context.watch<TeamsController>().squads)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _SquadCard(squad: squad),
+                    ),
+                ],
+              ),
+              const PlayersTab(),
             ],
           ),
         ),
@@ -168,6 +195,8 @@ class _SquadCard extends StatelessWidget {
                       initials: initialsOf(
                         state.accountById(member)?.displayName ?? '?',
                       ),
+                      photoPath: state.accountById(member)?.photoPath,
+                      photoUrl: state.accountById(member)?.photoUrl,
                       size: 22,
                       color: tone,
                     ),
@@ -242,52 +271,6 @@ class _EntryRow extends StatelessWidget {
             ),
           ),
           StatusPill(entry.status.label, color: statusColor(entry.status.key)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlayerRow extends StatelessWidget {
-  const _PlayerRow({required this.player});
-
-  final Account player;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-      child: Row(
-        children: [
-          AccountAvatar(account: player, size: 34),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  player.displayName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: SportikaColors.text,
-                  ),
-                ),
-                Text(
-                  player.roles.map((r) => r.label).join(' · '),
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: SportikaColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            player.city,
-            style: const TextStyle(fontSize: 11, color: SportikaColors.textDim),
-          ),
         ],
       ),
     );

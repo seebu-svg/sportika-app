@@ -13,7 +13,7 @@ import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// Players discovery for the Discover tab: the community directory, filtered
+/// Players discovery for the Team tab: the community directory, filtered
 /// by sport and by name or city.
 class PlayersTab extends StatefulWidget {
   const PlayersTab({super.key});
@@ -51,7 +51,6 @@ class _PlayersTabState extends State<PlayersTab> {
         context
             .read<SessionController>()
             .accounts
-            .where((a) => a.has(UserRole.player))
             .where(
               (a) =>
                   sport == null || state.sportsPlayedBy(a.id).contains(sport),

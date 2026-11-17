@@ -5,8 +5,11 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/match_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/app/routes.dart';
+import 'package:sportika/shared/models/match.dart';
+import 'package:sportika/features/matches/widgets/match_vs_card.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -29,21 +32,6 @@ class ScorerWorkspaceScreen extends StatelessWidget {
         child: LoadingSkeleton(rows: 3, label: 'Loading assigned fixtures'),
       );
     }
-    if (!session.hasRole(UserRole.scorer)) {
-      return ScreenScaffold(
-        title: 'Scorer workspace',
-        child: ErrorState(
-          title: 'Scorers only',
-          message:
-              'An organizer has to assign the scorer role before you can keep '
-              'score for a fixture.',
-          icon: Icons.sports_score,
-          retryLabel: 'Go back',
-          onRetry: () => Navigator.of(context).maybePop(),
-        ),
-      );
-    }
-
     final assigned = state.myScoringFixtures;
     final inPlay = assigned
         .where((f) => f.status != FixtureStatus.submitted)
@@ -96,9 +84,92 @@ class ScorerWorkspaceScreen extends StatelessWidget {
                     child: _ScorerFixtureCard(fixture: fixture),
                   ),
               ],
+              const _OfficialMatchesSection(),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Official matches where this account is the assigned scorer. A one-off
+/// match has no tournament, so it never shows up in the fixture list above and
+/// needs its own way in.
+class _OfficialMatchesSection extends StatelessWidget {
+  const _OfficialMatchesSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final matches = context.watch<MatchController>().myScoringMatches;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionTitle('Official matches you are scoring (${matches.length})'),
+        if (matches.isEmpty)
+          const EmptyState(
+            title: 'No official matches yet',
+            body:
+                'An organizer can assign you as the official scorer of a '
+                'standalone match. It appears here the moment it is assigned.',
+            icon: Icons.sports_cricket,
+          )
+        else
+          for (final match in matches)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ScorerMatchCard(match: match),
+            ),
+      ],
+    );
+  }
+}
+
+class _ScorerMatchCard extends StatelessWidget {
+  const _ScorerMatchCard({required this.match});
+
+  final SportMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.watch<MatchController>();
+    final progress = controller.progressOf(match);
+    final openScoring = match.status == FixtureStatus.live;
+    return SurfaceCard(
+      padding: const EdgeInsets.all(12),
+      onTap: () =>
+          pushRoute(context, AppRoute.matchDetail, args: MatchArgs(match.id)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MatchVsCard(
+            match: match,
+            progress: progress,
+            showScore: match.status != FixtureStatus.upcoming,
+            dense: true,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              StatusPill(
+                match.status.label,
+                color: statusColor(match.status.key),
+                icon: statusIcon(match.status.key),
+              ),
+              const Spacer(),
+              if (openScoring)
+                GhostButton(
+                  label: 'Open scoring',
+                  icon: Icons.scoreboard_outlined,
+                  onPressed: () => pushRoute(
+                    context,
+                    AppRoute.matchScoring,
+                    args: MatchArgs(match.id),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

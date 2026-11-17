@@ -5,12 +5,15 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
+import 'package:sportika/core/state/monetization_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
 import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
+import 'package:sportika/features/monetization/widgets/billing_widgets.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Organizer home (spec §4, §5): what needs a decision now, plus every event
@@ -22,6 +25,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<TournamentsController>();
     context.watch<TournamentsController>();
+    final billing = context.watch<MonetizationController>();
     final me = context.read<ProfileController>().currentAccount;
     final mine = state.tournamentsForOrganizer(me?.id);
     final pending = <Entry>[
@@ -37,7 +41,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: sportikaAppBar(
-        'Organizer dashboard',
+        'My tournaments',
         subtitle: '${mine.length} events · ${pending.length} entries to review',
         actions: [
           IconButton(
@@ -51,6 +55,7 @@ class OrganizerDashboardScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
         children: [
+          PremiumStatusCard(billing: billing),
           Row(
             children: [
               Expanded(
@@ -427,6 +432,71 @@ class _OrganizerDisputeCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Whether this organizer's events carry the premium toolkit, and the one tap
+/// that changes it.
+///
+/// The card is worded so the free layer stays named as free, and it never
+/// describes the member as a kind of account: one universal account buys tools
+/// or does not, and loses nothing it already had either way.
+class PremiumStatusCard extends StatelessWidget {
+  const PremiumStatusCard({super.key, required this.billing});
+
+  final MonetizationController billing;
+
+  @override
+  Widget build(BuildContext context) {
+    final pro = billing.isPro;
+    final periodEnd = billing.proSubscription?.currentPeriodEnd;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SurfaceCard(
+        borderColor: pro
+            ? SportikaColors.gold.withValues(alpha: 0.42)
+            : SportikaColors.borderSubtle,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    pro ? 'Organizer Pro is active' : 'Free tournament tools',
+                    style: SportikaType.bodyStrong,
+                  ),
+                ),
+                if (pro) const PremiumBadge(compact: true),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              pro
+                  ? 'Premium entry ceilings, group draw controls and rule '
+                        'presets are on for every event you organise'
+                        '${periodEnd == null ? '.' : ' until ${billingDate(periodEnd)}.'}'
+                  : 'Creating matches, scoring officially and publishing '
+                        'results stay free. Pro raises the entry ceiling to '
+                        '${billing.premiumEntryCap} and unlocks the draw '
+                        'controls on your events.',
+              style: SportikaType.caption,
+            ),
+            const SizedBox(height: 12),
+            GhostButton(
+              label: pro ? 'Manage plan' : 'Go premium',
+              icon: pro ? Icons.tune : Icons.workspace_premium_outlined,
+              tone: pro ? SportikaColors.textBody : SportikaColors.gold,
+              expand: true,
+              onPressed: () => pushRoute(
+                context,
+                pro ? AppRoute.subscription : AppRoute.pricing,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

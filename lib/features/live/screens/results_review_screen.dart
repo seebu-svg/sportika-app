@@ -36,7 +36,7 @@ class ResultsReviewScreen extends StatelessWidget {
       return ScreenScaffold(
         title: 'Results review',
         child: ErrorState(
-          title: 'Organizers only',
+          title: 'Sign in to review',
           message:
               'Only the organizer of a tournament can publish its '
               'results. Ask them to review the submission.',
@@ -51,7 +51,7 @@ class ResultsReviewScreen extends StatelessWidget {
         .where((f) => tournamentId == null || f.tournamentId == tournamentId)
         .toList();
     final published =
-        state.fixtures
+        state.myOrganizerFixtures
             .where(
               (f) =>
                   f.status == FixtureStatus.published &&

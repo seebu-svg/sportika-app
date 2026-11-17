@@ -114,17 +114,33 @@ class AuthRules {
 
   static bool email(String value) {
     final v = value.trim();
-    if (v.length < 6 || v.contains(' ')) return false;
-    final at = v.indexOf('@');
-    if (at <= 0 || at != v.lastIndexOf('@')) return false;
-    final domain = v.substring(at + 1);
-    return domain.contains('.') && !domain.endsWith('.') && domain.length >= 4;
+    if (v.length > 254 || RegExp(r'\s').hasMatch(v)) return false;
+    final parts = v.split('@');
+    if (parts.length != 2 || parts.first.isEmpty || parts.first.length > 64) {
+      return false;
+    }
+    final local = parts.first;
+    if (local.startsWith('.') || local.endsWith('.') || local.contains('..')) {
+      return false;
+    }
+    if (!RegExp(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$").hasMatch(local)) {
+      return false;
+    }
+    final labels = parts.last.split('.');
+    return labels.length >= 2 &&
+        labels.last.length >= 2 &&
+        labels.every(
+          (label) =>
+              label.isNotEmpty &&
+              label.length <= 63 &&
+              RegExp(r'^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$')
+                  .hasMatch(label),
+        );
   }
 
   static bool password(String value) => value.trim().length >= 8;
 
-  static bool otp(String value) =>
-      value.length == 6 && int.tryParse(value) != null;
+  static bool otp(String value) => RegExp(r'^[0-9]{6}$').hasMatch(value);
 
   /// Password checklist surfaced on Reset Password.
   static List<({String label, bool Function(String) passes})> get checks => [

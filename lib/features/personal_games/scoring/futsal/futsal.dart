@@ -16,19 +16,24 @@ class FutsalEngine implements SportEngine {
     '2 × 15 min',
     '2 × 20 min',
     '2 × 20 min · knockout',
+    '2 × 20 min · extra time & penalties',
   ];
 
   @override
   Map<String, dynamic> rulesForFormat(String format) => {
     'halves': 2,
     'halfMinutes': format.contains('15') ? 15 : 20,
-    'winnerRequired': format.contains('knockout'),
-    'shootout': format.contains('knockout'),
+    'winnerRequired':
+        (format.contains('knockout') || format.contains('extra time')),
+    'shootout': (format.contains('knockout') || format.contains('extra time')),
+    'extraTime': format.contains('extra time'),
+    'extraHalfMinutes': 5,
   };
 
   @override
   String describeRules(Map<String, dynamic> rules) =>
       '${rules['halves'] ?? 2} × ${rules['halfMinutes'] ?? 20} min'
+      '${rules['extraTime'] == true ? ' · 2 × 5 min extra time if tied' : ''}'
       '${rules['shootout'] == true ? ' · penalty shootout if tied' : ''}';
 
   @override
@@ -42,7 +47,10 @@ class FutsalEngine implements SportEngine {
     final winnerRequired = rules['winnerRequired'] == true;
     final allowShootout = rules['shootout'] == true;
 
-    final st = _FutsalState(totalHalves);
+    final extraTime = rules['extraTime'] == true;
+    final st = _FutsalState(totalHalves + (extraTime ? 2 : 0));
+    st.regulationHalves = totalHalves;
+    st.extraHalfMinutes = (rules['extraHalfMinutes'] as num?)?.toInt() ?? 5;
 
     for (final e in events) {
       switch (e.kind) {
@@ -50,6 +58,7 @@ class FutsalEngine implements SportEngine {
           if (st.phase == _Phase.shootout || st.phase == _Phase.complete) break;
           final s = e.side ?? 0;
           final h = e.data['half'] as int? ?? st.halfIndex;
+          if (s < 0 || s > 1 || h < 0 || h >= st.byHalf.length) break;
           st.goals[s]++;
           st.byHalf[h][s]++;
           st.scorers.add(
@@ -59,6 +68,7 @@ class FutsalEngine implements SportEngine {
         case kPenalty:
           if (st.phase != _Phase.shootout) break;
           final s = e.side ?? 0;
+          if (s < 0 || s > 1) break;
           st.taken[s]++;
           if (e.data['scored'] == true) st.shootout[s]++;
           _resolveShootout(st);
@@ -104,6 +114,8 @@ class FutsalEngine implements SportEngine {
     ];
 
     final detail = <String>[
+      if (st.halfIndex >= totalHalves)
+        'Extra time ${st.byHalf.skip(totalHalves).fold<int>(0, (n, h) => n + h[0])}-${st.byHalf.skip(totalHalves).fold<int>(0, (n, h) => n + h[1])}',
       'Goals by half · H1 ${st.byHalf[0][0]}-${st.byHalf[0][1]} · H2 ${st.byHalf[1][0]}-${st.byHalf[1][1]}',
       if (st.scorers.isNotEmpty) 'Goals: ${st.scorers.join(' · ')}',
       if (st.phase == _Phase.shootout || st.shootoutTotal > 0)
@@ -149,6 +161,13 @@ class FutsalEngine implements SportEngine {
         'periodElapsed': st.elapsed[st.halfIndex],
         'phase': st.phase.name,
         'half': st.halfIndex + 1,
+        'extraTime': st.halfIndex >= totalHalves,
+        'periodMinutes': st.halfIndex >= totalHalves
+            ? st.extraHalfMinutes
+            : halfMinutes,
+        'periods': st.byHalf.length,
+        'shootoutTaken': st.taken,
+        'shootoutScores': st.shootout,
         'elapsed': st.elapsedSeconds,
         'running': st.phase == _Phase.running,
       },
@@ -182,22 +201,27 @@ class FutsalEngine implements SportEngine {
         // Elapsed time is taken from the persisted event stamps, so the fold
         // replays identically after a resume, a reassignment or a restart.
         if (st.resumeAt != null) {
-          st.elapsed[st.halfIndex] += e.at.difference(st.resumeAt!).inSeconds;
+          st.elapsed[st.halfIndex] += e.at
+              .difference(st.resumeAt!)
+              .inSeconds
+              .clamp(0, 86400);
           st.resumeAt = null;
         }
         st.phase = _Phase.paused;
         break;
       case 'end_half':
         if (st.phase == _Phase.running && st.resumeAt != null) {
-          st.elapsed[st.halfIndex] += e.at.difference(st.resumeAt!).inSeconds;
+          st.elapsed[st.halfIndex] += e.at
+              .difference(st.resumeAt!)
+              .inSeconds
+              .clamp(0, 86400);
           st.resumeAt = null;
         }
-        st.elapsed[st.halfIndex] = st.elapsed[st.halfIndex].clamp(
-          0,
-          halfMinutes * 60 + 120,
-        );
-        if (st.phase == _Phase.halfTime) {
-          // The break has already happened, so this closes the last half.
+        if (st.phase == _Phase.halfTime &&
+            st.byHalf.length == st.regulationHalves) {
+          _endRegulation(st, winnerRequired, allowShootout);
+        } else if (st.halfIndex == st.regulationHalves - 1 &&
+            (st.goals[0] != st.goals[1] || !winnerRequired)) {
           _endRegulation(st, winnerRequired, allowShootout);
         } else if (st.halfIndex < st.byHalf.length - 1) {
           st.phase = _Phase.halfTime;
@@ -207,7 +231,10 @@ class FutsalEngine implements SportEngine {
         break;
       case 'end_match':
         if (st.phase == _Phase.running && st.resumeAt != null) {
-          st.elapsed[st.halfIndex] += e.at.difference(st.resumeAt!).inSeconds;
+          st.elapsed[st.halfIndex] += e.at
+              .difference(st.resumeAt!)
+              .inSeconds
+              .clamp(0, 86400);
           st.resumeAt = null;
         }
         st.phase = _Phase.complete;
@@ -424,8 +451,10 @@ class FutsalEngine implements SportEngine {
 
   String _phaseLabel(_FutsalState st, int halfMinutes) => switch (st.phase) {
     _Phase.pre => 'Kick-off pending',
-    _Phase.running => 'Half ${st.halfIndex + 1} · running',
-    _Phase.paused => 'Half ${st.halfIndex + 1} · stopped',
+    _Phase.running =>
+      '${st.halfIndex >= st.regulationHalves ? 'Extra time ${st.halfIndex - st.regulationHalves + 1}' : 'Half ${st.halfIndex + 1}'} · running',
+    _Phase.paused =>
+      '${st.halfIndex >= st.regulationHalves ? 'Extra time ${st.halfIndex - st.regulationHalves + 1}' : 'Half ${st.halfIndex + 1}'} · stopped',
     _Phase.halfTime => 'Half time',
     _Phase.shootout => 'Penalty shootout',
     _Phase.complete => 'Full time',
@@ -449,6 +478,8 @@ class _FutsalState {
   final List<String> scorers = [];
   _Phase phase = _Phase.pre;
   int halfIndex = 0;
+  int regulationHalves = 2;
+  int extraHalfMinutes = 5;
   int winnerIndex = -1;
   String completionReason = '';
   DateTime? resumeAt;

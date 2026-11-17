@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -30,41 +31,43 @@ class _Slide {
 const List<_Slide> _slides = [
   _Slide(
     number: '01',
-    eyebrow: 'PRIVATE SCORECARDS',
-    title: 'EVERY MATCH',
-    accent: 'IS A STORY.',
-    body:
-        'Keep ball-by-ball and rally-by-rally scorecards for cricket, padel, '
-        'futsal and badminton. Every tap saves itself.',
+    eyebrow: 'DISCOVER GAMES',
+    title: 'YOUR NEXT',
+    accent: 'GAME AWAITS.',
+    body: 'Find a cricket game nearby, explore local fixtures and make time for the sport you love.',
     sport: Sport.cricket,
-    alignment: Alignment(0, -.15),
+    alignment: Alignment(0, .1),
   ),
   _Slide(
     number: '02',
-    eyebrow: 'TOURNAMENTS',
-    title: 'RUN THE',
-    accent: 'WHOLE EVENT.',
-    body:
-        'Draws, fixtures and live scoring in one place. Results stay provisional '
-        'until the organizer publishes them.',
-    sport: Sport.futsal,
-    alignment: Alignment(0, -.1),
-  ),
-  _Slide(
-    number: '03',
-    eyebrow: 'COMMUNITY',
-    title: 'YOUR GAME.',
-    accent: 'YOUR PEOPLE.',
-    body:
-        'Build squads, join community games and follow the tournaments your city '
-        'is playing this week.',
+    eyebrow: 'CONNECT WITH PLAYERS',
+    title: 'FIND YOUR',
+    accent: 'PEOPLE.',
+    body: 'Meet players who share your passion. Find a padel partner, join a team and build your sporting community.',
     sport: Sport.padel,
     alignment: Alignment(0, 0),
   ),
+  _Slide(
+    number: '03',
+    eyebrow: 'MATCHES & TOURNAMENTS',
+    title: 'BRING THE',
+    accent: 'GAME TO LIFE.',
+    body: 'Create a futsal match or run a tournament. Bring teams together, build the draw and manage your event with one account.',
+    sport: Sport.futsal,
+    alignment: Alignment(.15, -.1),
+  ),
+  _Slide(
+    number: '04',
+    eyebrow: 'SCORES & PERFORMANCE',
+    title: 'EVERY POINT.',
+    accent: 'YOUR PROGRESS.',
+    body: 'Track badminton rallies and scores across all four sports. Keep personal scorecards and follow your official match history.',
+    sport: Sport.badminton,
+    alignment: Alignment(.2, -.15),
+  ),
 ];
 
-/// 02 · Three-slide onboarding carousel. Photography carries each slide;
-/// navigation stays in the thumb zone and never blocks the swipe.
+/// Four sport stories over bundled photography, with a persistent action area.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -88,176 +91,267 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  void _goTo(int index, bool reduceMotion) {
+    if (reduceMotion) {
+      _pages.jumpToPage(index);
+    } else {
+      _pages.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<AuthFlowController>();
     final index = flow.onboardingIndex.clamp(0, _slides.length - 1);
     final last = index == _slides.length - 1;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final footerInset =
+        164.0 +
+        (textScale - 1).clamp(0, 2) * 36 +
+        (flow.inlineError == null ? 0 : 100);
 
     return Scaffold(
       backgroundColor: SportikaColors.deepest,
-      body: Stack(
-        children: [
-          PageView.builder(
-            controller: _pages,
-            itemCount: _slides.length,
-            onPageChanged: flow.setOnboardingIndex,
-            itemBuilder: (context, i) => _SlideView(slide: _slides[i]),
-          ),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 150,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0x99061426), Color(0x00061426)],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              child: Container(
-                height: 260,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      SportikaColors.deepest.withValues(alpha: 0),
-                      SportikaColors.deepest.withValues(alpha: .86),
-                      SportikaColors.deepest,
-                    ],
-                    stops: const [0, .45, 1],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
+      body: DefaultTextStyle.merge(
+        style: const TextStyle(fontFamily: SportikaType.bodyFamily),
+        child: LayoutBuilder(
+          builder: (context, viewport) {
+            final sidePadding = viewport.maxWidth > 760
+                ? (viewport.maxWidth - 680) / 2
+                : 24.0;
+            final showCounter =
+                viewport.maxWidth - sidePadding * 2 > 176 + 100 * textScale;
+            return Stack(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 14, 0),
-                  child: Row(
-                    children: [
-                      const BrandMark(size: 26),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'SPORTIKA',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.6,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: flow.finishOnboarding,
-                        style: TextButton.styleFrom(
-                          foregroundColor: SportikaColors.textMuted,
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          minimumSize: const Size(0, 34),
-                        ),
-                        child: const Text(
-                          'SKIP',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.8,
-                          ),
-                        ),
-                      ),
-                    ],
+                PageView.builder(
+                  controller: _pages,
+                  itemCount: _slides.length,
+                  onPageChanged: flow.setOnboardingIndex,
+                  allowImplicitScrolling: true,
+                  itemBuilder: (context, i) => AnimatedBuilder(
+                    animation: _pages,
+                    builder: (context, _) => _SlideView(
+                      slide: _slides[i],
+                      sidePadding: sidePadding,
+                      footerInset: footerInset,
+                      distance: reduceMotion
+                          ? 0
+                          : ((_pages.hasClients ? _pages.page : null) ??
+                                    index.toDouble()) -
+                                i,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 22),
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 150,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x99061426), Color(0x00061426)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: Container(
+                      height: 260,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            SportikaColors.deepest.withValues(alpha: 0),
+                            SportikaColors.deepest.withValues(alpha: .86),
+                            SportikaColors.deepest,
+                          ],
+                          stops: const [0, .45, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SafeArea(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          for (var i = 0; i < _slides.length; i++)
-                            GestureDetector(
-                              onTap: () => _pages.animateToPage(
-                                i,
-                                duration: const Duration(milliseconds: 380),
-                                curve: Curves.easeOutCubic,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 14, 0),
+                        child: Row(
+                          children: [
+                            const BrandMark(size: 26),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'SPORTIKA',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.6,
                               ),
-                              behavior: HitTestBehavior.opaque,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                                height: 3,
-                                width: i == index ? 30 : 14,
-                                margin: const EdgeInsets.only(right: 6),
-                                decoration: BoxDecoration(
-                                  color: i == index
-                                      ? SportikaColors.mint
-                                      : SportikaColors.borderStrong,
-                                  borderRadius: BorderRadius.circular(2),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: flow.busy
+                                  ? null
+                                  : flow.finishOnboarding,
+                              style: TextButton.styleFrom(
+                                foregroundColor: SportikaColors.textMuted,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                minimumSize: const Size(48, 48),
+                              ),
+                              child: const Text(
+                                'SKIP',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.8,
                                 ),
                               ),
                             ),
-                          const Spacer(),
-                          Text(
-                            '${_slides[index].number} / 03',
-                            style: authDisplay(
-                              12,
-                              color: SportikaColors.textDim,
-                              letterSpacing: 1.6,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 18),
-                      AuthAction(
-                        label: last ? 'GET STARTED' : 'NEXT',
-                        onPressed: () {
-                          if (last) {
-                            flow.finishOnboarding();
-                            return;
-                          }
-                          _pages.nextPage(
-                            duration: const Duration(milliseconds: 420),
-                            curve: Curves.easeOutCubic,
-                          );
-                        },
+                      const Spacer(),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          sidePadding,
+                          0,
+                          sidePadding,
+                          22,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                for (var i = 0; i < _slides.length; i++)
+                                  Semantics(
+                                    label:
+                                        'Slide ${i + 1} of ${_slides.length}: ${_slides[i].sport.label}',
+                                    selected: i == index,
+                                    button: true,
+                                    child: Tooltip(
+                                      message:
+                                          'Go to ${_slides[i].sport.label}',
+                                      child: InkWell(
+                                        onTap: flow.busy
+                                            ? null
+                                            : () => _goTo(i, reduceMotion),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          width: 44,
+                                          height: 48,
+                                          child: Center(
+                                            child: AnimatedContainer(
+                                              duration: reduceMotion
+                                                  ? Duration.zero
+                                                  : const Duration(
+                                                      milliseconds: 280,
+                                                    ),
+                                              curve: Curves.easeOutCubic,
+                                              height: 3,
+                                              width: i == index ? 30 : 14,
+                                              decoration: BoxDecoration(
+                                                color: i == index
+                                                    ? SportikaColors.mint
+                                                    : SportikaColors
+                                                          .borderStrong,
+                                                borderRadius:
+                                                    BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                const Spacer(),
+                                if (showCounter)
+                                  Text(
+                                    '${_slides[index].number} / 04',
+                                    style: authDisplay(
+                                      12,
+                                      color: SportikaColors.textDim,
+                                      letterSpacing: 1.6,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (flow.inlineError != null)
+                              Semantics(
+                                liveRegion: true,
+                                child: AuthNotice(
+                                  flow.inlineError!,
+                                  tone: SportikaColors.danger,
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            AuthAction(
+                              label: last ? 'GET STARTED' : 'NEXT',
+                              busy: flow.busy,
+                              onPressed: flow.busy
+                                  ? null
+                                  : () {
+                                      if (last) {
+                                        flow.finishOnboarding();
+                                      } else {
+                                        _goTo(index + 1, reduceMotion);
+                                      }
+                                    },
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
 class _SlideView extends StatelessWidget {
-  const _SlideView({required this.slide});
+  const _SlideView({
+    required this.slide,
+    required this.sidePadding,
+    required this.footerInset,
+    required this.distance,
+  });
 
   final _Slide slide;
+  final double sidePadding, footerInset, distance;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        AuthPhoto(sport: slide.sport, alignment: slide.alignment),
+        ExcludeSemantics(
+          child: Transform.scale(
+            scale: 1 + distance.abs().clamp(0, 1) * .045,
+            child: AuthPhoto(sport: slide.sport, alignment: slide.alignment),
+          ),
+        ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -275,17 +369,47 @@ class _SlideView extends StatelessWidget {
         ),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 158),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Spacer(),
-                AuthEyebrow('${slide.number} — ${slide.eyebrow}'),
-                const SizedBox(height: 16),
-                AuthHeadline(slide.title, accent: slide.accent, size: 44),
-                const SizedBox(height: 16),
-                AuthLead(slide.body),
-              ],
+            padding: EdgeInsets.fromLTRB(
+              sidePadding,
+              80,
+              sidePadding,
+              footerInset,
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: AuthEyebrow(
+                          '${slide.number} · ${slide.sport.label.toUpperCase()}',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        slide.eyebrow,
+                        style: authDisplay(
+                          16,
+                          color: SportikaColors.mint,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AuthHeadline(
+                        slide.title,
+                        accent: slide.accent,
+                        size: constraints.maxHeight < 300 ? 36 : 48,
+                      ),
+                      const SizedBox(height: 16),
+                      AuthLead(slide.body),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),

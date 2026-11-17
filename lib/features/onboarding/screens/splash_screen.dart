@@ -1,179 +1,251 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 
-/// 01 · Splash. Brand-first, one photograph, and a finite progress rail so the
-/// prototype never leaves the user on an indeterminate spinner.
+/// Brand introduction. Startup timing and destination belong to the auth flow.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final flow = context.read<AuthFlowController>();
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: flow.continueFromSplash,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: SportikaColors.deepest,
+      ),
       child: Scaffold(
         backgroundColor: SportikaColors.deepest,
-        body: Stack(
-          children: [
-            const Positioned.fill(
-              child: AuthPhoto(
-                sport: Sport.cricket,
-                alignment: Alignment(0, -.2),
-              ),
-            ),
-            const Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x99061426),
-                      Color(0x59061426),
-                      Color(0xE6061426),
-                      SportikaColors.deepest,
-                    ],
-                    stops: [0, .3, .62, 1],
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(fontFamily: SportikaType.bodyFamily),
+          child: Stack(
+            children: [
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: ExcludeSemantics(
+                    child: CustomPaint(painter: _SplashCourtPainter()),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: -80,
-              bottom: 90,
-              child: Container(
-                height: 220,
-                width: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      SportikaColors.mint.withValues(alpha: .13),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(26, 18, 26, 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: AuthEyebrow('Karachi · Est. 2026'),
+              SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxHeight < 600;
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 24,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'PRE-AUTH',
-                          style: authDisplay(
-                            11,
-                            color: SportikaColors.textDim,
-                            letterSpacing: 2.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(flex: 3),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 900),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) => Opacity(
-                        opacity: value,
-                        child: Transform.translate(
-                          offset: Offset(0, 16 * (1 - value)),
-                          child: child,
-                        ),
-                      ),
-                      child: const BrandMark(size: 62, showWordmark: true),
-                    ),
-                    const SizedBox(height: 30),
-                    const AuthHeadline(
-                      'THE GAME',
-                      accent: 'CONNECTS US.',
-                      size: 50,
-                    ),
-                    const SizedBox(height: 14),
-                    const AuthLead(
-                      'Scorecards, tournaments and the people you play with — '
-                      'one calm place for four sports.',
-                      maxWidth: 300,
-                    ),
-                    const Spacer(flex: 2),
-                    const AuthRule(),
-                    const SizedBox(height: 14),
-                    Text(
-                      'CRICKET  ·  PADEL  ·  FUTSAL  ·  BADMINTON',
-                      style: authDisplay(
-                        11,
-                        color: SportikaColors.textMuted,
-                        letterSpacing: 1.7,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 2,
-                            color: SportikaColors.border,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0, end: 1),
-                                duration: const Duration(milliseconds: 1650),
-                                curve: Curves.easeInOutCubic,
-                                builder: (context, value, _) =>
-                                    FractionallySizedBox(
-                                      widthFactor: value,
-                                      child: Container(
-                                        color: SportikaColors.mint,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'PLAY. CONNECT. COMPETE.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 2.4,
+                                  color: SportikaColors.textMuted,
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: compact ? 28 : 56,
+                                ),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0, end: 1),
+                                  duration: reduceMotion
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 700),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, value, child) => Opacity(
+                                    opacity: value,
+                                    child: Transform.translate(
+                                      offset: Offset(0, 12 * (1 - value)),
+                                      child: Transform.scale(
+                                        scale: .94 + .06 * value,
+                                        child: child,
                                       ),
                                     ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      BrandMark(size: compact ? 84 : 104),
+                                      const SizedBox(height: 24),
+                                      const FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'SPORTIKA',
+                                          style: TextStyle(
+                                            fontFamily: 'Barlow Condensed',
+                                            fontSize: 52,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 5,
+                                            height: 1,
+                                            color: SportikaColors.text,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Container(
+                                        width: 32,
+                                        height: 3,
+                                        decoration: BoxDecoration(
+                                          color: SportikaColors.mint,
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      const Text(
+                                        'The game connects us.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.3,
+                                          color: SportikaColors.text,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      const Text(
+                                        'Your people. Your next game.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          height: 1.5,
+                                          color: SportikaColors.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Wrap(
+                                    alignment: WrapAlignment.center,
+                                    spacing: 14,
+                                    runSpacing: 8,
+                                    children: [
+                                      _SportLabel('CRICKET'),
+                                      _SportLabel('PADEL'),
+                                      _SportLabel('FUTSAL'),
+                                      _SportLabel('BADMINTON'),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 20),
+                                  TextButton(
+                                    onPressed: context
+                                        .read<AuthFlowController>()
+                                        .continueFromSplash,
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: SportikaColors.mint,
+                                      minimumSize: const Size(160, 48),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text('Tap to continue'),
+                                        ),
+                                        SizedBox(width: 8),
+                                        Icon(
+                                          Icons.arrow_forward_rounded,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              'PREPARING YOUR GAME',
-                              style: authDisplay(
-                                9.5,
-                                color: SportikaColors.textDim,
-                                letterSpacing: 1.8,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _SportLabel extends StatelessWidget {
+  const _SportLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: const TextStyle(
+      fontSize: 9,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 1.5,
+      color: SportikaColors.textMuted,
+    ),
+  );
+}
+
+/// Quiet court geometry keeps the introduction independent of image loading.
+class _SplashCourtPainter extends CustomPainter {
+  const _SplashCourtPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final glow = Paint()
+      ..shader =
+          RadialGradient(
+            colors: [
+              SportikaColors.mint.withValues(alpha: .09),
+              SportikaColors.deepest.withValues(alpha: 0),
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * .5, size.height * .4),
+              radius: size.longestSide * .48,
+            ),
+          );
+    canvas.drawRect(Offset.zero & size, glow);
+
+    final lines = Paint()
+      ..color = SportikaColors.mint.withValues(alpha: .055)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.save();
+    canvas.translate(size.width * .5, size.height * .45);
+    canvas.rotate(-.22);
+    final court = Rect.fromCenter(
+      center: Offset.zero,
+      width: size.width * 1.35,
+      height: size.height * .62,
+    );
+    canvas.drawRect(court, lines);
+    canvas.drawLine(Offset(court.left, 0), Offset(court.right, 0), lines);
+    canvas.drawLine(Offset(0, court.top), Offset(0, court.bottom), lines);
+    canvas.drawCircle(Offset.zero, size.width * .28, lines);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SplashCourtPainter oldDelegate) => false;
 }

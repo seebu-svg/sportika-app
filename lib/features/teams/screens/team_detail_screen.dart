@@ -1,3 +1,4 @@
+import 'package:sportika/shared/widgets/module_media_panel.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -99,6 +100,12 @@ class TeamDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ModuleMediaPanel(
+            bucket: 'team-media',
+            entity: squad.id,
+            canEdit: isCaptain,
+            label: squad.name,
+          ),
           Row(
             children: [
               SportTag(squad.sport),

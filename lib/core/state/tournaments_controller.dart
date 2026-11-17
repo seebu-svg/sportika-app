@@ -8,6 +8,17 @@ import 'package:sportika/core/data/repositories.dart';
 class TournamentsController extends FeatureController<TournamentRepository> {
   TournamentsController(super.repo);
 
+  /// True while the server read is in flight, so a section can tell an empty
+  /// list from one that has not arrived yet.
+  bool get loading => repo.loading;
+
+  /// Why the last read failed, or null while it is healthy.
+  String? get lastError => repo.lastError;
+
+  /// Re-reads the server rows. Pull-to-refresh and a section's retry both call
+  /// this instead of each screen inventing its own path.
+  Future<void> refresh() => repo.refresh();
+
   List<Tournament> get tournaments => repo.tournaments;
   List<Entry> get entries => repo.entries;
   Map<String, Entry> get entriesById => repo.entriesById;

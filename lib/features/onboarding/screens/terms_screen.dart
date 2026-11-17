@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:sportika/app/env.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
@@ -12,60 +13,75 @@ class _Section {
   final String body;
 }
 
-const List<_Section> _terms = [
-  _Section(
+/// The demo build runs on seeded device data, so three clauses have to say so.
+/// A live build promises the opposite: the account and its data live on the
+/// server. One switch keeps the two copies honest.
+List<_Section> _terms() => [
+  const _Section(
     'One account, real details',
     'Use an email you control and a name your team will recognise. You are '
         'responsible for keeping your sign-in details private.',
   ),
-  _Section(
+  const _Section(
     'Scorecards stay private',
     'Personal scorecards belong to you and never feed official standings. '
         'Only an organizer can publish an official result.',
   ),
-  _Section(
+  const _Section(
     'Fair play',
     'Do not submit false results, abuse officials or use Sportika to harass '
         'other players. Organizers can remove entries that break these rules.',
   ),
-  _Section(
+  const _Section(
     'Photography & marks',
     'Editorial photographs are credited in the app and do not depict fictional '
         'fixtures. Sportika names and marks remain the property of Sportika.',
   ),
-  _Section(
+  const _Section(
     'Closing your account',
-    'You can request deletion at any time. In this prototype, clearing demo '
-        'data removes everything stored on the device.',
+    AppEnv.demoMode
+        ? 'You can request deletion at any time. In this prototype, clearing '
+              'demo data removes everything stored on the device.'
+        : 'You can request deletion at any time by writing to '
+              'privacy@sportika.pk from your account address. We delete the '
+              'account, its profile and its scorecards.',
   ),
 ];
 
-const List<_Section> _privacy = [
-  _Section(
+List<_Section> _privacy() => [
+  const _Section(
     'What we store',
-    'Your name, email, city, sports preferences and avatar choice. Scorecards '
-        'and demo results are stored on this device, not on a server.',
+    AppEnv.demoMode
+        ? 'Your name, email, city, sports preferences, avatar choice and, if '
+              'you add one, the profile picture you imported. Scorecards, demo '
+              'results and that picture file are stored on this device, not on '
+              'a server.'
+        : 'Your name, email, city, sports preferences and avatar choice, plus '
+              'the profile picture you imported. Your profile and scorecards '
+              'belong to your Sportika account.',
   ),
-  _Section(
+  const _Section(
     'What we never do',
     'We do not sell personal data, build advertising profiles or read private '
         'scorecards for marketing.',
   ),
-  _Section(
+  const _Section(
     'Photos & location',
-    'This prototype stores an avatar style, not an uploaded photo. We ask for a '
-        'city only; no background location is collected.',
+    'A profile picture you take or pick is cropped and shrunk on this device '
+        'before it is used anywhere. We ask for a city only; no background '
+        'location is collected.',
   ),
-  _Section(
+  const _Section(
     'Your controls',
-    'Edit your profile, change preferences, sign out or reset demo data from '
-        'the Me tab at any time.',
+    AppEnv.demoMode
+        ? 'Edit your profile, replace or remove your picture, change '
+              'preferences, sign out, reset demo data or clear everything from '
+              'the Me tab at any time.'
+        : 'Edit your profile, replace or remove your picture, change your '
+              'password or email, sign out of every device, or clear what this '
+              'device stores from Settings at any time.',
   ),
-  _Section(
-    'Contact',
-    'Questions about data: privacy@sportika.pk. Prototype data never leaves '
-        'this device.',
-  ),
+  const _Section('Contact', 'Questions about data: privacy@sportika.pk.'),
 ];
 
 /// 17 · Terms & Privacy. Editorial legal copy, readable in two tabs, with one
@@ -83,7 +99,7 @@ class _TermsScreenState extends State<TermsScreen> {
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<AuthFlowController>();
-    final sections = _tab == 0 ? _terms : _privacy;
+    final sections = _tab == 0 ? _terms() : _privacy();
 
     return AuthPage(
       sport: Sport.badminton,

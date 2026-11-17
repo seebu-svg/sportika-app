@@ -11,6 +11,7 @@ import 'package:sportika/features/discover/screens/games_tab.dart';
 import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/features/discover/screens/players_tab.dart';
 import 'package:sportika/features/discover/screens/tournaments_tab.dart';
+import 'package:sportika/features/matches/screens/matches_tab.dart';
 
 /// Discover: games, tournaments and players in one place, with a single
 /// create entry point for the things this account is allowed to start.
@@ -52,6 +53,7 @@ class _DiscoverTabState extends State<DiscoverTab> {
               FilterChoice(0, 'Games'),
               FilterChoice(1, 'Tournaments'),
               FilterChoice(2, 'Players'),
+              FilterChoice(3, 'Matches'),
             ],
           ),
         ),
@@ -59,7 +61,8 @@ class _DiscoverTabState extends State<DiscoverTab> {
           child: switch (_segment) {
             0 => const GamesTab(),
             1 => const TournamentsTab(),
-            _ => const PlayersTab(),
+            2 => const PlayersTab(),
+            _ => const MatchesTab(),
           },
         ),
       ],
@@ -89,6 +92,17 @@ class _DiscoverTabState extends State<DiscoverTab> {
               onTap: () {
                 Navigator.pop(sheetContext);
                 pushRoute(context, AppRoute.createGame);
+              },
+            ),
+            SheetOption(
+              icon: Icons.sports_cricket,
+              title: 'Official match',
+              subtitle:
+                  'Score a one-off match with an official scorer and result',
+              tone: SportikaColors.cricket,
+              onTap: () {
+                Navigator.pop(sheetContext);
+                pushRoute(context, AppRoute.createMatch);
               },
             ),
             if (context.read<SessionController>().canOrganize)

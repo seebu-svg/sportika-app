@@ -1,11 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:sportika/features/auth/state/auth_flow.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/widgets/avatar_presets.dart';
+import 'package:sportika/shared/widgets/profile_avatar.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -41,15 +42,44 @@ class AuthPhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.network(
-      SportPhotography.forSport(sport),
-      fit: BoxFit.cover,
-      alignment: alignment,
-      filterQuality: FilterQuality.medium,
-      semanticLabel: '${sport.label} sports photography',
-      loadingBuilder: (_, child, progress) =>
-          progress == null ? child : _fallback(),
-      errorBuilder: (_, _, _) => _fallback(),
+    // Same asset-first contract as `SportPhoto`: the bundled photograph is the
+    // offline path, the credited remote photo is only the fallback.
+    final viewport = MediaQuery.sizeOf(context);
+    // Cover needs enough pixels for the height as well as the width. Otherwise
+    // a wide photograph decoded at phone width looks soft in portrait.
+    final aspect = switch (sport) {
+      Sport.cricket => 1200 / 616,
+      Sport.padel => 1200 / 901,
+      Sport.futsal => 1200 / 800,
+      Sport.badminton => 1200 / 801,
+    };
+    final coverWidth = viewport.width > viewport.height * aspect
+        ? viewport.width
+        : viewport.height * aspect;
+    final decodeWidth = (coverWidth * MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(1, 1200);
+    final semanticLabel = '${sport.label} sports photography';
+    return RepaintBoundary(
+      child: Image.asset(
+        'assets/images/sports/${sport.name}.jpg',
+        fit: BoxFit.cover,
+        alignment: alignment,
+        cacheWidth: decodeWidth,
+        semanticLabel: semanticLabel,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (_, _, _) => Image.network(
+          SportPhotography.forSport(sport),
+          fit: BoxFit.cover,
+          alignment: alignment,
+          cacheWidth: decodeWidth,
+          semanticLabel: semanticLabel,
+          filterQuality: FilterQuality.medium,
+          loadingBuilder: (_, child, progress) =>
+              progress == null ? child : _fallback(),
+          errorBuilder: (_, _, _) => _fallback(),
+        ),
+      ),
     );
   }
 
@@ -88,7 +118,6 @@ class AuthPage extends StatelessWidget {
     this.onBack,
     this.stepLabel,
     this.brandSuffix,
-    this.scroll = true,
     this.padding = const EdgeInsets.fromLTRB(24, 10, 24, 8),
   });
 
@@ -100,104 +129,184 @@ class AuthPage extends StatelessWidget {
   final VoidCallback? onBack;
   final String? stepLabel;
   final Widget? brandSuffix;
-  final bool scroll;
   final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
+    final flow = context.watch<AuthFlowController>();
+    final media = MediaQuery.of(context);
+    // Typing shrinks the viewport. Dock the action area above the keyboard only
+    // when the remaining space still fits it with enlarged text; on short
+    // viewports the footer stays inside the scroll view instead.
+    final visibleHeight =
+        media.size.height -
+        media.padding.top -
+        media.padding.bottom -
+        media.viewInsets.bottom;
+    final dockFooter =
+        footer != null && media.viewInsets.bottom > 0 && visibleHeight >= 420;
     final content = Padding(
       padding: padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-
-    return Scaffold(
-      backgroundColor: SportikaColors.background,
-      body: Stack(
         children: [
-          Positioned.fill(
-            child: AuthPhoto(sport: sport, alignment: photoAlignment),
-          ),
-          const Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0x40061426),
-                      Color(0xCC061426),
-                      SportikaColors.background,
-                      SportikaColors.background,
-                    ],
-                    stops: [0, .3, .58, .82],
-                  ),
-                ),
+          if (flow.inlineError != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: AuthNotice(
+                flow.inlineError!,
+                tone: SportikaColors.danger,
+                icon: Icons.error_outline,
               ),
             ),
-          ),
-          SafeArea(
+            const SizedBox(height: 16),
+          ],
+          AbsorbPointer(
+            absorbing: flow.busy,
             child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 20, 0),
-                  child: Row(
-                    children: [
-                      if (showBack)
-                        _RoundIcon(
-                          icon: Icons.arrow_back,
-                          onTap: onBack,
-                          tooltip: 'Back',
-                        )
-                      else
-                        const BrandMark(size: 26),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'SPORTIKA',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.6,
-                          color: SportikaColors.text,
-                        ),
-                      ),
-                      const Spacer(),
-                      ?brandSuffix,
-                      if (stepLabel != null)
-                        Text(
-                          stepLabel!.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.7,
-                            color: SportikaColors.textDim,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: scroll
-                      ? SingleChildScrollView(
-                          padding: EdgeInsets.zero,
-                          keyboardDismissBehavior:
-                              ScrollViewKeyboardDismissBehavior.onDrag,
-                          child: content,
-                        )
-                      : content,
-                ),
-                if (footer != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 14),
-                    child: footer,
-                  ),
-              ],
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: children,
             ),
           ),
         ],
+      ),
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: SportikaColors.background,
+      ),
+      child: Scaffold(
+        backgroundColor: SportikaColors.background,
+        body: DefaultTextStyle.merge(
+          style: const TextStyle(fontFamily: SportikaType.bodyFamily),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: AuthPhoto(sport: sport, alignment: photoAlignment),
+              ),
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x40061426),
+                          Color(0xCC061426),
+                          SportikaColors.background,
+                          SportikaColors.background,
+                        ],
+                        stops: [0, .3, .58, .82],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 6, 20, 0),
+                      child: Row(
+                        children: [
+                          if (showBack)
+                            _RoundIcon(
+                              icon: Icons.arrow_back,
+                              onTap: onBack,
+                              tooltip: 'Back',
+                            )
+                          else
+                            const BrandMark(size: 26),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'SPORTIKA',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.6,
+                              color: SportikaColors.text,
+                            ),
+                          ),
+                          const Spacer(),
+                          ?brandSuffix,
+                          if (stepLabel != null)
+                            Flexible(
+                              child: Text(
+                                stepLabel!.toUpperCase(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.7,
+                                  color: SportikaColors.textDim,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth: 560,
+                                    minHeight: constraints.maxHeight,
+                                  ),
+                                  child: AutofillGroup(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        content,
+                                        if (footer != null && !dockFooter)
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              24,
+                                              16,
+                                              24,
+                                              14,
+                                            ),
+                                            child: footer,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                      ),
+                    ),
+                    // With the keyboard up the primary action stays reachable
+                    // without scrolling past the fields. The action block is
+                    // capped and scrollable so enlarged text cannot overflow a
+                    // short viewport.
+                    if (footer != null && dockFooter)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: media.size.height * .3,
+                        ),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
+                          child: footer,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -221,8 +330,8 @@ class _RoundIcon extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: SizedBox(
-            height: 38,
-            width: 38,
+            height: 48,
+            width: 48,
             child: Icon(icon, size: 18, color: Colors.white),
           ),
         ),
@@ -253,13 +362,15 @@ class AuthEyebrow extends StatelessWidget {
           Container(width: 16, height: 1.5, color: tone),
           const SizedBox(width: 9),
         ],
-        Text(
-          text.toUpperCase(),
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 2.3,
-            color: tone,
+        Flexible(
+          child: Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2.3,
+              color: tone,
+            ),
           ),
         ),
       ],
@@ -409,9 +520,15 @@ class AuthField extends StatefulWidget {
     this.labelAction,
     this.initialValue,
     this.enabled = true,
+    this.readOnly = false,
+    this.onTap,
+    this.filledStyle = false,
+    this.trailing,
   });
 
   final String label;
+  final bool filledStyle;
+  final Widget? trailing;
   final TextEditingController? controller;
   final String? hint;
   final String? errorText;
@@ -427,6 +544,8 @@ class AuthField extends StatefulWidget {
   final Widget? labelAction;
   final String? initialValue;
   final bool enabled;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   @override
   State<AuthField> createState() => _AuthFieldState();
@@ -453,6 +572,16 @@ class _AuthFieldState extends State<AuthField> {
   }
 
   @override
+  void didUpdateWidget(covariant AuthField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.errorText != null && oldWidget.errorText != widget.errorText) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focus.requestFocus();
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _focus.dispose();
     _internal?.dispose();
@@ -475,11 +604,11 @@ class _AuthFieldState extends State<AuthField> {
           children: [
             Expanded(
               child: Text(
-                widget.label.toUpperCase(),
+                widget.filledStyle ? widget.label : widget.label.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 9,
+                  fontSize: widget.filledStyle ? 12 : 9,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.8,
+                  letterSpacing: widget.filledStyle ? 0 : 1.8,
                   color: hasError
                       ? SportikaColors.danger
                       : SportikaColors.textDim,
@@ -489,11 +618,17 @@ class _AuthFieldState extends State<AuthField> {
             if (widget.labelAction != null) widget.labelAction!,
           ],
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: widget.filledStyle ? 8 : 2),
         TextField(
           controller: _controller,
+          readOnly: widget.readOnly,
+          onTap: widget.onTap,
           focusNode: _focus,
-          enabled: widget.enabled,
+          enabled: widget.enabled && !context.watch<AuthFlowController>().busy,
+          enableSuggestions: !widget.obscure,
+          autocorrect:
+              !widget.obscure &&
+              widget.keyboardType != TextInputType.emailAddress,
           obscureText: widget.obscure && !_revealed,
           obscuringCharacter: '•',
           keyboardType: widget.keyboardType,
@@ -513,45 +648,69 @@ class _AuthFieldState extends State<AuthField> {
             color: SportikaColors.text,
           ),
           decoration: InputDecoration(
-            counterText: '',
+            counterText: widget.filledStyle && widget.maxLines > 1 ? null : '',
             isDense: true,
-            filled: false,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 11),
+            filled: widget.filledStyle,
+            fillColor: SportikaColors.surface,
+            border: widget.filledStyle
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide(color: ruleColor),
+                  )
+                : InputBorder.none,
+            enabledBorder: widget.filledStyle
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: const BorderSide(color: SportikaColors.border),
+                  )
+                : InputBorder.none,
+            focusedBorder: widget.filledStyle
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide(color: ruleColor, width: 1.4),
+                  )
+                : InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: widget.filledStyle ? 16 : 0,
+              vertical: widget.filledStyle ? 16 : 11,
+            ),
             hintText: widget.hint,
+            labelText: widget.label,
+            floatingLabelBehavior: FloatingLabelBehavior.never,
             hintStyle: const TextStyle(
               fontSize: 15.5,
               fontWeight: FontWeight.w500,
               color: SportikaColors.textDim,
             ),
-            suffixIcon: widget.obscure
-                ? IconButton(
-                    splashRadius: 18,
-                    tooltip: _revealed ? 'Hide password' : 'Show password',
-                    icon: Icon(
-                      _revealed
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      size: 18,
-                      color: SportikaColors.textDim,
-                    ),
-                    onPressed: () => setState(() => _revealed = !_revealed),
-                  )
-                : null,
+            suffixIcon:
+                widget.trailing ??
+                (widget.obscure
+                    ? IconButton(
+                        splashRadius: 18,
+                        tooltip: _revealed ? 'Hide password' : 'Show password',
+                        icon: Icon(
+                          _revealed
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 18,
+                          color: SportikaColors.textDim,
+                        ),
+                        onPressed: () => setState(() => _revealed = !_revealed),
+                      )
+                    : null),
             suffixIconConstraints: const BoxConstraints(
-              minWidth: 32,
-              minHeight: 32,
+              minWidth: 48,
+              minHeight: 48,
             ),
           ),
         ),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          height: hasError || _focused ? 1.6 : 1,
-          color: ruleColor,
-        ),
+        if (!widget.filledStyle)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            height: hasError || _focused ? 1.6 : 1,
+            color: ruleColor,
+          ),
         if (hasError)
           Padding(
             padding: const EdgeInsets.only(top: 7),
@@ -603,65 +762,74 @@ class AuthAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null && !busy;
+    final loading = busy || context.watch<AuthFlowController>().busy;
+    final enabled = onPressed != null && !loading;
     final foreground = ghost ? Colors.white : Colors.white;
-    return SizedBox(
-      height: 54,
-      width: double.infinity,
-      child: Material(
-        color: ghost
-            ? Colors.white.withValues(alpha: .04)
-            : enabled
-            ? tone
-            : tone.withValues(alpha: .35),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            decoration: BoxDecoration(
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: loading ? '$label, please wait' : label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 54),
+        child: SizedBox(
+          width: double.infinity,
+          child: Material(
+            color: ghost
+                ? Colors.white.withValues(alpha: .04)
+                : enabled
+                ? tone
+                : tone.withValues(alpha: .35),
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: enabled ? onPressed : null,
               borderRadius: BorderRadius.circular(14),
-              border: ghost
-                  ? Border.all(color: SportikaColors.borderStrong)
-                  : null,
-              gradient: ghost || !enabled
-                  ? null
-                  : LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [tone, Color.lerp(tone, Colors.white, .14)!],
-                    ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.1,
-                      color: foreground.withValues(alpha: enabled ? 1 : .7),
-                    ),
-                  ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: ghost
+                      ? Border.all(color: SportikaColors.borderStrong)
+                      : null,
+                  gradient: ghost || !enabled
+                      ? null
+                      : LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [tone, Color.lerp(tone, Colors.white, .14)!],
+                        ),
                 ),
-                if (busy)
-                  const SizedBox(
-                    height: 16,
-                    width: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontFamily: SportikaType.bodyFamily,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: foreground.withValues(alpha: enabled ? 1 : .7),
+                        ),
+                      ),
                     ),
-                  )
-                else if (icon != null)
-                  Icon(
-                    icon,
-                    size: 19,
-                    color: foreground.withValues(alpha: enabled ? 1 : .7),
-                  ),
-              ],
+                    if (loading)
+                      const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    else if (icon != null)
+                      Icon(
+                        icon,
+                        size: 19,
+                        color: foreground.withValues(alpha: enabled ? 1 : .7),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -689,12 +857,12 @@ class AuthLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: onTap,
+      onPressed: context.watch<AuthFlowController>().busy ? null : onTap,
       style: TextButton.styleFrom(
         foregroundColor: tone,
         padding: const EdgeInsets.symmetric(vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        minimumSize: const Size(48, 48),
+        tapTargetSize: MaterialTapTargetSize.padded,
         alignment: align == TextAlign.center
             ? Alignment.center
             : Alignment.centerLeft,
@@ -702,12 +870,14 @@ class AuthLink extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: .2,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .2,
+              ),
             ),
           ),
           if (icon != null) ...[const SizedBox(width: 4), Icon(icon, size: 14)],
@@ -761,28 +931,19 @@ class AuthCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onChanged(!value),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 22,
-        width: 22,
-        decoration: BoxDecoration(
-          color: value ? tone : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: value
-                ? tone
-                : error
-                ? SportikaColors.danger
-                : SportikaColors.borderStrong,
-            width: 1.4,
-          ),
+    return Semantics(
+      label: 'Accept terms and privacy',
+      child: Checkbox(
+        value: value,
+        onChanged: context.watch<AuthFlowController>().busy
+            ? null
+            : (next) => onChanged(next ?? false),
+        activeColor: tone,
+        checkColor: SportikaColors.deepest,
+        isError: error,
+        side: BorderSide(
+          color: error ? SportikaColors.danger : SportikaColors.borderStrong,
         ),
-        child: value
-            ? const Icon(Icons.check, size: 15, color: SportikaColors.deepest)
-            : null,
       ),
     );
   }
@@ -894,7 +1055,7 @@ class AuthChoicePill extends StatelessWidget {
   }
 }
 
-/// Six-box OTP entry with auto-advance and paste support.
+/// One accessible OTP field supports paste, autofill and normal backspace.
 class AuthOtpInput extends StatefulWidget {
   const AuthOtpInput({
     super.key,
@@ -903,142 +1064,68 @@ class AuthOtpInput extends StatefulWidget {
     this.error = false,
     this.value = '',
   });
-
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onCompleted;
   final bool error;
   final String value;
-
   @override
   State<AuthOtpInput> createState() => _AuthOtpInputState();
 }
 
 class _AuthOtpInputState extends State<AuthOtpInput> {
-  final List<TextEditingController> _controllers = List.generate(
-    6,
-    (_) => TextEditingController(),
-  );
-  final List<FocusNode> _nodes = List.generate(6, (_) => FocusNode());
-
+  late final TextEditingController _controller;
   @override
   void initState() {
     super.initState();
-    for (final node in _nodes) {
-      node.addListener(_handleFocus);
-    }
-  }
-
-  void _handleFocus() {
-    if (mounted) setState(() {});
+    _controller = TextEditingController(text: widget.value);
   }
 
   @override
   void didUpdateWidget(covariant AuthOtpInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.value.isEmpty && oldWidget.value.isNotEmpty) {
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _nodes.first.requestFocus();
+    if (widget.value != _controller.text) {
+      _controller.value = TextEditingValue(
+        text: widget.value,
+        selection: TextSelection.collapsed(offset: widget.value.length),
+      );
     }
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final n in _nodes) {
-      n.dispose();
-    }
+    _controller.dispose();
     super.dispose();
   }
 
-  void _handle(int index, String raw) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) {
-      _controllers[index].text = '';
-      widget.onChanged(_value());
-      return;
-    }
-    if (digits.length > 1) {
-      for (var i = 0; i < 6; i++) {
-        _controllers[i].text = i < digits.length ? digits[i] : '';
-      }
-      final last = math.min(digits.length, 6) - 1;
-      _nodes[last].requestFocus();
-      if (digits.length >= 6) FocusScope.of(context).unfocus();
-    } else {
-      _controllers[index].text = digits;
-      if (index < 5) _nodes[index + 1].requestFocus();
-    }
-    final value = _value();
-    widget.onChanged(value);
-    if (value.length == 6) {
-      FocusScope.of(context).unfocus();
-      widget.onCompleted(value);
-    }
-  }
-
-  String _value() => _controllers.map((c) => c.text).join();
-
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (var i = 0; i < 6; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final focused = _nodes[i].hasFocus;
-                return AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: SportikaColors.surfaceSunken.withValues(alpha: .9),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: widget.error
-                          ? SportikaColors.danger
-                          : focused
-                          ? SportikaColors.mint
-                          : SportikaColors.border,
-                      width: focused || widget.error ? 1.5 : 1,
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: TextField(
-                    controller: _controllers[i],
-                    focusNode: _nodes[i],
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    cursorColor: SportikaColors.mint,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    onChanged: (value) => _handle(i, value),
-                    style: authDisplay(
-                      24,
-                      color: SportikaColors.text,
-                      height: 1,
-                      letterSpacing: 1,
-                    ),
-                    decoration: const InputDecoration(
-                      counterText: '',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ],
-    );
-  }
+  Widget build(BuildContext context) => TextField(
+    controller: _controller,
+    enabled: !context.watch<AuthFlowController>().busy,
+    keyboardType: TextInputType.number,
+    textInputAction: TextInputAction.next,
+    autofillHints: const [AutofillHints.oneTimeCode],
+    autocorrect: false,
+    enableSuggestions: false,
+    inputFormatters: [
+      FilteringTextInputFormatter.digitsOnly,
+      LengthLimitingTextInputFormatter(6),
+    ],
+    textAlign: TextAlign.center,
+    style: authDisplay(28, height: 1.3, letterSpacing: 12),
+    decoration: InputDecoration(
+      labelText: 'Six-digit code',
+      hintText: '000000',
+      errorText: widget.error ? 'Check the code and try again.' : null,
+      filled: true,
+      fillColor: SportikaColors.surfaceSunken,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+    onChanged: (value) {
+      widget.onChanged(value);
+      if (value.length == 6) widget.onCompleted(value);
+    },
+  );
 }
 
 /// Circular avatar preview; initials instead of a photo upload.
@@ -1049,6 +1136,8 @@ class AuthAvatar extends StatelessWidget {
     this.avatarId = 'midnight',
     this.size = 88,
     this.showRing = true,
+    this.photoPath,
+    this.photoUrl,
   });
 
   final String initials;
@@ -1056,41 +1145,22 @@ class AuthAvatar extends StatelessWidget {
   final double size;
   final bool showRing;
 
+  /// The imported picture, when the player has one. Anything the profile photo
+  /// store did not issue falls back to the gradient face.
+  final String? photoPath;
+
+  /// The uploaded copy, shown when this device has no local file.
+  final String? photoUrl;
+
   @override
   Widget build(BuildContext context) {
-    final option = avatarOptionFor(avatarId);
-    return Container(
-      height: size,
-      width: size,
-      padding: EdgeInsets.all(showRing ? 3 : 0),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: option.colors.first.withValues(alpha: .55),
-          width: 1.2,
-        ),
-      ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: option.colors,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            initials.toUpperCase(),
-            style: authDisplay(
-              size * .36,
-              color: option.ink,
-              height: 1,
-              letterSpacing: 0,
-            ),
-          ),
-        ),
-      ),
+    return ProfileAvatar(
+      initials: initials,
+      avatarId: avatarId,
+      photoPath: photoPath,
+      photoUrl: photoUrl,
+      size: size,
+      showRing: showRing,
     );
   }
 }

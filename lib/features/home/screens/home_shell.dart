@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:sportika/shared/widgets/global_app_header.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/features/home/screens/home_tab.dart';
-import 'package:sportika/features/discover/screens/discover_tab.dart';
+import 'package:sportika/features/discover/screens/tournament_tab.dart';
 import 'package:sportika/features/live/screens/scores_tab.dart';
 import 'package:sportika/features/teams/screens/teams_tab.dart';
 import 'package:sportika/features/profile/screens/profile_tab.dart';
 
-/// Root shell: Home, Discover, Live, Team and Me, with an in-place index, so a
+/// Root shell: Home, Tournament, Match, Team and Me, with an in-place index, so a
 /// notification deep link switches tab instead of pushing a second shell.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.initialIndex = 0});
@@ -45,14 +46,29 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          HomeTab(),
-          DiscoverTab(),
-          ScoresTab(),
-          TeamsTab(),
-          ProfileTab(),
+      body: Column(
+        children: [
+          GlobalAppHeader(
+            section: const [
+              'Home',
+              'Tournament',
+              'Match',
+              'Team',
+              'Me',
+            ][_index],
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _index,
+              children: const [
+                HomeTab(),
+                TournamentTab(),
+                ScoresTab(),
+                TeamsTab(),
+                ProfileTab(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: DecoratedBox(
@@ -71,12 +87,12 @@ class _HomeShellState extends State<HomeShell> {
             NavigationDestination(
               icon: Icon(Icons.explore_outlined),
               selectedIcon: Icon(Icons.explore_rounded),
-              label: 'Discover',
+              label: 'Tournament',
             ),
             NavigationDestination(
               icon: Icon(Icons.sensors_outlined),
               selectedIcon: Icon(Icons.sensors_rounded),
-              label: 'Live',
+              label: 'Match',
             ),
             NavigationDestination(
               icon: Icon(Icons.groups_outlined),

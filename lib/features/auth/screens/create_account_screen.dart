@@ -59,10 +59,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       footer: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AuthAction(label: 'CONTINUE', onPressed: () => _submit(flow)),
+          AuthAction(
+            label: 'CONTINUE',
+            busy: flow.busy,
+            onPressed: () => _submit(flow),
+          ),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text(
                 'Already have an account?',
@@ -75,7 +80,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       ),
       children: [
         const SizedBox(height: 8),
-        const AuthStepRail(current: 0, labels: ['Account', 'Type', 'Verify']),
+        AuthStepRail(current: 0, labels: flow.signupStepLabels),
         const SizedBox(height: 26),
         const AuthEyebrow('CREATE ACCOUNT'),
         const SizedBox(height: 14),
@@ -88,6 +93,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         const SizedBox(height: 24),
         AuthField(
           label: 'Full name',
+          maxLength: 80,
           controller: _name,
           hint: 'Your name on the scorecard',
           textCapitalization: TextCapitalization.words,
@@ -164,7 +170,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                     onTap: () => flow.openTerms(AuthStage.createAccount),
                   ),
                   const Text(
-                    '. Official results are published by organizers only.',
+                    '. One account to play, create matches, join teams and run tournaments.',
                     style: TextStyle(
                       fontSize: 11.5,
                       height: 1.5,
@@ -184,8 +190,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           ),
         ],
         const SizedBox(height: 14),
-        const AuthMicro(
-          'We use your email for match updates, entry decisions and nothing else.',
+        AuthMicro(
+          flow.emailVerificationEnabled
+              ? 'Use an email you can access to verify your account and recover your password.'
+              : 'Use an email you can access: it signs you in and recovers your password.',
         ),
         const SizedBox(height: 8),
       ],

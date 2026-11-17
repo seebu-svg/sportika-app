@@ -7,7 +7,6 @@ import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/features/live/screens/notifications_screen.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 
 String greetingEyebrow() {
@@ -17,260 +16,248 @@ String greetingEyebrow() {
   return 'GOOD EVENING';
 }
 
-/// Home greeting row: avatar, time-aware greeting and the notification bell.
-class HomeHeader extends StatelessWidget {
-  const HomeHeader({
+/// Editorial discovery banner with the featured event's photograph first,
+/// falling back to the same sport photography when a remote banner fails.
+class HomeHero extends StatelessWidget {
+  const HomeHero({
     super.key,
-    required this.account,
+    required this.sport,
     required this.pagePadding,
+    this.imageUrl,
+    this.featuredTournament,
   });
 
-  final Account account;
+  final Sport? sport;
   final double pagePadding;
+  final String? imageUrl;
+
+  /// Real parent-provided context, independent of the banner's URL.
+  final Tournament? featuredTournament;
+
+  Widget _backdrop(double height) {
+    final fallback = SportPhoto(
+      sport: sport ?? Sport.cricket,
+      height: height,
+      radius: 0,
+    );
+    final url = imageUrl;
+    if (url == null || url.isEmpty) return fallback;
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      height: height,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(pagePadding, 14, pagePadding, 16),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () => openHomeTab(context, 4),
-              borderRadius: BorderRadius.circular(24),
-              child: AccountAvatar(account: account, size: 40),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${greetingEyebrow()} · ${account.city.toUpperCase()}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      letterSpacing: 1.6,
-                      color: SportikaColors.textMuted,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Let’s play, ${account.displayName.split(' ').first}.',
-                      maxLines: 1,
-                      softWrap: false,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -.4,
+    final event = featuredTournament;
+    final title = event?.name.trim();
+    final headline = title != null && title.isNotEmpty
+        ? title
+        : 'Find your next match';
+    final supporting = event == null
+        ? 'Explore ${sport?.label ?? 'sports'} matches and tournaments.'
+        : [
+            event.sport.label,
+            dayLabel(event.startsAt.toLocal()),
+            if (event.city.trim().isNotEmpty) event.city.trim(),
+          ].join(' · ');
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          event == null
+              ? 'DISCOVER SPORTIKA'
+              : event.isDemo
+              ? 'FEATURED TOURNAMENT · DEMO'
+              : 'FEATURED TOURNAMENT',
+          style: SportikaType.micro,
+        ),
+        const SizedBox(height: SportikaSpacing.sm),
+        Text(headline, style: SportikaType.title),
+      ],
+    );
+    final action = FilledButton.icon(
+      onPressed: () => openMatchTab(context, section: 5),
+      icon: const Icon(Icons.arrow_forward_rounded, size: SportikaSpacing.lg),
+      label: const Text('Find a match'),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(
+          kMinInteractiveDimension,
+          kMinInteractiveDimension,
+        ),
+        backgroundColor: SportikaColors.mint,
+        foregroundColor: SportikaColors.deepest,
+        textStyle: SportikaType.action,
+        padding: const EdgeInsets.symmetric(
+          horizontal: SportikaSpacing.md,
+          vertical: SportikaSpacing.sm,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SportikaRadius.sm),
+        ),
+      ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(SportikaRadius.lg),
+      child: ColoredBox(
+        color: SportikaColors.surface,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final wide =
+                constraints.maxWidth >= SportikaSpacing.xl * 16 * scale;
+            final roomyText =
+                scale > 1.3 || constraints.maxWidth < SportikaSpacing.xl * 10;
+            Widget photo(double height) => ClipRRect(
+              borderRadius: BorderRadius.circular(SportikaRadius.sm),
+              child: SizedBox(height: height, child: _backdrop(height)),
+            );
+            final copy = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (wide || roomyText)
+                  heading
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(child: heading),
+                      const SizedBox(width: SportikaSpacing.md),
+                      SizedBox(
+                        width: SportikaSpacing.xl * 3,
+                        child: photo(SportikaSpacing.xl * 3),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const NotificationBell(),
-          ],
+                const SizedBox(height: SportikaSpacing.sm),
+                Text(supporting, style: SportikaType.caption),
+                const SizedBox(height: SportikaSpacing.md),
+                action,
+              ],
+            );
+            return Padding(
+              padding: EdgeInsets.all(pagePadding),
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(flex: 3, child: copy),
+                        const SizedBox(width: SportikaSpacing.lg),
+                        Expanded(flex: 2, child: photo(SportikaSpacing.xl * 6)),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (roomyText) ...[
+                          photo(SportikaSpacing.xl * 3),
+                          const SizedBox(height: SportikaSpacing.md),
+                        ],
+                        copy,
+                      ],
+                    ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-/// Full-bleed photographic hero. The sport follows the active filter so the
-/// banner stays personal without adding another control.
-class HomeHero extends StatelessWidget {
-  const HomeHero({super.key, required this.sport, required this.pagePadding});
-
-  final Sport? sport;
-  final double pagePadding;
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final height = (width.clamp(320, 760) * .46).clamp(200, 300).toDouble();
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          SportPhoto(sport: sport ?? Sport.cricket, height: height, radius: 0),
-          // Single bottom scrim: photo visible at the top, type readable at the
-          // base. No extra gradients stacked on top of this.
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x14061426),
-                  Color(0xCC09182D),
-                  SportikaColors.page,
-                ],
-                stops: [.05, .62, 1],
-              ),
-            ),
-          ),
-          Positioned(
-            left: pagePadding,
-            right: pagePadding,
-            bottom: 14,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'THE GAME CONNECTS US',
-                  style: SportikaType.micro.copyWith(
-                    color: SportikaColors.mint,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'YOUR NEXT MATCH\nSTARTS HERE.',
-                    maxLines: 2,
-                    softWrap: false,
-                    style: TextStyle(
-                      fontFamily: SportikaType.displayFamily,
-                      fontSize: 42,
-                      height: .95,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -.3,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Discover games, find your people and make it count.',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: SportikaType.caption.copyWith(
-                          color: SportikaColors.textBody,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    InkWell(
-                      onTap: () => openHomeTab(context, 1),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'FIND A GAME',
-                              style: SportikaType.micro.copyWith(
-                                color: SportikaColors.mint,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.arrow_forward,
-                              size: 14,
-                              color: SportikaColors.mint,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One notification in the Home activity timeline.
+/// Compact Home feed entry; navigation continues to open the notification inbox.
 class ActivityRow extends StatelessWidget {
   const ActivityRow({super.key, required this.notification});
-
   final AppNotification notification;
 
+  IconData get _icon => switch (notification.kind) {
+    NotificationKind.entryDecision => Icons.how_to_reg_outlined,
+    NotificationKind.fixtureChange => Icons.event_outlined,
+    NotificationKind.scorerAssignment => Icons.sports_score,
+    NotificationKind.resultSubmitted => Icons.hourglass_top,
+    NotificationKind.resultPublished => Icons.verified_outlined,
+    NotificationKind.resultCorrected => Icons.edit_note,
+    NotificationKind.dispute => Icons.gavel,
+    NotificationKind.matchInvite => Icons.person_add_alt_1_outlined,
+    NotificationKind.matchUpdate => Icons.sports_outlined,
+    NotificationKind.matchReminder => Icons.alarm_outlined,
+    NotificationKind.tournamentUpdate => Icons.emoji_events_outlined,
+    NotificationKind.teamUpdate => Icons.groups_outlined,
+    NotificationKind.accountUpdate => Icons.shield_outlined,
+    NotificationKind.platformUpdate => Icons.campaign_outlined,
+  };
+
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    hint: 'Open notifications',
+    child: InkWell(
       onTap: () => pushRoute(context, AppRoute.notifications),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: 28,
-              child: Column(
-                children: [
-                  const SizedBox(height: 5),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: notification.read
-                          ? SportikaColors.textDim
-                          : SportikaColors.mint,
-                    ),
+      borderRadius: BorderRadius.circular(SportikaRadius.sm),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: SportikaSpacing.sm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ExcludeSemantics(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: SportikaSpacing.xs),
+                  child: Icon(
+                    _icon,
+                    size: SportikaSpacing.lg,
+                    color: SportikaColors.textMuted,
                   ),
-                  const SizedBox(height: 6),
-                  const Expanded(child: VerticalDivider(width: 1)),
-                ],
+                ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 22),
+              const SizedBox(width: SportikaSpacing.md),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       notification.title,
-                      style: SportikaType.bodyStrong.copyWith(fontSize: 13),
+                      style: notification.read
+                          ? SportikaType.body
+                          : SportikaType.bodyStrong,
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      notification.body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: SportikaType.caption.copyWith(height: 1.5),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      timeAgo(notification.at),
-                      style: SportikaType.micro.copyWith(
-                        color: SportikaColors.textDim,
-                      ),
+                    if (notification.body.trim().isNotEmpty) ...[
+                      const SizedBox(height: SportikaSpacing.xs),
+                      Text(notification.body, style: SportikaType.caption),
+                    ],
+                    const SizedBox(height: SportikaSpacing.xs),
+                    Wrap(
+                      spacing: SportikaSpacing.sm,
+                      runSpacing: SportikaSpacing.xs,
+                      children: [
+                        Text(
+                          timeAgo(notification.at),
+                          style: SportikaType.caption.copyWith(
+                            color: SportikaColors.textDim,
+                          ),
+                        ),
+                        if (!notification.read)
+                          Text(
+                            'Unread',
+                            style: SportikaType.caption.copyWith(
+                              color: SportikaColors.mint,
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

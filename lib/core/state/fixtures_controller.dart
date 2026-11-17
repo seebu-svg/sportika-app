@@ -8,6 +8,15 @@ import 'package:sportika/core/data/repositories.dart';
 class FixturesController extends FeatureController<FixtureRepository> {
   FixturesController(super.repo);
 
+  /// True while the server read is in flight.
+  bool get loading => repo.loading;
+
+  /// Why the last read failed, or null while it is healthy.
+  String? get lastError => repo.lastError;
+
+  /// Re-reads the match rows the bracket is projected from.
+  Future<void> refresh() => repo.refresh();
+
   List<Fixture> get fixtures => repo.fixtures;
 
   Fixture? fixtureById(String id) => repo.fixtureById(id);

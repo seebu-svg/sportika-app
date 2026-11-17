@@ -1,9 +1,11 @@
+import 'package:sportika/features/profile/widgets/optional_identity_fields.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
+import 'package:sportika/features/profile/widgets/profile_identity_fields.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 
@@ -21,6 +23,7 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
   late final TextEditingController _handle;
   late final TextEditingController _city;
   late final TextEditingController _bio;
+  late final TextEditingController _birthDate;
 
   @override
   void initState() {
@@ -30,6 +33,7 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
     _handle = TextEditingController(text: flow.handle);
     _city = TextEditingController(text: flow.city);
     _bio = TextEditingController(text: flow.bio);
+    _birthDate = TextEditingController(text: flow.birthDateText);
   }
 
   @override
@@ -38,7 +42,19 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
     _handle.dispose();
     _city.dispose();
     _bio.dispose();
+    _birthDate.dispose();
     super.dispose();
+  }
+
+  void _syncDraft() {
+    final flow = context.read<AuthFlowController>();
+    flow.fullName = _name.text;
+    flow.handle = _handle.text;
+    flow.city = _city.text;
+    flow.bio = _bio.text;
+    flow.updateBirthDate(_birthDate.text);
+    flow.clearInline();
+    setState(() {});
   }
 
   @override
@@ -49,6 +65,8 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
     );
 
     return AuthPage(
+      showBack: true,
+      onBack: flow.back,
       sport: Sport.cricket,
       photoAlignment: const Alignment(0, -.4),
       stepLabel: 'PROFILE SETUP',
@@ -57,12 +75,15 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
         children: [
           AuthAction(
             label: 'CONTINUE',
-            onPressed: () => flow.saveBasics(
-              name: _name.text,
-              handleValue: _handle.text,
-              cityValue: _city.text,
-              bioValue: _bio.text,
-            ),
+            onPressed: () {
+              FocusScope.of(context).unfocus();
+              flow.saveBasics(
+                name: _name.text,
+                handleValue: _handle.text,
+                cityValue: _city.text,
+                bioValue: _bio.text,
+              );
+            },
           ),
           const SizedBox(height: 8),
           const AuthMicro('You can change all of this from the Me tab.'),
@@ -72,7 +93,7 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
         const SizedBox(height: 8),
         const AuthStepRail(
           current: 0,
-          labels: ['Basics', 'Sports', 'Levels', 'Photo'],
+          labels: ['Basics', 'Photo', 'Sports', 'Play', 'Review'],
         ),
         const SizedBox(height: 26),
         const AuthEyebrow('YOUR IDENTITY'),
@@ -102,7 +123,7 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Four quick steps and your profile is ready.',
+                    'Five quick steps and your profile is ready.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.4,
@@ -115,52 +136,23 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
           ],
         ),
         const SizedBox(height: 24),
-        AuthField(
-          label: 'Display name',
-          controller: _name,
-          hint: 'Your name on the scorecard',
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.name],
-          errorText: flow.inlineField == 'name' ? flow.inlineError : null,
-          onChanged: (value) {
-            if (flow.inlineField == 'name') flow.clearInline();
-            setState(() {});
+        ProfileIdentityFields(
+          name: _name,
+          username: _handle,
+          birthDate: _birthDate,
+          city: _city,
+          bio: _bio,
+          gender: flow.gender,
+          errorField: flow.inlineField,
+          errorMessage: flow.inlineError,
+          onGenderChanged: (value) {
+            flow.gender = value;
+            _syncDraft();
           },
+          onChanged: _syncDraft,
         ),
-        const SizedBox(height: 18),
-        AuthField(
-          label: 'Username',
-          controller: _handle,
-          hint: 'yourhandle',
-          textInputAction: TextInputAction.next,
-          errorText: flow.inlineField == 'handle' ? flow.inlineError : null,
-          onChanged: (value) {
-            if (flow.inlineField == 'handle') flow.clearInline();
-          },
-        ),
-        const SizedBox(height: 18),
-        AuthField(
-          label: 'City',
-          controller: _city,
-          hint: 'Karachi',
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.next,
-          errorText: flow.inlineField == 'city' ? flow.inlineError : null,
-          onChanged: (value) {
-            if (flow.inlineField == 'city') flow.clearInline();
-          },
-        ),
-        const SizedBox(height: 18),
-        AuthField(
-          label: 'Short bio',
-          controller: _bio,
-          hint: 'Left-arm spinner. Plays padel on Thursdays.',
-          maxLines: 3,
-          maxLength: 120,
-          textCapitalization: TextCapitalization.sentences,
-          errorText: flow.inlineField == 'bio' ? flow.inlineError : null,
-        ),
+        const SizedBox(height: 24),
+        OptionalIdentityFields(key: ValueKey(flow.identityKind)),
         const SizedBox(height: 10),
         const AuthMicro(
           'Your handle appears in entries and squads. You can change it later.',

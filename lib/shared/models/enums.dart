@@ -137,6 +137,12 @@ extension PersonalMatchStatusX on PersonalMatchStatus {
       );
 }
 
+/// What a notification is about.
+///
+/// The first seven kinds are the device store's own vocabulary and go back to
+/// the seeded demo world. The rest arrived with the server-backed inbox and
+/// fold the many server event types into the handful of shapes the
+/// notification centre draws.
 enum NotificationKind {
   entryDecision,
   fixtureChange,
@@ -145,6 +151,13 @@ enum NotificationKind {
   resultPublished,
   resultCorrected,
   dispute,
+  matchInvite,
+  matchUpdate,
+  matchReminder,
+  tournamentUpdate,
+  teamUpdate,
+  accountUpdate,
+  platformUpdate,
 }
 
 extension NotificationKindX on NotificationKind {
@@ -154,4 +167,60 @@ extension NotificationKindX on NotificationKind {
         (r) => r.name == key,
         orElse: () => NotificationKind.entryDecision,
       );
+
+  /// Maps a server event type onto the shape the notification centre draws.
+  ///
+  /// The server names every event precisely; the centre only needs to know
+  /// which icon and colour to use, so the types collapse into these kinds. An
+  /// unknown type falls back to a match update rather than to a failure: a
+  /// server event the app has not heard of yet must still reach the inbox.
+  static NotificationKind fromServerType(String type) => switch (type) {
+    'match_invite' ||
+    'match_invite_accepted' ||
+    'match_invite_declined' => NotificationKind.matchInvite,
+    'match_removed' ||
+    'match_schedule_changed' ||
+    'match_cancelled' => NotificationKind.matchUpdate,
+    'match_starting_soon' => NotificationKind.matchReminder,
+    'match_result_submitted' => NotificationKind.resultSubmitted,
+    'result_published' => NotificationKind.resultPublished,
+    'result_corrected' => NotificationKind.resultCorrected,
+    'scorer_assigned' ||
+    'scorer_assignment_revoked' ||
+    'scorer_match_started' ||
+    'scorer_match_completed' ||
+    'scorer_fixture_assigned' ||
+    'scorer_fixture_revoked' ||
+    'scorer_fixture_answered' ||
+    'scorer_duty_reminder' => NotificationKind.scorerAssignment,
+    'dispute_submitted' ||
+    'dispute_resolved' ||
+    'dispute_rejected' ||
+    'dispute_status_changed' => NotificationKind.dispute,
+    'tournament_registration_received' ||
+    'tournament_registration_confirmed' ||
+    'tournament_registration_rejected' ||
+    'tournament_entry_withdrawn' ||
+    'tournament_advancement' ||
+    'tournament_result' ||
+    'tournament_cancelled' ||
+    'tournament_schedule_changed' ||
+    'tournament_registration_closing' ||
+    'tournament_staff_added' ||
+    'fixture_published' ||
+    'draw_published' => NotificationKind.tournamentUpdate,
+    'team_invite' ||
+    'team_join_request' ||
+    'team_member_joined' ||
+    'team_member_left' ||
+    'team_member_removed' ||
+    'team_invite_cancelled' ||
+    'team_invite_declined' ||
+    'team_captain_changed' ||
+    'team_deleted' => NotificationKind.teamUpdate,
+    'account_username_changed' ||
+    'security_email_changed' ||
+    'security_password_changed' => NotificationKind.accountUpdate,
+    _ => NotificationKind.matchUpdate,
+  };
 }

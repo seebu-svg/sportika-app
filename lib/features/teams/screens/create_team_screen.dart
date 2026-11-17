@@ -79,11 +79,6 @@ class _CreateTeamScreenState extends State<CreateTeamScreen> {
       type: _type,
       memberIds: _members.toList(),
     );
-    // Members picked here have not answered yet, so they are invitations rather
-    // than silent additions to the roster.
-    for (final id in _members) {
-      teams.invite(squad.id, id);
-    }
     if (!mounted) return;
     Navigator.of(context).pop();
     showSnack(context, '${squad.name} created');

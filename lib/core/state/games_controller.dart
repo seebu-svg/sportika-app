@@ -6,6 +6,15 @@ import 'package:sportika/core/data/repositories.dart';
 class GamesController extends FeatureController<GameRepository> {
   GamesController(super.repo);
 
+  /// True while the server read is in flight.
+  bool get loading => repo.loading;
+
+  /// Why the last read failed, or null while it is healthy.
+  String? get lastError => repo.lastError;
+
+  /// Re-reads the coming week of games.
+  Future<void> refresh() => repo.refresh();
+
   List<CommunityGame> get games => repo.games;
 
   void publishGame(CommunityGame game) => repo.publishGame(game);

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/core/state/fixtures_controller.dart';
-import 'package:sportika/core/state/session_controller.dart';
-import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/app/routes.dart';
-import 'package:sportika/shared/widgets/filter_chip_row.dart';
+import 'package:sportika/features/discover/screens/games_tab.dart';
+import 'package:sportika/features/matches/screens/matches_tab.dart';
+import 'package:sportika/shared/navigation/navigation.dart';
+import 'package:sportika/shared/widgets/widgets.dart';
 
+/// Match landing page. Legacy section requests still reach their destination.
 class ScoresTab extends StatefulWidget {
   const ScoresTab({super.key});
   @override
@@ -16,77 +14,48 @@ class ScoresTab extends StatefulWidget {
 }
 
 class _ScoresTabState extends State<ScoresTab> {
-  int tab = 0;
-  Sport? sport;
+  int _scope = 0;
+
   @override
-  Widget build(BuildContext context) {
-    final state = context.watch<FixturesController>();
-    final fixtures = (tab == 0 ? state.liveFixtures : state.completedFixtures)
-        .where((f) => sport == null || state.tournamentOf(f)?.sport == sport)
-        .toList();
-    return Column(
-      children: [
-        TabHeader(
-          title: 'Live',
-          subtitle: 'Official matches and your private scores.',
-          actions: [
-            if (context.read<SessionController>().hasRole(UserRole.scorer))
-              IconButton(
-                tooltip: 'Scorer assignments',
-                icon: const Icon(Icons.assignment_outlined),
-                onPressed: () => pushRoute(context, AppRoute.scorerWorkspace),
-              ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-          child: FilterChipRow<int>(
-            label: 'Scores section',
-            selected: tab,
-            onChanged: (v) => setState(() => tab = v),
-            choices: const [
-              FilterChoice(0, 'Live Scores'),
-              FilterChoice(1, 'Results'),
-              FilterChoice(2, 'Personal'),
-            ],
-          ),
-        ),
-        if (tab != 2)
-          SportFilterBar(
-            selected: sport,
-            onChanged: (v) => setState(() => sport = v),
-          ),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              if (tab == 2) ...[
-                const InfoBanner(
-                  icon: Icons.lock_outline,
-                  text: 'Personal games and spectator scorecards are private. They never affect official tournament results.',
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () => pushRoute(context, AppRoute.personalGames),
-                  icon: const Icon(Icons.sports_score),
-                  label: const Text('My personal games'),
-                ),
-              ] else ...[
-                for (final f in fixtures)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: officialFixtureTile(context, f),
-                  ),
-                if (fixtures.isEmpty)
-                  const EmptyState(
-                    title: 'No matches here yet',
-                    icon: Icons.sports_score,
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
+  void initState() {
+    super.initState();
+    matchSectionRequest.addListener(_handleSectionRequest);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && matchSectionRequest.value != 0) _handleSectionRequest();
+    });
   }
+
+  void _handleSectionRequest() {
+    final section = matchSectionRequest.value;
+    if (section == 2) {
+      pushRoute(context, AppRoute.personalGames);
+    } else if (section == 4) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => Scaffold(
+            appBar: sportikaAppBar('Pickup games'),
+            body: const SafeArea(child: GamesTab()),
+          ),
+        ),
+      );
+    } else {
+      setState(
+        () => _scope = switch (section) {
+          0 => 1,
+          1 => 3,
+          3 => 2,
+          _ => 0,
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    matchSectionRequest.removeListener(_handleSectionRequest);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => MatchesTab(initialScope: _scope);
 }

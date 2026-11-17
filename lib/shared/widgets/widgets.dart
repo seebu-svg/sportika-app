@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
+import 'package:sportika/shared/widgets/avatar_photo.dart';
+import 'package:sportika/shared/widgets/avatar_presets.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 /// Brand tint per sport, used consistently across cards, chips and charts.
@@ -112,13 +115,17 @@ class StatusPill extends StatelessWidget {
             Icon(icon, size: 11, color: c),
             const SizedBox(width: 4),
           ],
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: c,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: c,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
             ),
           ),
         ],
@@ -170,16 +177,19 @@ class SectionTitle extends StatelessWidget {
       padding: padding ?? const EdgeInsets.fromLTRB(0, 22, 0, 12),
       child: Row(
         children: [
-          Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
-              color: SportikaColors.textMuted,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+                color: SportikaColors.textMuted,
+              ),
             ),
           ),
-          const Spacer(),
           if (action != null)
             TextButton(
               onPressed: onAction,
@@ -402,46 +412,67 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 22),
-      decoration: BoxDecoration(
-        color: SportikaColors.surfaceSunken,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: SportikaColors.borderSubtle),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: SportikaColors.textDim, size: 26),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: SportikaColors.textBody,
-              fontWeight: FontWeight.w700,
-              fontSize: 13.5,
+    return Semantics(
+      container: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: SportikaSpacing.lg,
+          horizontal: SportikaSpacing.md,
+        ),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: sportikaMaxContentWidth,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ExcludeSemantics(
+                  child: Icon(
+                    icon,
+                    color: SportikaColors.textMuted,
+                    size: SportikaSpacing.xl,
+                  ),
+                ),
+                const SizedBox(height: SportikaSpacing.sm),
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: SportikaType.bodyStrong,
+                  ),
+                ),
+                if (body != null && body!.trim().isNotEmpty) ...[
+                  const SizedBox(height: SportikaSpacing.xs),
+                  Text(
+                    body!,
+                    textAlign: TextAlign.center,
+                    style: SportikaType.body,
+                  ),
+                ],
+                if (action != null) ...[
+                  const SizedBox(height: SportikaSpacing.md),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: kMinInteractiveDimension,
+                    ),
+                    child: action!,
+                  ),
+                ],
+              ],
             ),
           ),
-          if (body != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              body!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: SportikaColors.textDim,
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ],
-          if (action != null) ...[const SizedBox(height: 16), action!],
-        ],
+        ),
       ),
     );
   }
 }
 
+/// A player's round identity tile: the imported picture when there is one, and
+/// the initials/preset avatar otherwise.
 class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar({
     super.key,
@@ -449,6 +480,11 @@ class PlayerAvatar extends StatelessWidget {
     this.color = SportikaColors.blue,
     this.size = 36,
     this.badge,
+    this.photoPath,
+    this.photoUrl,
+    this.gradient,
+    this.ink,
+    this.ring,
   });
 
   final String initials;
@@ -456,8 +492,36 @@ class PlayerAvatar extends StatelessWidget {
   final double size;
   final Widget? badge;
 
+  /// Reference handed out by the profile photo store. Null, or anything that did
+  /// not come from the store, shows the drawn face instead.
+  final String? photoPath;
+
+  /// Uploaded copy of the same picture, used when this device has no local file
+  /// (a fresh install, or a picture changed on another device).
+  final String? photoUrl;
+
+  /// The gradient the player chose at setup. When null the flat [color] style is
+  /// used, which is what team and sport faces keep.
+  final List<Color>? gradient;
+
+  /// Initials colour that belongs to [gradient].
+  final Color? ink;
+
+  /// Border colour. Defaults to [color], so an account can keep its role tint as
+  /// the ring while the face shows the gradient the player chose.
+  final Color? ring;
+
   @override
   Widget build(BuildContext context) {
+    final palette = gradient;
+    final face = Text(
+      initials.toUpperCase(),
+      style: TextStyle(
+        color: palette == null ? color : (ink ?? Colors.white),
+        fontWeight: FontWeight.w800,
+        fontSize: size * 0.36,
+      ),
+    );
     return SizedBox(
       height: size,
       width: size,
@@ -467,19 +531,27 @@ class PlayerAvatar extends StatelessWidget {
           Container(
             height: size,
             width: size,
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.18),
+              color: palette == null ? color.withValues(alpha: 0.18) : null,
+              gradient: palette == null
+                  ? null
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: palette,
+                    ),
               shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.45)),
+              border: Border.all(
+                color: (ring ?? color).withValues(alpha: 0.45),
+              ),
             ),
             alignment: Alignment.center,
-            child: Text(
-              initials.toUpperCase(),
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w800,
-                fontSize: size * 0.36,
-              ),
+            child: avatarFace(
+              photoPath: photoPath,
+              photoUrl: photoUrl,
+              size: size,
+              fallback: face,
             ),
           ),
           if (badge != null) Positioned(right: -2, bottom: -2, child: badge!),
@@ -748,8 +820,10 @@ class FixtureRow extends StatelessWidget {
     this.footer,
     this.onTap,
     this.accent,
+    this.scoreboard,
   });
 
+  final Widget? scoreboard;
   final Widget topLeft;
   final String homeLabel;
   final String awayLabel;
@@ -780,9 +854,13 @@ class FixtureRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          _sideRow(homeLabel, homeScore),
-          const SizedBox(height: 6),
-          _sideRow(awayLabel, awayScore),
+          if (scoreboard != null)
+            scoreboard!
+          else ...[
+            _sideRow(homeLabel, homeScore),
+            const SizedBox(height: 6),
+            _sideRow(awayLabel, awayScore),
+          ],
           if (footer != null) ...[
             const SizedBox(height: 10),
             const Divider(height: 1),
@@ -873,25 +951,12 @@ class BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = Container(
+    final mark = Image.asset(
+      'assets/branding/brand-mark.png',
       height: size,
       width: size,
-      decoration: BoxDecoration(
-        color: SportikaColors.mint,
-        borderRadius: BorderRadius.circular(size * .22),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        'S',
-        style: TextStyle(
-          color: SportikaColors.deepest,
-          fontStyle: FontStyle.italic,
-          fontSize: size * 0.64,
-          fontWeight: FontWeight.w900,
-          height: 1,
-          letterSpacing: -1,
-        ),
-      ),
+      filterQuality: FilterQuality.high,
+      semanticLabel: 'Sportika logo',
     );
 
     if (!showWordmark) return mark;
@@ -1223,7 +1288,9 @@ void showSnack(BuildContext context, String message, {bool error = false}) {
     );
 }
 
-/// Account initials avatar from an [Account], with role badges.
+/// Account avatar: the imported picture when the player set one, otherwise the
+/// gradient and initials they chose during setup. Role tints the ring so an
+/// organizer still reads as one at a glance.
 class AccountAvatar extends StatelessWidget {
   const AccountAvatar({super.key, required this.account, this.size = 36});
   final Account account;
@@ -1231,12 +1298,15 @@ class AccountAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final preset = avatarOptionFor(account.avatar);
     return PlayerAvatar(
       initials: account.initials,
       size: size,
-      color: account.has(UserRole.organizer)
-          ? SportikaColors.mint
-          : SportikaColors.blue,
+      photoPath: account.photoPath,
+      photoUrl: account.photoUrl,
+      gradient: preset.colors,
+      ink: preset.ink,
+      color: SportikaColors.blue,
     );
   }
 }

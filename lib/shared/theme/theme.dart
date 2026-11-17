@@ -18,6 +18,15 @@ class SportikaColors {
   static const Color surfaceSunken = Color(0xFF0B1D33);
   static const Color surfaceElevated = Color(0xFF10243D);
 
+  // Light surfaces used by match lineup components.
+  static const Color lightSurface = Colors.white;
+  static const Color lightText = surface;
+  static const Color lightTextMuted = Color(0xFF617087);
+  static const Color lightBorder = Color(0xFFE5EBF2);
+  static const Color lightBlue = Color(0xFFF0F5FF);
+  static const Color lightMint = Color(0xFFE0F8F1);
+  static const Color lightMintText = Color(0xFF087D65);
+
   // Borders.
   static const Color border = Color(0xFF233A54);
   static const Color borderSubtle = Color(0xFF1A3049);

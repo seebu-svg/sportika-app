@@ -1,14 +1,20 @@
-import 'package:sportika/shared/widgets/editorial.dart';
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/app/routes.dart';
+import 'package:sportika/core/state/monetization_controller.dart';
+import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/tournaments_controller.dart';
+import 'package:sportika/features/monetization/widgets/billing_widgets.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/app/routes.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// Tournament summary card shared by Home, Tournaments and the organizer lists.
+/// Compact competition identity; sport photography is the existing fallback
+/// because the tournament model carries no uploaded banner/logo reference.
 class TournamentCard extends StatelessWidget {
   const TournamentCard({
     super.key,
@@ -16,17 +22,28 @@ class TournamentCard extends StatelessWidget {
     this.onTap,
     this.trailing,
   });
-
   final Tournament tournament;
   final VoidCallback? onTap;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final tone = sportColor(tournament.sport);
-    final dates =
-        '${dayLabel(tournament.startsAt)} – ${dayLabel(tournament.endsAt)}';
-
+    final confirmed = context.watch<TournamentsController>().confirmedCountFor(
+      tournament,
+    );
+    // The premium mark belongs to the event, not to whoever is looking at it:
+    // only an organizer's own unlocked tournaments carry it.
+    final organizerId = context.watch<ProfileController>().currentAccount?.id;
+    final premium =
+        organizerId != null &&
+        tournament.organizerId == organizerId &&
+        context.watch<MonetizationController>().canUsePremiumTournament(
+          tournament.id,
+        );
+    final full = confirmed >= tournament.registrationLimit;
+    final registration = tournament.status == TournamentStatus.open
+        ? (full ? 'Registration full' : 'Registration open')
+        : tournament.status.label;
     return SurfaceCard(
       onTap:
           onTap ??
@@ -35,94 +52,101 @@ class TournamentCard extends StatelessWidget {
             AppRoute.tournamentDetail,
             args: TournamentDetailArgs(tournament.id),
           ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SportPhoto(sport: tournament.sport, height: 156),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 76,
+                height: 76,
+                child: SportPhoto(
+                  sport: tournament.sport,
+                  height: 76,
+                  radius: 12,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tournament.sport.label.toUpperCase(),
+                      style: SportikaType.micro.copyWith(
+                        color: sportColor(tournament.sport),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      tournament.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: SportikaType.hero.copyWith(fontSize: 23),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      tournament.city,
+                      style: SportikaType.caption,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              SportTag(tournament.sport, compact: true),
               StatusPill(
-                tournament.status.label,
-                color: statusColor(tournament.status.key),
-                icon: statusIcon(tournament.status.key),
+                registration,
+                color: tournament.status == TournamentStatus.open && !full
+                    ? SportikaColors.mint
+                    : statusColor(tournament.status.key),
               ),
+              if (premium) const PremiumBadge(compact: true),
               ?trailing,
             ],
           ),
-          const SizedBox(height: 9),
+          const SizedBox(height: 10),
           Text(
-            tournament.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.2,
-              color: SportikaColors.text,
-            ),
+            '${dayLabel(tournament.startsAt)} – ${dayLabel(tournament.endsAt)}',
+            style: SportikaType.caption,
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
+          Text(
+            '${tournament.format.label} · ${tournament.entryType.label} · ${tournament.entryFee}',
+            style: SportikaType.caption,
+          ),
+          const SizedBox(height: 10),
           Row(
             children: [
               const Icon(
-                Icons.place_outlined,
-                size: 12,
-                color: SportikaColors.textDim,
+                Icons.groups_outlined,
+                size: 16,
+                color: SportikaColors.gold,
               ),
-              const SizedBox(width: 3),
-              Text(
-                tournament.city,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: SportikaColors.textMuted,
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '$confirmed / ${tournament.registrationLimit} confirmed entries',
+                  style: SportikaType.caption,
                 ),
               ),
-              const Dot(),
-              Text(
-                dates,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: SportikaColors.textMuted,
-                ),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 18,
+                color: SportikaColors.blueBright,
               ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              _meta(tone, Icons.account_tree_outlined, tournament.format.label),
-              _meta(tone, Icons.people_outline, tournament.entryType.label),
-              _meta(tone, Icons.payments_outlined, tournament.entryFee),
             ],
           ),
         ],
       ),
     );
   }
-
-  Widget _meta(Color tone, IconData icon, String label) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 12, color: tone),
-      const SizedBox(width: 4),
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: SportikaColors.textMuted,
-        ),
-      ),
-    ],
-  );
 }

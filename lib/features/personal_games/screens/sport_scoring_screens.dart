@@ -336,14 +336,10 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
                   );
                 }
                 if (widget.startAfterSave) {
-                  Navigator.pushReplacement(
+                  pushReplacementRoute(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) => ScorecardScreen(
-                        id: m.id,
-                        mode: ScorecardMode.personal,
-                      ),
-                    ),
+                    AppRoute.scorecard,
+                    args: ScorecardArgs(m.id, ScorecardMode.personal),
                   );
                 } else {
                   Navigator.pop(context);
@@ -359,12 +355,10 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
             ),
             if (widget.startAfterSave)
               TextButton(
-                onPressed: () => Navigator.pushReplacement(
+                onPressed: () => pushReplacementRoute(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ScorecardScreen(id: m.id, mode: ScorecardMode.personal),
-                  ),
+                  AppRoute.scorecard,
+                  args: ScorecardArgs(m.id, ScorecardMode.personal),
                 ),
                 child: const Text('Score without player attribution'),
               ),

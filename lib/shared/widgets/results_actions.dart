@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/official_result.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
@@ -326,11 +325,10 @@ Future<void> editFixtureSchedule(BuildContext context, Fixture fixture) async {
 
 Future<void> assignScorerSheet(BuildContext context, Fixture fixture) async {
   final state = context.read<FixturesController>();
-  final me = context.read<ProfileController>().currentAccount;
   final candidates = context
       .read<SessionController>()
       .accounts
-      .where((a) => a.has(UserRole.scorer) || a.id == me?.id)
+      .where((a) => a.id.isNotEmpty)
       .toList();
 
   await _sheet<void>(
@@ -446,9 +444,9 @@ class _ScorerRow extends StatelessWidget {
                     color: SportikaColors.text,
                   ),
                 ),
-                Text(
-                  account.roles.map((r) => r.label).join(' · '),
-                  style: const TextStyle(
+                const Text(
+                  'Sportika member',
+                  style: TextStyle(
                     fontSize: 10.5,
                     color: SportikaColors.textMuted,
                   ),

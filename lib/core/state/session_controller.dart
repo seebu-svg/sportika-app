@@ -1,8 +1,14 @@
+import 'package:sportika/shared/models/profile_setup.dart';
 import 'package:sportika/core/state/feature_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/onboarding.dart';
 import 'package:sportika/core/data/repositories.dart';
+
+// The notification centre grew past the session module, so its controller
+// lives in its own file. It is still re-exported here because every screen
+// that used to import the session controller keeps working unchanged.
+export 'notifications_controller.dart';
 
 /// Session, identity and account-directory reads and writes.
 class SessionController extends FeatureController<SessionRepository> {
@@ -18,6 +24,11 @@ class SessionController extends FeatureController<SessionRepository> {
   bool get canOrganize => repo.canOrganize;
   Account? accountById(String? id) => repo.accountById(id);
   Account? accountByEmail(String email) => repo.accountByEmail(email);
+
+  /// Fetches the profile a verified session belongs to, before anything reads
+  /// [accountById]. A no-op on the on-device store.
+  Future<void> hydrateAccount(String accountId) =>
+      repo.hydrateAccount(accountId);
 
   Future<void> signIn(String accountId) => repo.signIn(accountId);
   Future<void> signOut() => repo.signOut();
@@ -51,6 +62,11 @@ class SessionController extends FeatureController<SessionRepository> {
     required Map<String, PlayingLevel> levels,
     required PlayStyle playStyle,
     required String avatar,
+    String? email,
+    DateTime? dateOfBirth,
+    ProfileGender? gender,
+    Map<String, String>? playingPositions,
+    bool playingPreferencesSkipped = false,
   }) => repo.completeProfileSetup(
     displayName: displayName,
     handle: handle,
@@ -60,6 +76,11 @@ class SessionController extends FeatureController<SessionRepository> {
     levels: levels,
     playStyle: playStyle,
     avatar: avatar,
+    email: email,
+    dateOfBirth: dateOfBirth,
+    gender: gender,
+    playingPositions: playingPositions,
+    playingPreferencesSkipped: playingPreferencesSkipped,
   );
 }
 
@@ -96,16 +117,4 @@ class PreferencesController extends FeatureController<PreferencesRepository> {
       repo.preference(key, fallback: fallback);
 
   void setPreference(String key, bool value) => repo.setPreference(key, value);
-}
-
-/// Notifications for the signed-in account.
-class NotificationsController
-    extends FeatureController<NotificationRepository> {
-  NotificationsController(super.repo);
-
-  List<AppNotification> get myNotifications => repo.myNotifications;
-  int get unreadCount => repo.unreadCount;
-
-  void markNotificationRead(String id) => repo.markNotificationRead(id);
-  void markAllNotificationsRead() => repo.markAllNotificationsRead();
 }

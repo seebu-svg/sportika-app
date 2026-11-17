@@ -13,7 +13,29 @@ import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
-/// Games board for the Discover tab: pickup matches you can find or manage.
+/// One name on the roster. Shows the player's imported picture when the account
+/// behind the membership is known, and a neutral face when it is not, instead of
+/// borrowing somebody else's name.
+class _GameMemberTile extends StatelessWidget {
+  const _GameMemberTile({required this.accountId, required this.index});
+
+  final String accountId;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.watch<SessionController>().accountById(accountId);
+    return ListTile(
+      leading: account == null
+          ? const CircleAvatar(child: Icon(Icons.person_outline))
+          : AccountAvatar(account: account, size: 36),
+      title: Text(account?.displayName ?? 'Sportika player'),
+      subtitle: Text(index == 0 ? 'Captain' : 'Confirmed player'),
+    );
+  }
+}
+
+/// Pickup games board for the Match tab: pickup matches you can find or manage.
 class GamesTab extends StatefulWidget {
   const GamesTab({super.key});
   @override
@@ -455,22 +477,8 @@ class GameDetailScreen extends StatelessWidget {
             'Players · ${game.members.length}/${game.capacity}',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          for (var i = 0; i < game.members.length; i++)
-            ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-              title: Text(
-                context
-                        .read<SessionController>()
-                        .accountById(game.members[i])
-                        ?.displayName ??
-                    context
-                        .read<SessionController>()
-                        .accounts[(i + 1) %
-                            context.read<SessionController>().accounts.length]
-                        .displayName,
-              ),
-              subtitle: Text(i == 0 ? 'Captain' : 'Confirmed player'),
-            ),
+          for (final (i, memberId) in game.members.indexed)
+            _GameMemberTile(accountId: memberId, index: i),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: !joined && game.full

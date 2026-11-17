@@ -162,9 +162,11 @@ void main() {
   group('fixtures controller', () {
     test('assigning a scorer is visible through the controller', () async {
       final store = await freshStore();
-      await store.signIn('acc-seebu');
       final controller = FixturesController(store);
       final fixture = controller.fixtures.first;
+      await store.signIn(
+        store.tournamentById(fixture.tournamentId)!.organizerId,
+      );
       controller.assignScorer(fixture.id, 'acc-seebu');
       expect(
         controller.fixtureById(fixture.id)!.scorerAccountIds,

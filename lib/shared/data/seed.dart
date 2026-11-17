@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:sportika/shared/models/enums.dart';
+import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/official_result.dart';
 import 'package:sportika/features/personal_games/scoring/cricket/cricket.dart';
@@ -33,6 +34,21 @@ class SeedWorld {
     required this.notifications,
   });
 }
+
+/// The document a live build starts from.
+///
+/// Nothing here is invented: tournaments, fixtures, teams and scorecards come
+/// from PostgreSQL, and an account that has played nothing genuinely has no
+/// history. Empty lists, not the fictional Karachi world.
+SeedWorld emptySeedWorld() => SeedWorld(
+  accounts: [],
+  squads: [],
+  tournaments: [],
+  entries: [],
+  fixtures: [],
+  personal: [],
+  notifications: [],
+);
 
 SeedWorld buildSeed() {
   final now = DateTime.now();
@@ -1243,4 +1259,217 @@ List<Map<String, dynamic>> _badmintonGame(int winner, int loserScore) {
     seq.add(winner);
   }
   return [for (final s in seq) _ev('rally', s, {})];
+}
+
+// ─── Standalone official matches ──────────────────────────────────────────
+// Three matches cover the states the match module has to render: one being
+// scored live, one open for invitations, and one already published. They live
+// beside the tournament fixtures, not inside them.
+
+/// Turns an engine-shaped event log into sequenced match events.
+List<MatchEvent> _matchLog(
+  List<Map<String, dynamic>> raw, {
+  required String by,
+}) {
+  var seq = 0;
+  return [
+    for (final e in raw)
+      MatchEvent(
+        id: e['id'] as String? ?? 'ev-${seq + 1}',
+        seq: ++seq,
+        clientId: e['id'] as String? ?? 'ev-$seq',
+        kind: e['kind'] as String? ?? '',
+        side: (e['side'] as num?)?.toInt(),
+        data: Map<String, dynamic>.from(e['data'] as Map? ?? const {}),
+        at: DateTime.tryParse(e['at'] as String? ?? '') ?? DateTime.now(),
+        byAccountId: by,
+      ),
+  ];
+}
+
+List<SportMatch> matchSeed(List<Account> accounts, {DateTime? now}) {
+  final base = now ?? DateTime.now();
+  String name(int i) => i < accounts.length
+      ? accounts[i].displayName
+      : 'Sportika member ${i + 1}';
+  String pid(int i) =>
+      i < accounts.length ? accounts[i].id : 'acc-member-${i + 1}';
+
+  final organizer = pid(0);
+  final scorer = pid(1);
+
+  final cricketRules = {
+    ...SportEngines.rulesFor(Sport.cricket, 'T10 · 10 overs'),
+    'discipline': 'team',
+  };
+  final cricketLog = _matchLog([
+    for (var i = 0; i < 9; i++)
+      _ev(CricketEngine.kBall, 0, {
+        'runs': i.isEven ? 1 : (i == 7 ? 4 : 0),
+        'batter': name(2),
+        'bowler': name(3),
+      }, at: base.subtract(Duration(minutes: 30 - i * 2))),
+  ], by: scorer);
+
+  final badmintonRules = {
+    ...SportEngines.rulesFor(
+      Sport.badminton,
+      SportEngines.formatsFor(Sport.badminton).first,
+    ),
+    'discipline': 'singles',
+  };
+  final badmintonLog = _matchLog(
+    _badmintonMatch(seed: 7, winner: 0),
+    by: organizer,
+  );
+
+  final padelRules = {
+    ...SportEngines.rulesFor(
+      Sport.padel,
+      SportEngines.formatsFor(Sport.padel).first,
+    ),
+    'discipline': 'doubles',
+  };
+
+  final live = SportMatch(
+    id: 'match-seed-cricket',
+    sport: Sport.cricket,
+    formatLabel: 'T10 · 10 overs',
+    rules: cricketRules,
+    title: 'Friday night tape-ball derby',
+    venue: 'Gulberg Grounds, Karachi',
+    scheduledAt: base.subtract(const Duration(minutes: 32)),
+    visibility: MatchVisibility.public,
+    organizerId: organizer,
+    scorerId: scorer,
+    status: FixtureStatus.live,
+    sideNames: ['${name(2)} XI', '${name(3)} XI'],
+    discipline: MatchDiscipline.team,
+    capacity: 22,
+    startedAt: base.subtract(const Duration(minutes: 31)),
+    eventCount: cricketLog.length,
+    createdAt: base.subtract(const Duration(days: 2)),
+    participants: [
+      MatchParticipant(
+        profileId: organizer,
+        displayName: name(0),
+        side: 0,
+        status: MatchParticipantStatus.accepted,
+        invitedById: organizer,
+      ),
+      MatchParticipant(
+        profileId: pid(2),
+        displayName: name(2),
+        side: 0,
+        status: MatchParticipantStatus.accepted,
+        invitedById: organizer,
+      ),
+      MatchParticipant(
+        profileId: pid(3),
+        displayName: name(3),
+        side: 1,
+        status: MatchParticipantStatus.accepted,
+        invitedById: organizer,
+      ),
+      MatchParticipant(
+        profileId: pid(4),
+        displayName: name(4),
+        side: 1,
+        status: MatchParticipantStatus.invited,
+        invitedById: organizer,
+      ),
+    ],
+    events: cricketLog,
+  );
+
+  final upcoming = SportMatch(
+    id: 'match-seed-padel',
+    sport: Sport.padel,
+    formatLabel: SportEngines.formatsFor(Sport.padel).first,
+    rules: padelRules,
+    title: 'Saturday morning padel ladder',
+    venue: 'Clifton Padel Courts',
+    scheduledAt: base.add(const Duration(days: 1, hours: 2)),
+    visibility: MatchVisibility.public,
+    organizerId: scorer,
+    status: FixtureStatus.upcoming,
+    sideNames: ['${name(1)} & ${name(5)}', '${name(6)} & ${name(7)}'],
+    discipline: MatchDiscipline.doubles,
+    capacity: 4,
+    createdAt: base.subtract(const Duration(days: 1)),
+    participants: [
+      MatchParticipant(
+        profileId: scorer,
+        displayName: name(1),
+        side: 0,
+        status: MatchParticipantStatus.accepted,
+        invitedById: scorer,
+      ),
+      MatchParticipant(
+        profileId: pid(5),
+        displayName: name(5),
+        side: 0,
+        status: MatchParticipantStatus.accepted,
+        invitedById: scorer,
+      ),
+      MatchParticipant(
+        profileId: pid(6),
+        displayName: name(6),
+        side: 1,
+        status: MatchParticipantStatus.invited,
+        invitedById: scorer,
+      ),
+    ],
+  );
+
+  final published = SportMatch(
+    id: 'match-seed-badminton',
+    sport: Sport.badminton,
+    formatLabel: SportEngines.formatsFor(Sport.badminton).first,
+    rules: badmintonRules,
+    title: 'Club championship · court 3',
+    venue: 'Johar Sports Club',
+    scheduledAt: base.subtract(const Duration(days: 3)),
+    visibility: MatchVisibility.public,
+    organizerId: organizer,
+    scorerId: scorer,
+    status: FixtureStatus.published,
+    sideNames: [name(0), name(2)],
+    discipline: MatchDiscipline.singles,
+    capacity: 2,
+    startedAt: base.subtract(const Duration(days: 3, hours: 1)),
+    submittedAt: base.subtract(const Duration(days: 3, minutes: 40)),
+    completedAt: base.subtract(const Duration(days: 3, minutes: 30)),
+    publishedAt: base.subtract(const Duration(days: 3, minutes: 20)),
+    eventCount: badmintonLog.length,
+    createdAt: base.subtract(const Duration(days: 5)),
+    participants: [
+      MatchParticipant(
+        profileId: organizer,
+        displayName: name(0),
+        side: 0,
+        status: MatchParticipantStatus.accepted,
+        invitedById: organizer,
+      ),
+      MatchParticipant(
+        profileId: pid(2),
+        displayName: name(2),
+        side: 1,
+        status: MatchParticipantStatus.accepted,
+        invitedById: organizer,
+      ),
+    ],
+    events: badmintonLog,
+    result: OfficialResult(
+      sideScores: const ['2', '0'],
+      sideValues: const [2, 0],
+      winnerIndex: 0,
+      headline: '${name(0)} won 2-0',
+      detail: 'Straight games, 21-14 and 21-17',
+      publishedAt: base.subtract(const Duration(days: 3, minutes: 20)),
+      publishedById: organizer,
+    ),
+  );
+
+  return [live, upcoming, published];
 }

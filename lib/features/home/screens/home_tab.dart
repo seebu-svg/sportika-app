@@ -4,23 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/games_controller.dart';
-import 'package:sportika/core/state/personal_games_controller.dart';
+import 'package:sportika/core/state/match_controller.dart';
+import 'package:sportika/shared/models/match.dart';
+import 'package:sportika/shared/widgets/match_scoreboard.dart';
+import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/shared/widgets/fixture_tile.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/home/widgets/home_header.dart';
 import 'package:sportika/features/home/widgets/role_empty_state.dart';
 
-/// Home and discovery (spec §5): greet the player, filter by sport, resume a
-/// private card, follow live matches, see your own fixtures and find a
-/// tournament to join.
+/// Participation-first dashboard using account activity and sports discovery.
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -29,9 +31,77 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  /// Null means "All sports" - the selector above the cards drives every
-  /// fixture and tournament list on this tab.
+  /// Discovery filter; personal participation and totals stay account-wide.
   Sport? _sport;
+  bool _refreshing = false;
+  bool _refreshFailed = false;
+
+  /// Cached so [dispose] can close the live channel without reading the
+  /// element tree after it has been torn down.
+  MatchController? _matches;
+
+  @override
+  void initState() {
+    super.initState();
+    // Live scores arrive through the realtime channel, so Home opens it on the
+    // first frame instead of polling. The inbox channel is session-wide and
+    // shared with the header bell; starting it here only makes sure it runs.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<MatchController>().watchAllMatches();
+      context.read<NotificationsController>().start();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _matches ??= context.read<MatchController>();
+  }
+
+  @override
+  void dispose() {
+    // Only the match channel is Home's to close: the inbox channel belongs to
+    // the session, so it stays open for every other screen.
+    _matches?.unwatchAllMatches();
+    super.dispose();
+  }
+
+  /// Pull-to-refresh reloads every source Home paints, in parallel, so one
+  /// slow endpoint cannot leave the rest of the dashboard stale.
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() {
+      _refreshing = true;
+      _refreshFailed = false;
+    });
+    try {
+      await Future.wait([
+        context.read<SessionController>().reload(),
+        context.read<MatchController>().refresh(),
+        context.read<TournamentsController>().refresh(),
+        context.read<FixturesController>().refresh(),
+        context.read<GamesController>().refresh(),
+        context.read<TeamsController>().refresh(),
+        context.read<NotificationsController>().refresh(),
+      ]);
+      if (mounted) _refreshFailed = _anySourceFailed(context);
+    } catch (_) {
+      if (mounted) setState(() => _refreshFailed = true);
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  /// True when any source Home reads is holding a failure. A section keeps its
+  /// last good rows, so this only decides whether the banner appears.
+  static bool _anySourceFailed(BuildContext context) =>
+      context.read<MatchController>().lastError != null ||
+      context.read<TournamentsController>().lastError != null ||
+      context.read<FixturesController>().lastError != null ||
+      context.read<GamesController>().lastError != null ||
+      context.read<TeamsController>().lastError != null ||
+      context.read<NotificationsController>().error != null;
 
   /// One horizontal rhythm for the whole tab: 20 on phones, centred 720
   /// column on tablets and desktop so nothing stretches edge to edge.
@@ -42,303 +112,417 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<FixturesController>();
-    final me = context.read<ProfileController>().currentAccount;
+    final me = context.watch<ProfileController>().currentAccount;
+    final official = context.watch<MatchController>();
+    final tournaments = context.watch<TournamentsController>();
+    final games = context.watch<GamesController>();
+    final inbox = context.watch<NotificationsController>();
     if (me == null) return const SizedBox.shrink();
 
-    bool inSport(Fixture f) =>
-        _sport == null || state.tournamentOf(f)?.sport == _sport;
+    final now = DateTime.now();
 
-    final resume = context.read<PersonalGamesController>().myPersonalInProgress;
-    final upcoming = state.myFixtures
-        .where((f) => f.status == FixtureStatus.upcoming && inSport(f))
-        .take(2)
+    /// Side and winner, so one rule decides a win in every section below.
+    bool won(SportMatch m) {
+      final side = m.participantOf(me.id)?.side;
+      final winner = m.result?.winnerIndex;
+      return side != null && winner != null && winner >= 0 && winner == side;
+    }
+
+    // The match module is the only source of a member's own fixtures, so a
+    // tournament result and a pickup result can never be counted twice.
+    final mine = official.myMatches.where((m) => m.isParticipant(me.id));
+    final myUpcoming =
+        mine
+            .where(
+              (m) =>
+                  m.status == FixtureStatus.upcoming &&
+                  !m.scheduledAt.isBefore(now),
+            )
+            .toList()
+          ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final liveNow = official.liveMatches.take(2).toList();
+    // Matches this member is the appointed scorer for: an obligation, so it
+    // keeps its own tile in the activity block.
+    final scoring = official.myScoringMatches
+        .where((m) => m.scorerId == me.id)
         .toList();
-    final live = state.liveFixtures.where(inSport).take(2).toList();
-    final discover = context
-        .read<TournamentsController>()
-        .liveTournaments
-        .where(
-          (t) =>
-              (t.status == TournamentStatus.open ||
-                  t.status == TournamentStatus.inProgress) &&
-              (_sport == null || t.sport == _sport),
-        )
-        .take(2)
+
+    // Open tournaments, ranked the way a player picks one: their own sports
+    // first, then their own city, then whatever starts soonest.
+    final featured =
+        tournaments.liveTournaments
+            .where(
+              (t) =>
+                  t.status == TournamentStatus.open &&
+                  !t.startsAt.isBefore(now),
+            )
+            .toList()
+          ..sort((a, b) {
+            int relevance(Tournament t) =>
+                (me.sports.contains(t.sport) ? 2 : 0) +
+                (t.city.toLowerCase() == me.city.toLowerCase() ? 1 : 0);
+            final rank = relevance(b).compareTo(relevance(a));
+            return rank != 0 ? rank : a.startsAt.compareTo(b.startsAt);
+          });
+
+    // Open matches with room left. A tournament fixture has no free place to
+    // claim — a place is earned through an entry — so it is excluded.
+    final recommendations =
+        official.discoverableMatches
+            .where(
+              (m) =>
+                  m.tournamentId == null &&
+                  m.status == FixtureStatus.upcoming &&
+                  !m.scheduledAt.isBefore(now) &&
+                  m.acceptedCount < m.capacity &&
+                  (_sport == null || m.sport == _sport),
+            )
+            .toList()
+          ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final hasGames = games.games.any(
+      (g) =>
+          g.visibility == 'Public' &&
+          !g.full &&
+          !g.at.isBefore(now) &&
+          (_sport == null || g.sport == _sport),
+    );
+
+    // The three newest unread items; "See all" opens the full inbox.
+    final updateRail = inbox.myNotifications
+        .where((n) => !n.read)
+        .take(3)
         .toList();
 
-    final official = state.myFixtures;
-    final wins = official.where((f) {
-      final result = f.result;
-      if (result == null) return false;
-      return result.winnerIndex == _mySide(state, f);
-    }).length;
-    final scheduled = official
-        .where((f) => f.status == FixtureStatus.upcoming)
-        .length;
+    // Honest numbers: only published results of matches this member played.
+    final played = mine
+        .where((m) => m.status == FixtureStatus.published)
+        .toList();
+    final wins = played.where(won).length;
+    final bySport = <Sport, ({int played, int wins})>{};
+    for (final m in played) {
+      final current = bySport[m.sport] ?? (played: 0, wins: 0);
+      bySport[m.sport] = (
+        played: current.played + 1,
+        wins: current.wins + (won(m) ? 1 : 0),
+      );
+    }
+    final breakdown = bySport.entries.toList()
+      ..sort((a, b) => b.value.played.compareTo(a.value.played));
 
-    final tools = [
-      if (context.read<SessionController>().canOrganize)
-        (
-          icon: Icons.dashboard_customize_outlined,
-          title: 'Organizer dashboard',
-          subtitle: 'Entries, draws, results to review',
-          tone: SportikaColors.mint,
-          open: () => pushRoute(context, AppRoute.organizerDashboard),
-        ),
-      if (context.read<SessionController>().hasRole(UserRole.scorer))
-        (
-          icon: Icons.sports_score,
-          title: 'Scorer workspace',
-          subtitle: 'Fixtures assigned to you',
-          tone: SportikaColors.blueBright,
-          open: () => pushRoute(context, AppRoute.scorerWorkspace),
-        ),
-    ];
-
+    final heroTournament = featured.isEmpty ? null : featured.first;
+    final firstName = me.displayName.trim().split(RegExp(r'\s+')).first;
     final page = _pagePadding(context);
 
     return RefreshIndicator(
-      onRefresh: () => context.read<SessionController>().reload(),
+      onRefresh: _refresh,
       color: SportikaColors.mint,
       backgroundColor: SportikaColors.surface,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-            child: HomeHeader(account: me, pagePadding: page),
-          ),
-          // Full-bleed photographic hero, outside the content padding.
-          SliverToBoxAdapter(
-            child: HomeHero(sport: _sport, pagePadding: page),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(page, 16, page, 16),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'LET’S PLAY',
+                    style: SportikaType.micro.copyWith(
+                      color: SportikaColors.mint,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${greeting(firstName.isEmpty ? 'Player' : firstName)}!',
+                    style: SportikaType.hero.copyWith(fontSize: 26),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    (myUpcoming.isNotEmpty || liveNow.isNotEmpty)
+                        ? 'Your next game is on the horizon. Make it count.'
+                        : 'Ready for your next game?',
+                    style: SportikaType.caption,
+                  ),
+                ],
+              ),
+            ),
           ),
           SliverPadding(
-            padding: EdgeInsets.fromLTRB(page, 22, page, 32),
+            padding: EdgeInsets.symmetric(horizontal: page),
+            sliver: SliverToBoxAdapter(
+              child: HomeHero(
+                sport:
+                    _sport ??
+                    (heroTournament?.sport ??
+                        (me.sports.isEmpty ? Sport.cricket : me.sports.first)),
+                // The featured event's own banner outranks stock photography;
+                // the widget falls back when the URL 404s.
+                imageUrl: heroTournament?.bannerUrl,
+                featuredTournament: heroTournament,
+                pagePadding: SportikaSpacing.lg,
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(page, 24, page, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                BrandMetricStrip(
-                  metrics: [
-                    (
-                      value: _pad(
-                        context
-                            .read<ProfileController>()
-                            .officialMatchesPlayed()
-                            .length,
-                      ),
-                      label: 'Matches played',
-                    ),
-                    (value: _pad(wins), label: 'Victories'),
-                    (value: _pad(scheduled), label: 'Coming up'),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'FICTIONAL DEMO · KARACHI COMMUNITY',
-                  style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 1.4,
-                    color: SportikaColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _title(
-                  'Your sports',
-                  action: 'My teams',
-                  onAction: () => openHomeTab(context, 3),
-                ),
-                const SizedBox(height: 12),
-                _sports(),
-                const SizedBox(height: 30),
                 _title('Quick actions'),
                 const SizedBox(height: 12),
                 _quickActions(context),
-                if (resume.isNotEmpty) ...[
-                  const SizedBox(height: 30),
+                if (_refreshFailed) ...[
+                  const SizedBox(height: 12),
+                  InlineBanner(
+                    text: 'Couldn’t refresh everything. Showing the last activity that loaded.',
+                    icon: Icons.cloud_off_outlined,
+                    action: TextButton(
+                      onPressed: _refresh,
+                      child: const Text('Try again'),
+                    ),
+                  ),
+                ],
+                if (_refreshing) ...[
+                  const SizedBox(height: 12),
+                  const LoadingSkeleton(
+                    rows: 1,
+                    rowHeight: 36,
+                    label: 'Loading home activity',
+                  ),
+                ],
+                if (myUpcoming.isNotEmpty) ...[
+                  const SizedBox(height: 28),
                   _title(
-                    'Continue scoring',
-                    action: 'All cards',
-                    onAction: () => pushRoute(context, AppRoute.matchHistory),
+                    'Your next match',
+                    action: 'My matches',
+                    onAction: () => openMatchTab(context, section: 3),
                   ),
                   const SizedBox(height: 12),
-                  for (final match in resume.take(2))
+                  KeyedSubtree(
+                    key: ValueKey('next-match-${myUpcoming.first.id}'),
+                    child: _officialCard(context, official, myUpcoming.first),
+                  ),
+                ],
+                if (liveNow.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  _title(
+                    'Live now',
+                    action: 'Match center',
+                    onAction: () => openMatchTab(context),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final match in liveNow)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: const Border(
-                            left: BorderSide(
-                              color: SportikaColors.mint,
-                              width: 3,
-                            ),
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.play_circle_outline,
-                                    size: 18,
-                                    color: SportikaColors.mint,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        'RESUME YOUR SCORECARD',
-                                        maxLines: 1,
-                                        softWrap: false,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          letterSpacing: 1.2,
-                                          fontWeight: FontWeight.w800,
-                                          color: SportikaColors.mint,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            personalScorecardTile(context, match),
-                          ],
-                        ),
-                      ),
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _officialCard(context, official, match),
                     ),
                 ],
-                const SizedBox(height: 30),
-                _title(
-                  'Upcoming match',
-                  action: 'My matches',
-                  onAction: () => pushRoute(context, AppRoute.matchHistory),
-                ),
-                const SizedBox(height: 12),
-                if (upcoming.isEmpty)
-                  RoleAwareEmpty(
-                    title: 'Nothing scheduled yet',
-                    newcomerBody: 'Enter your first tournament and your fixtures appear here.',
-                    playerBody: 'Enter a tournament and your fixtures will show up here.',
-                    organizerBody: 'Your draw has no upcoming fixtures. Generate a draw from the organizer dashboard.',
-                    icon: Icons.event_available,
-                    action: GhostButton(
-                      label: 'Browse tournaments',
-                      icon: Icons.emoji_events_outlined,
-                      onPressed: () => openHomeTab(context, 1),
-                    ),
-                  )
-                else
-                  for (final fixture in upcoming)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _upcomingMatch(context, state, fixture),
-                    ),
-                const SizedBox(height: 30),
-                _title(
-                  'Live now',
-                  action: 'Match center',
-                  onAction: () => openHomeTab(context, 2),
-                ),
-                const SizedBox(height: 12),
-                if (live.isEmpty)
-                  const RoleAwareEmpty(
-                    title: 'No live fixtures',
-                    newcomerBody: 'Pick a sport and follow live scores once matches start.',
-                    playerBody: 'Scheduled matches appear here as soon as a scorer starts them.',
-                    organizerBody: 'No fixture is being scored right now. Assign a scorer to start one.',
-                    icon: Icons.sensors_off,
-                  )
-                else
-                  for (final fixture in live)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _liveScore(context, state, fixture),
-                    ),
-                const SizedBox(height: 30),
-                _title(
-                  'Upcoming tournaments',
-                  action: 'Explore',
-                  onAction: () => openHomeTab(context, 1),
-                ),
-                const SizedBox(height: 12),
-                if (discover.isEmpty)
-                  const RoleAwareEmpty(
-                    title: 'No open tournaments',
-                    newcomerBody: 'New events appear here as soon as organizers publish them.',
-                    playerBody: 'Nothing open right now. Check back after the next draw.',
-                    organizerBody: 'You have no published events. Publish one from the organizer dashboard.',
-                    icon: Icons.emoji_events_outlined,
-                  )
-                else
-                  for (final tournament in discover)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _discoverCard(context, state, tournament),
-                    ),
-                const SizedBox(height: 30),
-                _title(
-                  'Discover games near you',
-                  action: 'See all',
-                  onAction: () => openHomeTab(context, 1),
-                ),
-                const SizedBox(height: 12),
-                if (!context.read<GamesController>().games.any(
-                  (g) => _sport == null || g.sport == _sport,
-                ))
-                  const EmptyState(
-                    title: 'Find your next game',
-                    body: 'New community games will appear here.',
-                    icon: Icons.sports_outlined,
+                if (featured.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  _title(
+                    'Featured tournaments',
+                    action: 'See all',
+                    onAction: () => openHomeTab(context, 1),
                   ),
-                _gameRail(context, state),
-                const SizedBox(height: 30),
-                _title(
-                  'Recent activity',
-                  action: 'View all',
-                  onAction: () => pushRoute(context, AppRoute.notifications),
-                ),
-                const SizedBox(height: 12),
-                if (context
-                    .read<NotificationsController>()
-                    .myNotifications
-                    .isEmpty)
-                  const EmptyState(
-                    title: 'You’re all caught up',
-                    body: 'Match updates and community news will appear here.',
-                    icon: Icons.check_circle_outline,
-                  ),
-                for (final notification
-                    in context
-                        .read<NotificationsController>()
-                        .myNotifications
-                        .take(3))
-                  ActivityRow(notification: notification),
-                if (tools.isNotEmpty) ...[
-                  const SizedBox(height: 30),
-                  _title('Your tools'),
                   const SizedBox(height: 12),
-                  SurfaceCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 4,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = constraints.maxWidth < 360
+                          ? constraints.maxWidth - 16
+                          : (constraints.maxWidth < 600
+                                ? 310.0
+                                : (constraints.maxWidth - 12) / 2);
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final tournament in featured.take(4))
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: SizedBox(
+                                  width: width,
+                                  child: _discoverCard(context, tournament),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ] else if (tournaments.loading) ...[
+                  const SizedBox(height: 28),
+                  _title('Featured tournaments'),
+                  const SizedBox(height: 12),
+                  const LoadingSkeleton(
+                    rows: 1,
+                    rowHeight: 150,
+                    label: 'Loading tournaments',
+                  ),
+                ] else if (tournaments.lastError != null) ...[
+                  const SizedBox(height: 28),
+                  _title('Featured tournaments'),
+                  const SizedBox(height: 12),
+                  ErrorState(
+                    title: 'Couldn’t load tournaments',
+                    message: tournaments.lastError,
+                    compact: true,
+                    onRetry: tournaments.refresh,
+                  ),
+                ],
+                const SizedBox(height: 24),
+                _title(
+                  'Matches for you',
+                  action: 'See all',
+                  onAction: () => openMatchTab(context, section: 5),
+                ),
+                const SizedBox(height: 10),
+                _sports(),
+                const SizedBox(height: 12),
+                for (final match in recommendations.take(2))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _discoveryMatch(context, match),
+                  ),
+                if (hasGames) _gameRail(context),
+                if (games.lastError != null) ...[
+                  const SizedBox(height: 10),
+                  ErrorState(
+                    title: 'Couldn’t load pickup games',
+                    message: games.lastError,
+                    compact: true,
+                    onRetry: games.refresh,
+                  ),
+                ],
+                if (!hasGames && recommendations.isEmpty)
+                  AccountEmptyState(
+                    title: 'Your next opportunity is ahead',
+                    newcomerBody:
+                        'Find a match or bring your own team together.',
+                    playerBody: 'No open matches for this sport. Try another sport or create a match.',
+                    icon: Icons.sports_outlined,
+                    action: GhostButton(
+                      label: 'Create Match',
+                      icon: Icons.add,
+                      onPressed: () => pushRoute(context, AppRoute.createMatch),
                     ),
+                  ),
+
+                // ── Updates ─────────────────────────────────────────────
+                if (updateRail.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  _title(
+                    'Updates',
+                    action: 'See all',
+                    onAction: () => pushRoute(context, AppRoute.notifications),
+                  ),
+                  const SizedBox(height: 12),
+                  Column(
+                    children: [
+                      for (
+                        var index = 0;
+                        index < updateRail.length;
+                        index++
+                      ) ...[
+                        if (index > 0)
+                          const Divider(
+                            height: 1,
+                            color: SportikaColors.borderSubtle,
+                          ),
+                        ActivityRow(notification: updateRail[index]),
+                      ],
+                    ],
+                  ),
+                ],
+
+                // ── Activity ────────────────────────────────────────────
+                const SizedBox(height: 28),
+                _title('Your activity'),
+                const SizedBox(height: 6),
+                const Text(
+                  'Your official match record, across all sports.',
+                  style: SportikaType.caption,
+                ),
+                const SizedBox(height: 16),
+                if (scoring.isNotEmpty) ...[
+                  _surface(
                     child: Column(
                       children: [
-                        for (final tool in tools)
-                          SheetOption(
-                            icon: tool.icon,
-                            title: tool.title,
-                            subtitle: tool.subtitle,
-                            tone: tool.tone,
-                            onTap: tool.open,
+                        for (final match in scoring.take(2))
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(
+                              Icons.assignment_outlined,
+                              color: SportikaColors.gold,
+                            ),
+                            title: Text(
+                              match.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: const Text('Official scorer assignment'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => pushRoute(
+                              context,
+                              AppRoute.matchDetail,
+                              args: MatchArgs(match.id),
+                            ),
                           ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                BrandMetricStrip(
+                  compact: true,
+                  metrics: [
+                    (value: _pad(played.length), label: 'Played'),
+                    (value: _pad(wins), label: 'Wins'),
+                    (value: _pad(myUpcoming.length), label: 'Upcoming'),
+                  ],
+                ),
+                if (breakdown.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _surface(
+                    child: Column(
+                      children: [
+                        for (final entry in breakdown)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                SportGlyph(
+                                  sport: entry.key,
+                                  size: 16,
+                                  color: sportColor(entry.key),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    entry.key.label,
+                                    style: SportikaType.bodyStrong.copyWith(
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${entry.value.wins}W · '
+                                  '${entry.value.played - entry.value.wins}L',
+                                  style: SportikaType.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (played.isEmpty && myUpcoming.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Every player starts somewhere. Join a match or a tournament to build your record.',
+                    style: SportikaType.caption,
                   ),
                 ],
               ]),
@@ -353,6 +537,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _sports() {
     return SizedBox(
+      key: const ValueKey('home-sports-filter'),
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -429,383 +614,252 @@ class _HomeTabState extends State<HomeTab> {
 
   // --------------------------------------------------------- quick actions --
 
-  /// One compact strip instead of four floating tiles - monochrome icons,
-  /// hairline dividers, no colored containers.
+  /// Four direct actions, wrapping into two columns for smaller screens.
   Widget _quickActions(BuildContext context) {
     final actions = [
       (
-        label: 'Find game',
+        label: 'Create Match',
+        icon: Icons.add_circle_outline_rounded,
+        open: () => pushRoute(context, AppRoute.createMatch),
+      ),
+      (
+        label: 'Find Match',
         icon: Icons.search_rounded,
+        open: () => openMatchTab(context, section: 5),
+      ),
+      (
+        label: 'Tournaments',
+        icon: Icons.emoji_events_outlined,
         open: () => openHomeTab(context, 1),
       ),
       (
-        label: 'Create match',
-        icon: Icons.add_circle_outline_rounded,
-        open: () => pushRoute(context, AppRoute.createGame),
-      ),
-      (
-        label: 'Personal score',
-        icon: Icons.edit_note_rounded,
-        open: () => pushRoute(context, AppRoute.matchHistory),
-      ),
-      (
-        label: 'My teams',
+        label: 'My Teams',
         icon: Icons.groups_rounded,
         open: () => openHomeTab(context, 3),
       ),
     ];
 
-    return SurfaceCard(
-      padding: EdgeInsets.zero,
-      onTap: null,
-      child: Row(
-        children: [
-          for (var i = 0; i < actions.length; i++) ...[
-            if (i > 0)
-              const SizedBox(
-                height: 40,
-                child: VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: SportikaColors.borderSubtle,
-                ),
-              ),
-            Expanded(
-              child: InkWell(
-                onTap: actions[i].open,
-                borderRadius: BorderRadius.circular(18),
-                child: SizedBox(
-                  height: 62,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        actions[i].icon,
-                        size: 19,
-                        color: SportikaColors.textBody,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns =
+            constraints.maxWidth < 380 ||
+                MediaQuery.textScalerOf(context).scale(12) > 16
+            ? 2
+            : 4;
+        final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final action in actions)
+              SizedBox(
+                width: width,
+                child: Material(
+                  color: SportikaColors.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: SportikaColors.borderSubtle),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: action.open,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 16,
                       ),
-                      const SizedBox(height: 6),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          actions[i].label,
-                          maxLines: 1,
-                          softWrap: false,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: .1,
-                            color: SportikaColors.textMuted,
+                      child: Column(
+                        children: [
+                          Icon(
+                            action.icon,
+                            size: 22,
+                            color: SportikaColors.mint,
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          Text(
+                            action.label,
+                            textAlign: TextAlign.center,
+                            style: SportikaType.caption.copyWith(
+                              color: SportikaColors.text,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _discoveryMatch(BuildContext context, SportMatch match) {
+    return _surface(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () =>
+            pushRoute(context, AppRoute.matchDetail, args: MatchArgs(match.id)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  SportPhoto(sport: match.sport, height: 200, radius: 0),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, SportikaColors.deepest],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 14,
+                    left: 14,
+                    child: _pill(
+                      match.sport.label.toUpperCase(),
+                      SportikaColors.deepest,
+                      SportikaColors.mint,
+                    ),
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                    child: Text(
+                      match.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: SportikaType.title.copyWith(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${dayLabel(match.scheduledAt)} · ${timeLabel(match.scheduledAt)}',
+                    style: SportikaType.bodyStrong,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    match.venue,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.caption,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${match.capacity - match.acceptedCount} spots available',
+                          style: SportikaType.caption.copyWith(
+                            color: SportikaColors.mint,
+                          ),
+                        ),
+                      ),
+                      const Text('View match', style: SportikaType.label),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 16,
+                        color: SportikaColors.mint,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  // --------------------------------------------------------------- fixture --
-
-  Widget _upcomingMatch(
+  Widget _officialCard(
     BuildContext context,
-    FixturesController state,
-    Fixture fixture,
+    MatchController state,
+    SportMatch match,
   ) {
-    final tournament = state.tournamentOf(fixture);
-    final sport = tournament?.sport ?? Sport.cricket;
-    final venue = [
-      if (fixture.venue.isNotEmpty) fixture.venue,
-      if (tournament != null && tournament.city.isNotEmpty) tournament.city,
-    ].join(', ');
-    final d = fixture.scheduledAt;
-
+    final session = context.read<SessionController>();
     return _surface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // Editorial date block - condensed numerals, no container.
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    d.day.toString().padLeft(2, '0'),
-                    style: const TextStyle(
-                      fontFamily: 'Barlow Condensed',
-                      fontSize: 26,
-                      height: .9,
-                      fontWeight: FontWeight.w800,
-                      color: SportikaColors.text,
-                    ),
-                  ),
-                  Text(
-                    _monthShort(d).toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 9,
-                      letterSpacing: 1.6,
-                      fontWeight: FontWeight.w800,
-                      color: SportikaColors.mint,
-                    ),
-                  ),
-                ],
+              SportGlyph(
+                sport: match.sport,
+                color: SportikaColors.mint,
+                size: 16,
               ),
-              const SizedBox(width: 12),
-              Container(width: 1, height: 34, color: SportikaColors.border),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      tournament?.name ?? 'Tournament fixture',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -.1,
-                        color: SportikaColors.text,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      venue.isEmpty
-                          ? '${fixture.stage} · ${timeLabel(d)}'
-                          : '$venue · ${timeLabel(d)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: SportikaColors.textMuted,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  '${match.sport.label} · ${match.formatLabel}',
+                  style: SportikaType.caption,
                 ),
               ),
               _pill(
-                sport.label.toUpperCase(),
-                sportColor(sport).withValues(alpha: 0.12),
-                sportColor(sport),
+                match.isLive ? 'LIVE' : 'UPCOMING',
+                SportikaColors.blueSubtle,
+                match.isLive ? SportikaColors.mint : SportikaColors.gold,
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _matchSide(state.sideLabel(fixture, 0), sport),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'VS',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 2,
-                color: SportikaColors.textDim,
-              ),
-            ),
-          ),
-          _matchSide(state.sideLabel(fixture, 1), sport),
           const SizedBox(height: 12),
-          const Divider(),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => pushRoute(
-                context,
-                AppRoute.fixtureDetail,
-                args: FixtureDetailArgs(fixture.id),
-              ),
-              child: const Text('View details →'),
+          MatchScoreboard(
+            sport: match.sport,
+            labels: match.sideLabels,
+            versus: true,
+            progress: match.isLive ? state.progressOf(match) : null,
+            players: [
+              for (var side = 0; side < 2; side++)
+                [
+                  for (final p in match.participantsOnSide(side))
+                    if (session.accountById(p.profileId) != null)
+                      session.accountById(p.profileId)!,
+                ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${dayLabel(match.scheduledAt)} · ${timeLabel(match.scheduledAt)} · ${match.venue}',
+            style: SportikaType.caption,
+          ),
+          TextButton(
+            onPressed: () => pushRoute(
+              context,
+              AppRoute.matchDetail,
+              args: MatchArgs(match.id),
             ),
+            child: Text(match.isLive ? 'Follow live →' : 'View match →'),
           ),
         ],
       ),
     );
   }
-
-  // ------------------------------------------------------------ live board --
-
-  /// Broadcast-style scoreboard: dark floor, big condensed numerals, one
-  /// live indicator and the situation label the scoring engine provides.
-  Widget _liveScore(
-    BuildContext context,
-    FixturesController state,
-    Fixture fixture,
-  ) {
-    final progress = state.progressOfFixture(fixture);
-    final home = progress.scoreDisplay.isNotEmpty
-        ? progress.scoreDisplay[0]
-        : '–';
-    final away = progress.scoreDisplay.length > 1
-        ? progress.scoreDisplay[1]
-        : '–';
-    final sport = state.tournamentOf(fixture)?.sport ?? Sport.cricket;
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: SportikaColors.deepest,
-        border: Border.all(color: SportikaColors.borderStrong),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // Broadcast lower-third bar.
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: SportikaColors.border)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: SportikaColors.mint,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Text(
-                  'LIVE',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: SportikaColors.mint,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    sport.label.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: SportikaColors.textMuted,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    progress.statusLabel ?? 'In progress',
-                    textAlign: TextAlign.end,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: SportikaColors.textMuted,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-            child: Column(
-              children: [
-                _scoreLine(state.sideLabel(fixture, 0), home),
-                const Divider(color: SportikaColors.border),
-                _scoreLine(state.sideLabel(fixture, 1), away),
-              ],
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: () => pushRoute(
-                context,
-                AppRoute.fixtureDetail,
-                args: FixtureDetailArgs(fixture.id),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 0,
-                ),
-                minimumSize: const Size(48, 44),
-              ),
-              child: const Text(
-                'Open match center →',
-                style: TextStyle(
-                  color: SportikaColors.mintSoft,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
-      ),
-    );
-  }
-
-  Widget _scoreLine(String label, String score) => Row(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      Expanded(
-        flex: 5,
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      const SizedBox(width: 16),
-      Flexible(
-        flex: 4,
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerRight,
-            child: Text(
-              score,
-              style: const TextStyle(
-                fontFamily: 'Barlow Condensed',
-                fontSize: 34,
-                height: 1.2,
-                fontWeight: FontWeight.w800,
-                letterSpacing: .5,
-                color: Colors.white,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
 
   // ---------------------------------------------------------- tournaments --
 
-  Widget _discoverCard(
-    BuildContext context,
-    FixturesController state,
-    Tournament tournament,
-  ) {
+  Widget _discoverCard(BuildContext context, Tournament tournament) {
     final confirmed = context.read<TournamentsController>().confirmedCountFor(
       tournament,
     );
     final left = (tournament.registrationLimit - confirmed).clamp(0, 999);
+    final banner = tournament.bannerUrl;
 
     return _surface(
       padding: EdgeInsets.zero,
@@ -814,7 +868,24 @@ class _HomeTabState extends State<HomeTab> {
         children: [
           Stack(
             children: [
-              SportPhoto(sport: tournament.sport, height: 150, radius: 0),
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: banner == null || banner.isEmpty
+                    ? SportPhoto(
+                        sport: tournament.sport,
+                        height: 150,
+                        radius: 0,
+                      )
+                    : Image.network(
+                        banner,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => SportPhoto(
+                          sport: tournament.sport,
+                          height: 150,
+                          radius: 0,
+                        ),
+                      ),
+              ),
               Positioned(
                 left: 14,
                 bottom: 12,
@@ -837,6 +908,17 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
               ),
+              // Demo content is labelled, never passed off as a real event.
+              if (tournament.isDemo)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: _pill(
+                    'DEMO',
+                    SportikaColors.gold,
+                    SportikaColors.deepest,
+                  ),
+                ),
             ],
           ),
           Padding(
@@ -849,7 +931,7 @@ class _HomeTabState extends State<HomeTab> {
                     Expanded(
                       child: Text(
                         tournament.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontFamily: 'Barlow Condensed',
@@ -902,7 +984,7 @@ class _HomeTabState extends State<HomeTab> {
                       args: TournamentDetailArgs(tournament.id),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: SportikaColors.blue,
+                      foregroundColor: SportikaColors.mint,
                       side: const BorderSide(
                         color: SportikaColors.borderStrong,
                       ),
@@ -932,16 +1014,29 @@ class _HomeTabState extends State<HomeTab> {
 
   /// Horizontal, image-backed discovery cards - photography first, one line
   /// of condensed title and the availability state.
-  Widget _gameRail(BuildContext context, FixturesController state) {
-    final games = context
-        .read<GamesController>()
-        .games
-        .where((g) => _sport == null || g.sport == _sport)
-        .take(6)
-        .toList();
+  Widget _gameRail(BuildContext context) {
+    final games =
+        context
+            .read<GamesController>()
+            .games
+            .where(
+              (g) =>
+                  g.visibility == 'Public' &&
+                  !g.full &&
+                  !g.at.isBefore(DateTime.now()) &&
+                  (_sport == null || g.sport == _sport),
+            )
+            .toList()
+          ..sort((a, b) {
+            final me = context.read<ProfileController>().currentAccount!;
+            final rank = (me.sports.contains(b.sport) ? 1 : 0).compareTo(
+              me.sports.contains(a.sport) ? 1 : 0,
+            );
+            return rank != 0 ? rank : a.at.compareTo(b.at);
+          });
     if (games.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: 196,
+      height: 216,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.zero,
@@ -961,13 +1056,13 @@ class _HomeTabState extends State<HomeTab> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  SportPhoto(sport: game.sport, height: 196, radius: 16),
+                  SportPhoto(sport: game.sport, height: 216, radius: 16),
                   // Bottom scrim only under the type block.
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    height: 96,
+                    height: 140,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         borderRadius: const BorderRadius.vertical(
@@ -1054,7 +1149,7 @@ class _HomeTabState extends State<HomeTab> {
                       children: [
                         Text(
                           game.title,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontFamily: 'Barlow Condensed',
@@ -1089,21 +1184,6 @@ class _HomeTabState extends State<HomeTab> {
 
   // ---------------------------------------------------------------- others --
 
-  Widget _matchSide(String label, Sport sport) => Row(
-    children: [
-      SportGlyph(sport: sport, size: 18, color: sportColor(sport)),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
-        ),
-      ),
-    ],
-  );
-
   // ------------------------------------------------------------- primitives --
 
   Widget _title(String title, {String? action, VoidCallback? onAction}) {
@@ -1113,10 +1193,10 @@ class _HomeTabState extends State<HomeTab> {
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.6,
-              color: SportikaColors.textMuted,
+              letterSpacing: .1,
+              color: SportikaColors.text,
             ),
           ),
         ),
@@ -1160,52 +1240,25 @@ class _HomeTabState extends State<HomeTab> {
   Widget _surface({
     required Widget child,
     EdgeInsets padding = const EdgeInsets.all(18),
-  }) => Container(
-    padding: padding,
-    decoration: BoxDecoration(
-      color: SportikaColors.surface,
+  }) => Material(
+    color: SportikaColors.surface,
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: SportikaColors.border),
+      side: const BorderSide(color: SportikaColors.border),
     ),
-    child: child,
+    clipBehavior: Clip.antiAlias,
+    child: Padding(padding: padding, child: child),
   );
-
-  String _monthShort(DateTime d) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[d.month - 1];
-  }
-
-  /// Index of the side the signed-in account plays for, or -1.
-  int _mySide(FixturesController state, Fixture fixture) {
-    final me = context.read<ProfileController>().currentAccount?.id;
-    if (me == null) return -1;
-    final myEntryIds = context
-        .read<TournamentsController>()
-        .entries
-        .where((e) => e.memberAccountIds.contains(me))
-        .map((e) => e.id)
-        .toSet();
-    if (myEntryIds.contains(fixture.home.entryId)) return 0;
-    if (myEntryIds.contains(fixture.away.entryId)) return 1;
-    return -1;
-  }
 
   String _pad(int value) => value.toString().padLeft(2, '0');
 }
 
 String greeting(String name) {
-  return '${greetingEyebrow()}, $name';
+  final hour = DateTime.now().hour;
+  final salutation = hour < 12
+      ? 'Good morning'
+      : hour < 17
+      ? 'Good afternoon'
+      : 'Good evening';
+  return '$salutation, $name';
 }

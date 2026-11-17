@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:sportika/app/env.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 
-/// 07 · Email / OTP verification. Six boxes, a live resend timer and an honest
-/// note about how the prototype treats codes.
+/// One screen for the three codes the server can send: the signup
+/// confirmation, a passwordless sign-in code and a recovery code. Only the
+/// purpose, the copy and the way back change — the input and the request are
+/// identical, so there is no second screen to keep in sync.
 class VerifyEmailScreen extends StatefulWidget {
   const VerifyEmailScreen({super.key});
 
@@ -16,51 +19,72 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
-  String _code = '';
-
   @override
   Widget build(BuildContext context) {
     final flow = context.watch<AuthFlowController>();
     final waiting = flow.otpSecondsLeft > 0;
+    final signIn = flow.codePurpose == AuthCodePurpose.signIn;
 
     return AuthPage(
       sport: Sport.cricket,
       photoAlignment: const Alignment(0, -.3),
       showBack: true,
       onBack: flow.back,
-      stepLabel: 'VERIFY EMAIL',
+      stepLabel: signIn ? 'SIGN IN' : 'VERIFY EMAIL',
       footer: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (AppEnv.demoMode)
+            const AuthNotice(
+              'Demo verification code: 123456. No email is sent.',
+            ),
           AuthAction(
-            label: 'VERIFY & CONTINUE',
+            label: signIn ? 'SIGN IN' : 'VERIFY & CONTINUE',
             busy: flow.busy,
-            onPressed: () => flow.verifyCode(_code),
+            onPressed: () => flow.verifyCode(flow.otp),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Wrong address?',
-                style: TextStyle(fontSize: 11.5, color: SportikaColors.textDim),
-              ),
-              AuthLink(' Change email', onTap: flow.changeEmail),
-            ],
-          ),
+          // A sign-in code belongs to the address that was typed on the sign-in
+          // screen, so there is no account step to send the member back to.
+          if (!signIn) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text(
+                  'Wrong address?',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: SportikaColors.textDim,
+                  ),
+                ),
+                // The gap is a widget rather than a leading space in the label,
+                // so the link text stays exactly what the member reads.
+                const SizedBox(width: 6),
+                AuthLink('Change email', onTap: flow.changeVerificationEmail),
+              ],
+            ),
+          ],
         ],
       ),
       children: [
-        const SizedBox(height: 8),
-        const AuthStepRail(current: 2, labels: ['Account', 'Type', 'Verify']),
+        if (!signIn) ...[
+          const SizedBox(height: 8),
+          const AuthStepRail(
+            current: 1,
+            labels: ['Account', 'Verify', 'Profile'],
+          ),
+        ],
         const SizedBox(height: 26),
-        const AuthEyebrow('VERIFY EMAIL'),
+        AuthEyebrow(signIn ? 'PASSWORDLESS SIGN-IN' : 'VERIFY EMAIL'),
         const SizedBox(height: 14),
-        const AuthHeadline('CHECK YOUR', accent: 'INBOX.', size: 44),
+        signIn
+            ? const AuthHeadline('YOUR CODE', accent: 'TO GET IN.', size: 44)
+            : const AuthHeadline('CHECK YOUR', accent: 'INBOX.', size: 44),
         const SizedBox(height: 16),
         AuthLead(
-          'We sent a six-digit code to ${flow.maskedEmail}. It expires in ten '
-          'minutes.',
+          'Enter the six-digit code sent to ${flow.maskedEmail}. If it has '
+          'expired, request a new code below.',
         ),
         if (flow.notice != null) ...[
           const SizedBox(height: 14),
@@ -68,10 +92,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         ],
         const SizedBox(height: 24),
         AuthOtpInput(
-          value: _code,
+          value: flow.otp,
           error: flow.inlineField == 'otp',
           onChanged: (value) {
-            setState(() => _code = value);
             if (flow.inlineField == 'otp') flow.clearInline();
             flow.otp = value;
           },
@@ -85,12 +108,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ),
         ],
         const SizedBox(height: 16),
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
           children: [
             Text(
-              waiting
-                  ? 'RESEND IN 0:${flow.otpSecondsLeft.toString().padLeft(2, '0')}'
-                  : 'DIDN\'T GET IT?',
+              waiting ? 'RESEND IN ${flow.otpSecondsLeft}s' : 'DIDN\'T GET IT?',
               style: const TextStyle(
                 fontSize: 9,
                 fontWeight: FontWeight.w800,
@@ -98,7 +122,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 color: SportikaColors.textDim,
               ),
             ),
-            const Spacer(),
             if (!waiting)
               AuthLink(
                 'Resend code',
@@ -108,25 +131,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           ],
         ),
         const SizedBox(height: 18),
-        const AuthMeetingNote(),
+        AuthMicro(
+          signIn
+              ? 'The code expires shortly after it is sent. Check your spam '
+                    'folder before requesting another one.'
+              : 'Check your spam folder before requesting another code.',
+        ),
         const SizedBox(height: 8),
       ],
-    );
-  }
-}
-
-/// Prototype-only hint kept in one place so it can be removed with the mock
-/// verification service.
-class AuthMeetingNote extends StatelessWidget {
-  const AuthMeetingNote({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const AuthNotice(
-      'Prototype: any six digits verify the account. Enter 000000 to preview '
-      'the expired-code error and retry state.',
-      tone: SportikaColors.gold,
-      icon: Icons.science_outlined,
     );
   }
 }

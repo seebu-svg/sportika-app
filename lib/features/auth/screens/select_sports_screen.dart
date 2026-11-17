@@ -20,6 +20,8 @@ class SelectSportsScreen extends StatelessWidget {
     final allSelected = count == Sport.values.length;
 
     return AuthPage(
+      showBack: true,
+      onBack: flow.back,
       sport: Sport.padel,
       photoAlignment: const Alignment(0, -.45),
       stepLabel: 'PROFILE SETUP',
@@ -47,8 +49,8 @@ class SelectSportsScreen extends StatelessWidget {
       children: [
         const SizedBox(height: 8),
         const AuthStepRail(
-          current: 1,
-          labels: ['Basics', 'Sports', 'Levels', 'Photo'],
+          current: 2,
+          labels: ['Basics', 'Photo', 'Sports', 'Play', 'Review'],
         ),
         const SizedBox(height: 26),
         const AuthEyebrow('PREFERRED SPORTS'),
@@ -60,7 +62,10 @@ class SelectSportsScreen extends StatelessWidget {
           'whenever your game does.',
         ),
         const SizedBox(height: 20),
-        Row(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
           children: [
             Text(
               '$count OF ${Sport.values.length} SELECTED',
@@ -72,7 +77,6 @@ class SelectSportsScreen extends StatelessWidget {
                 letterSpacing: 1.5,
               ),
             ),
-            const Spacer(),
             AuthLink(
               allSelected ? 'Clear all' : 'Select all',
               tone: SportikaColors.textMuted,
@@ -106,7 +110,7 @@ class SelectSportsScreen extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         const AuthMicro(
-          'Organizers add the events. Players choose what they enter.',
+          'One account to play, follow sports and create your own events.',
           icon: Icons.emoji_events_outlined,
         ),
         const SizedBox(height: 8),

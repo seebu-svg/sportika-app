@@ -14,17 +14,56 @@ import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Fixtures for a tournament, grouped by bracket round or by group letter.
 class TournamentFixturesSection extends StatelessWidget {
-  const TournamentFixturesSection({super.key, required this.tournament});
+  const TournamentFixturesSection({
+    super.key,
+    required this.tournament,
+    this.status,
+  });
 
   final Tournament tournament;
+  final FixtureStatus? status;
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     final fixtures = context.read<FixturesController>().fixturesFor(
       tournament.id,
     );
+    if (status != null) {
+      final filtered =
+          fixtures
+              .where(
+                (f) =>
+                    f.status == status ||
+                    (status == FixtureStatus.published &&
+                        f.status == FixtureStatus.walkover),
+              )
+              .toList()
+            ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+      if (filtered.isEmpty) {
+        return EmptyState(
+          title: status == FixtureStatus.live
+              ? 'No live matches right now'
+              : status == FixtureStatus.published
+              ? 'No official results yet'
+              : 'No upcoming fixtures',
+          body: status == FixtureStatus.published
+              ? 'Results appear after the organizer publishes them.'
+              : 'Check the competition schedule for the latest fixtures.',
+          icon: Icons.sports_outlined,
+        );
+      }
+      return Column(
+        children: [
+          for (final fixture in filtered)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: officialFixtureTile(context, fixture),
+            ),
+        ],
+      );
+    }
     if (fixtures.isEmpty) {
       return EmptyState(
         title: tournament.status == TournamentStatus.open
@@ -32,7 +71,7 @@ class TournamentFixturesSection extends StatelessWidget {
             : 'No fixtures yet',
         body: tournament.status == TournamentStatus.open
             ? 'The organizer publishes fixtures once enough entries are confirmed.'
-            : 'Generate the draw from the organizer tools to create fixtures.',
+            : 'Fixtures appear once the organizer publishes the draw.',
         icon: Icons.account_tree_outlined,
       );
     }
@@ -82,7 +121,7 @@ class TournamentBracket extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     if (context.read<FixturesController>().fixturesFor(tournament.id).isEmpty) {
       return const EmptyState(
         title: 'Nothing to show yet',
@@ -106,7 +145,7 @@ class _StandingsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     final rows = state.standingsFor(tournament);
     if (rows.isEmpty) {
       return const EmptyState(
@@ -123,9 +162,23 @@ class _StandingsTable extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(
             children: [
-              const _StandingHeader(),
-              const SizedBox(height: 6),
-              for (final row in rows) _StandingLine(row: row),
+              LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth < 420
+                        ? 420
+                        : constraints.maxWidth,
+                    child: Column(
+                      children: [
+                        const _StandingHeader(),
+                        const SizedBox(height: 6),
+                        for (final row in rows) _StandingLine(row: row),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -272,7 +325,7 @@ class _Bracket extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     final rounds = state.roundsFor(tournament);
 
     return SingleChildScrollView(
@@ -322,7 +375,7 @@ class _BracketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     final sides = context.read<FixturesController>().sideLabelsOf(fixture);
     final result = fixture.result;
     final winner = result?.winnerIndex ?? -1;
@@ -415,7 +468,7 @@ class TournamentEntriesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
+    context.watch<FixturesController>();
     final entries = state.entriesFor(tournament.id);
     if (entries.isEmpty) {
       return const EmptyState(
@@ -583,10 +636,8 @@ class _EntryCard extends StatelessWidget {
                     icon: Icons.check,
                     small: true,
                     tone: SportikaColors.mint,
-                    onPressed: () {
-                      final state = context.read<TournamentsController>();
-                      state.decideEntry(entry.id, approve: true);
-                      showSnack(context, '${entry.label} confirmed');
+                    onPressed: () async {
+                      await _decide(context, approve: true);
                     },
                   ),
                 ),
@@ -596,14 +647,8 @@ class _EntryCard extends StatelessWidget {
                     label: 'Reject',
                     tone: SportikaColors.danger,
                     expand: true,
-                    onPressed: () {
-                      final state = context.read<TournamentsController>();
-                      state.decideEntry(
-                        entry.id,
-                        approve: false,
-                        note: 'Entry did not meet the tournament requirements',
-                      );
-                      showSnack(context, '${entry.label} rejected');
+                    onPressed: () async {
+                      await _decide(context, approve: false);
                     },
                   ),
                 ),
@@ -613,5 +658,29 @@ class _EntryCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _decide(BuildContext context, {required bool approve}) async {
+    try {
+      await context.read<TournamentsController>().decideEntry(
+        entry.id,
+        approve: approve,
+        note: approve ? null : 'Entry did not meet the tournament requirements',
+      );
+      if (context.mounted) {
+        showSnack(
+          context,
+          '${entry.label} ${approve ? 'confirmed' : 'rejected'}',
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        showSnack(
+          context,
+          'The entry could not be updated. Please try again.',
+          error: true,
+        );
+      }
+    }
   }
 }
