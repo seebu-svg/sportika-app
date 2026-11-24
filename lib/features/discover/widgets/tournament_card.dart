@@ -2,14 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/app/routes.dart';
-import 'package:sportika/core/state/monetization_controller.dart';
-import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/features/monetization/widgets/billing_widgets.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -31,15 +27,6 @@ class TournamentCard extends StatelessWidget {
     final confirmed = context.watch<TournamentsController>().confirmedCountFor(
       tournament,
     );
-    // The premium mark belongs to the event, not to whoever is looking at it:
-    // only an organizer's own unlocked tournaments carry it.
-    final organizerId = context.watch<ProfileController>().currentAccount?.id;
-    final premium =
-        organizerId != null &&
-        tournament.organizerId == organizerId &&
-        context.watch<MonetizationController>().canUsePremiumTournament(
-          tournament.id,
-        );
     final full = confirmed >= tournament.registrationLimit;
     final registration = tournament.status == TournamentStatus.open
         ? (full ? 'Registration full' : 'Registration open')
@@ -109,7 +96,6 @@ class TournamentCard extends StatelessWidget {
                     ? SportikaColors.mint
                     : statusColor(tournament.status.key),
               ),
-              if (premium) const PremiumBadge(compact: true),
               ?trailing,
             ],
           ),

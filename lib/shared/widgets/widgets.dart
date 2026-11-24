@@ -1,21 +1,17 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/widgets/avatar_photo.dart';
 import 'package:sportika/shared/widgets/avatar_presets.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
+import 'package:sportika/shared/widgets/surfaces.dart';
 
 /// Brand tint per sport, used consistently across cards, chips and charts.
-Color sportColor(Sport sport) => switch (sport) {
-  Sport.cricket => SportikaColors.cricket,
-  Sport.padel => SportikaColors.padel,
-  Sport.futsal => SportikaColors.futsal,
-  Sport.badminton => SportikaColors.badminton,
-};
+Color sportColor(Sport sport) => SportIdentities.of(sport).tone;
 
 String timeLabel(DateTime d) {
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
@@ -75,7 +71,7 @@ class SportTag extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: c.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(SportikaRadius.pill),
         border: Border.all(color: c.withValues(alpha: 0.38)),
       ),
       child: Text(
@@ -83,7 +79,7 @@ class SportTag extends StatelessWidget {
         style: TextStyle(
           color: c,
           fontSize: compact ? 9 : 10,
-          fontWeight: FontWeight.w800,
+          fontWeight: SportikaFontWeight.extraBold,
           letterSpacing: 0.9,
         ),
       ),
@@ -105,7 +101,7 @@ class StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: c.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(SportikaRadius.tag),
         border: Border.all(color: c.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -123,7 +119,7 @@ class StatusPill extends StatelessWidget {
               style: TextStyle(
                 color: c,
                 fontSize: 9.5,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 0.8,
               ),
             ),
@@ -184,7 +180,7 @@ class SectionTitle extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 1.5,
                 color: SportikaColors.textMuted,
               ),
@@ -202,7 +198,7 @@ class SectionTitle extends StatelessWidget {
                 action!,
                 style: const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: SportikaFontWeight.bold,
                 ),
               ),
             ),
@@ -212,7 +208,11 @@ class SectionTitle extends StatelessWidget {
   }
 }
 
-/// Standard bordered surface used for every card in the app.
+/// Standard surface used for every card in the app.
+///
+/// [style] defaults to the solid [SportikaSurfaceStyle.standard] card so lists
+/// and forms stay flat; important widgets opt into `elevated` and brand moments
+/// opt into `signature`.
 class SurfaceCard extends StatelessWidget {
   const SurfaceCard({
     super.key,
@@ -222,6 +222,7 @@ class SurfaceCard extends StatelessWidget {
     this.borderColor,
     this.fillColor,
     this.margin,
+    this.style = SportikaSurfaceStyle.standard,
   });
 
   final Widget child;
@@ -230,27 +231,18 @@ class SurfaceCard extends StatelessWidget {
   final Color? borderColor;
   final Color? fillColor;
   final EdgeInsets? margin;
+  final SportikaSurfaceStyle style;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: margin,
-      decoration: BoxDecoration(
-        color: fillColor ?? SportikaColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor ?? SportikaColors.border),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(padding: padding, child: child),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SportikaSurface(
+    style: style,
+    padding: padding,
+    margin: margin,
+    onTap: onTap,
+    fillColor: fillColor,
+    borderColor: borderColor,
+    child: child,
+  );
 }
 
 class PrimaryButton extends StatelessWidget {
@@ -275,9 +267,18 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final metallic = tone == SportikaColors.mint;
+    final enabled = onPressed != null;
     final foreground = tone.computeLuminance() > .4
-        ? SportikaColors.deepest
-        : Colors.white;
+        ? SportikaColors.onMint
+        : SportikaColors.onAccent;
+    final gradient = metallic
+        ? SportikaGradients.metallicMint
+        : SportikaGradients.accentFill(tone);
+    final glow = metallic
+        ? SportikaShadows.glow(SportikaColors.mint, strength: .7)
+        : SportikaShadows.glow(tone, strength: .8);
+    final borderRadius = BorderRadius.circular(SportikaRadius.md);
     final child = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -301,7 +302,7 @@ class PrimaryButton extends StatelessWidget {
               label,
               maxLines: 1,
               style: TextStyle(
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 0.4,
                 fontSize: small ? 12.5 : 14,
                 color: foreground,
@@ -314,15 +315,32 @@ class PrimaryButton extends StatelessWidget {
 
     return SizedBox(
       height: small ? 38 : 50,
-      child: Material(
-        color: onPressed == null ? tone.withValues(alpha: 0.35) : tone,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: small ? 14 : 18),
-            child: Center(child: child),
+      child: SportikaPressable(
+        enabled: enabled,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            boxShadow: enabled ? glow : null,
+          ),
+          child: Material(
+            color: enabled ? tone : tone.withValues(alpha: 0.35),
+            borderRadius: borderRadius,
+            child: Ink(
+              decoration: enabled
+                  ? BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: borderRadius,
+                    )
+                  : null,
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: borderRadius,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: small ? 14 : 18),
+                  child: Center(child: child),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -348,46 +366,51 @@ class GhostButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.sportika;
+    final borderRadius = BorderRadius.circular(SportikaRadius.control);
     return SizedBox(
       height: 38,
-      child: Material(
-        color: SportikaColors.surfaceAlt,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: SportikaColors.border),
-        ),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 13),
-            child: Row(
-              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 15, color: tone),
-                  const SizedBox(width: 7),
-                ],
-                // Labels are allowed to shrink rather than overflow: a long
-                // translation, a wide fallback font or textScale 1.3 must not
-                // push this row past the space it was given.
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.center,
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: tone,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.5,
+      child: SportikaPressable(
+        enabled: onPressed != null,
+        child: Material(
+          color: theme.surfaceAlt,
+          shape: RoundedRectangleBorder(
+            borderRadius: borderRadius,
+            side: BorderSide(color: theme.border),
+          ),
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: borderRadius,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 13),
+              child: Row(
+                mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 15, color: tone),
+                    const SizedBox(width: 7),
+                  ],
+                  // Labels are allowed to shrink rather than overflow: a long
+                  // translation, a wide fallback font or textScale 1.3 must not
+                  // push this row past the space it was given.
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: tone,
+                          fontWeight: SportikaFontWeight.bold,
+                          fontSize: 12.5,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -471,8 +494,12 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-/// A player's round identity tile: the imported picture when there is one, and
-/// the initials/preset avatar otherwise.
+/// A player's round identity tile: the imported picture when there is one, the
+/// initials/preset avatar otherwise, and the branded default portrait when the
+/// slot has neither.
+///
+/// The default portrait never replaces real initials: the colour preset a
+/// member picks at setup keeps identifying them until a photo is added.
 class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar({
     super.key,
@@ -485,6 +512,7 @@ class PlayerAvatar extends StatelessWidget {
     this.gradient,
     this.ink,
     this.ring,
+    this.figure,
   });
 
   final String initials;
@@ -511,24 +539,44 @@ class PlayerAvatar extends StatelessWidget {
   /// the ring while the face shows the gradient the player chose.
   final Color? ring;
 
+  /// The default portrait drawn when this member has no picture and no usable
+  /// initials. Null keeps the neutral silhouette; teams and sport monograms
+  /// never reach it because their initials always carry identity.
+  final DefaultAvatarFigure? figure;
+
   @override
   Widget build(BuildContext context) {
     final palette = gradient;
-    final face = Text(
+    final hasPhoto = hasAvatarPhoto(photoPath: photoPath, photoUrl: photoUrl);
+    // Initials stay the identity the player chose during setup; the default
+    // portrait only takes over when there are no letters to draw.
+    final hasInitials = hasAvatarInitials(initials);
+    final defaultFigure = hasInitials
+        ? null
+        : (figure ?? DefaultAvatarFigure.neutral);
+
+    final initialsFace = Text(
       initials.toUpperCase(),
       style: TextStyle(
-        color: palette == null ? color : (ink ?? Colors.white),
-        fontWeight: FontWeight.w800,
+        color: palette == null ? color : (ink ?? SportikaColors.onAccent),
+        fontWeight: SportikaFontWeight.extraBold,
         fontSize: size * 0.36,
       ),
     );
-    return SizedBox(
-      height: size,
-      width: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
+    final photoFallback = hasInitials
+        ? initialsFace
+        : BrandedDefaultAvatar(
+            size: size,
+            figure: defaultFigure ?? DefaultAvatarFigure.neutral,
+            ring: false,
+          );
+
+    // With nothing but a default portrait to show, the disc paints its own
+    // brand ring; keeping the preset gradient behind it would show through as
+    // the very gradient the default avatar replaces.
+    final disc = !hasPhoto && defaultFigure != null
+        ? BrandedDefaultAvatar(size: size, figure: defaultFigure)
+        : Container(
             height: size,
             width: size,
             clipBehavior: Clip.antiAlias,
@@ -551,9 +599,17 @@ class PlayerAvatar extends StatelessWidget {
               photoPath: photoPath,
               photoUrl: photoUrl,
               size: size,
-              fallback: face,
+              fallback: photoFallback,
             ),
-          ),
+          );
+
+    return SizedBox(
+      height: size,
+      width: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          disc,
           if (badge != null) Positioned(right: -2, bottom: -2, child: badge!),
         ],
       ),
@@ -583,8 +639,8 @@ class ScoreLineTile extends StatelessWidget {
             ? SportikaColors.surfaceAlt
             : line.leading
             ? SportikaColors.surfaceAlt
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+            : SportikaColors.transparent,
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         border: Border.all(
           color: line.leading
               ? SportikaColors.borderStrong
@@ -600,7 +656,7 @@ class ScoreLineTile extends StatelessWidget {
               color: line.leading
                   ? color
                   : SportikaColors.textDim.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(SportikaRadius.xxs),
             ),
           ),
           const SizedBox(width: 12),
@@ -613,7 +669,7 @@ class ScoreLineTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: SportikaFontWeight.bold,
                     fontSize: 13.5,
                     color: line.muted
                         ? SportikaColors.textMuted
@@ -639,7 +695,7 @@ class ScoreLineTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 26,
               height: 1,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               letterSpacing: -0.5,
               color: line.muted ? SportikaColors.textMuted : color,
             ),
@@ -680,7 +736,7 @@ class KeyValueRow extends StatelessWidget {
               style: TextStyle(
                 color: valueColor ?? SportikaColors.textBody,
                 fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+                fontWeight: SportikaFontWeight.bold,
               ),
             ),
           ),
@@ -721,7 +777,7 @@ class AppSheet extends StatelessWidget {
               height: 4,
               decoration: BoxDecoration(
                 color: SportikaColors.borderStrong,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(SportikaRadius.xxs),
               ),
             ),
           ),
@@ -730,7 +786,7 @@ class AppSheet extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               color: SportikaColors.text,
               letterSpacing: 0.2,
             ),
@@ -750,7 +806,9 @@ void showAppSheet(BuildContext context, Widget sheet) {
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) => sheet,
   );
@@ -791,15 +849,15 @@ class AppBadge extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 17),
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(SportikaRadius.badge),
       ),
       alignment: Alignment.center,
       child: Text(
         '$count',
         style: const TextStyle(
-          color: Colors.white,
+          color: SportikaColors.onAccent,
           fontSize: 10,
-          fontWeight: FontWeight.w800,
+          fontWeight: SportikaFontWeight.extraBold,
         ),
       ),
     );
@@ -882,7 +940,7 @@ class FixtureRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: SportikaColors.text,
-              fontWeight: FontWeight.w700,
+              fontWeight: SportikaFontWeight.bold,
               fontSize: 13.5,
             ),
           ),
@@ -892,9 +950,9 @@ class FixtureRow extends StatelessWidget {
             score,
             style: TextStyle(
               color: accent ?? SportikaColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               fontSize: 23,
-              fontFamily: 'Barlow Condensed',
+              fontFamily: SportikaType.displayFamily,
               letterSpacing: 0.3,
             ),
           ),
@@ -924,7 +982,7 @@ PreferredSizeWidget sportikaAppBar(
             style: const TextStyle(
               fontSize: 11,
               letterSpacing: 0.3,
-              fontWeight: FontWeight.w600,
+              fontWeight: SportikaFontWeight.semibold,
               color: SportikaColors.textMuted,
             ),
           ),
@@ -977,7 +1035,7 @@ class BrandMark extends StatelessWidget {
                   'SPORTIKA',
                   style: TextStyle(
                     fontSize: size * 0.34,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: SportikaFontWeight.black,
                     letterSpacing: size * 0.06,
                     color: SportikaColors.text,
                     height: 1.1,
@@ -987,7 +1045,7 @@ class BrandMark extends StatelessWidget {
                   'THE GAME CONNECTS US.',
                   style: TextStyle(
                     fontSize: size * 0.12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: SportikaFontWeight.bold,
                     letterSpacing: size * 0.032,
                     color: SportikaColors.textMuted,
                   ),
@@ -1034,7 +1092,7 @@ class TabHeader extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     letterSpacing: 2,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: SportikaFontWeight.black,
                   ),
                 ),
                 const Spacer(),
@@ -1042,16 +1100,7 @@ class TabHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            Text(
-              title,
-              style: const TextStyle(
-                fontFamily: 'Barlow Condensed',
-                fontSize: 32,
-                height: 1.05,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.6,
-              ),
-            ),
+            Text(title, style: SportikaType.hero),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
               Text(
@@ -1114,7 +1163,7 @@ class InfoBanner extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         border: Border.all(color: tone.withValues(alpha: 0.28)),
       ),
       child: Row(
@@ -1157,7 +1206,7 @@ class StatTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
         color: SportikaColors.surfaceSunken,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         border: Border.all(color: SportikaColors.borderSubtle),
       ),
       child: Column(
@@ -1168,7 +1217,7 @@ class StatTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               height: 1.1,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               color: tone,
             ),
           ),
@@ -1180,7 +1229,7 @@ class StatTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 9,
-              fontWeight: FontWeight.w700,
+              fontWeight: SportikaFontWeight.bold,
               letterSpacing: 0.7,
               color: SportikaColors.textMuted,
             ),
@@ -1211,10 +1260,10 @@ class SheetOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: SportikaColors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
           child: Row(
@@ -1224,7 +1273,7 @@ class SheetOption extends StatelessWidget {
                 width: 34,
                 decoration: BoxDecoration(
                   color: tone.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(SportikaRadius.sm),
                 ),
                 child: Icon(icon, size: 17, color: tone),
               ),
@@ -1238,7 +1287,7 @@ class SheetOption extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: SportikaFontWeight.bold,
                         color: SportikaColors.text,
                       ),
                     ),
@@ -1289,24 +1338,139 @@ void showSnack(BuildContext context, String message, {bool error = false}) {
 }
 
 /// Account avatar: the imported picture when the player set one, otherwise the
-/// gradient and initials they chose during setup. Role tints the ring so an
-/// organizer still reads as one at a glance.
+/// branded default portrait that matches their stated gender. Role tints the
+/// ring so an organizer still reads as one at a glance.
 class AccountAvatar extends StatelessWidget {
-  const AccountAvatar({super.key, required this.account, this.size = 36});
+  const AccountAvatar({
+    super.key,
+    required this.account,
+    this.size = SportikaSpacing.xxl,
+    this.ring,
+  });
   final Account account;
   final double size;
+  final Color? ring;
 
   @override
   Widget build(BuildContext context) {
     final preset = avatarOptionFor(account.avatar);
     return PlayerAvatar(
       initials: account.initials,
+      figure: defaultAvatarFigureFor(account.gender),
       size: size,
       photoPath: account.photoPath,
       photoUrl: account.photoUrl,
       gradient: preset.colors,
       ink: preset.ink,
+      ring: ring,
       color: SportikaColors.blue,
+    );
+  }
+}
+
+/// Row or Column child that scales its content down instead of overflowing.
+///
+/// [Row] lays out every non-flexible child at its intrinsic width before the
+/// flexible ones get a say, so a trailing pill, button or icon pair that is
+/// wider than the space left by its [Expanded] sibling overflows on narrow
+/// phones and at the 1.3 text ceiling. Making the child flexible gives it only
+/// the space that is actually left, and [FittedBox] with [BoxFit.scaleDown]
+/// shrinks it in place rather than clipping or ellipsising the copy.
+///
+/// With room to spare the child keeps its natural size, so the layout is
+/// unchanged; [expand] claims the leftover space the way [Expanded] does.
+class FittedFlex extends StatelessWidget {
+  const FittedFlex({
+    super.key,
+    required this.child,
+    this.expand = false,
+    this.flex = 1,
+    this.alignment = Alignment.center,
+  });
+
+  final Widget child;
+  final bool expand;
+  final int flex;
+  final AlignmentGeometry alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget fitted = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: alignment,
+      child: child,
+    );
+    return expand
+        ? Expanded(flex: flex, child: fitted)
+        : Flexible(flex: flex, child: fitted);
+  }
+}
+
+/// Trailing cluster of a label-plus-action row: pinned to the right edge and
+/// scaled down instead of overflowing.
+///
+/// A [Row] hands its non-flexible children an unbounded main axis, so a pill,
+/// button or icon pair sitting next to an [Expanded] label can only overflow
+/// once the copy grows (narrow column, 1.3 text ceiling). [TrailingRow] keeps
+/// the usual "label left, action right" rhythm: [leading] is laid out first
+/// and may contain flex children such as [Expanded], while [trailing] is laid
+/// out as one cluster capped to [maxFraction] of the row's own width and
+/// shrunk in place when it still needs more than that.
+///
+/// Prefer it over making the cluster [Flexible]: a flexible sibling splits the
+/// leftover space by flex factor, which pulls the cluster away from the right
+/// edge and squeezes the label even when there is room for both.
+class TrailingRow extends StatelessWidget {
+  const TrailingRow({
+    super.key,
+    required this.leading,
+    this.trailing = const <Widget>[],
+    this.maxFraction = 0.55,
+    this.mainAxisAlignment = MainAxisAlignment.start,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
+    this.textDirection,
+  });
+
+  /// Everything that renders before the cluster, flex children included.
+  final List<Widget> leading;
+
+  /// The right-hand cluster; laid out at its natural size, then scaled down.
+  final List<Widget> trailing;
+  final double maxFraction;
+  final MainAxisAlignment mainAxisAlignment;
+  final CrossAxisAlignment crossAxisAlignment;
+  final TextDirection? textDirection;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // Unbounded main axis means there is nothing to cap against, so the
+        // cluster simply keeps its natural size.
+        final double cap = constraints.maxWidth.isFinite
+            ? constraints.maxWidth * maxFraction
+            : double.infinity;
+        return Row(
+          mainAxisAlignment: mainAxisAlignment,
+          crossAxisAlignment: crossAxisAlignment,
+          textDirection: textDirection,
+          children: [
+            ...leading,
+            if (trailing.isNotEmpty)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: cap),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: trailing,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

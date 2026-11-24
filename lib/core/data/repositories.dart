@@ -8,7 +8,6 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/identity_document.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/models/monetization.dart';
 import 'package:sportika/shared/models/onboarding.dart';
 import 'package:sportika/shared/models/tournament_engine.dart';
 
@@ -145,6 +144,23 @@ abstract class MatchRepository extends SportikaRepository {
   });
   Future<void> respondToInvite(String matchId, {required bool accept});
   Future<void> removeParticipant(String matchId, String profileId);
+
+  /// Joins a public match on [side] (0 or 1) without waiting for an invitation.
+  /// Being in the match is the consent, so the row is written accepted and the
+  /// organizer is told. Joining twice is not an error; the per-side cap is
+  /// `capacity / 2` for team disciplines, 1 for singles and 2 for doubles, and
+  /// the server refuses a full side with `side_full`.
+  Future<void> joinMatch(String matchId, {int side = 0});
+
+  /// Leaves a match the caller joined, before kick-off. The organizer cannot
+  /// leave their own match, and the server refuses a started one.
+  Future<void> leaveMatch(String matchId);
+
+  /// Invites every accepted member of [squadId] to [side]. Organizer or scorer
+  /// only, and the caller must be on the squad. Consent stays with the players:
+  /// they are invited, not enrolled. Returns how many invitations were written.
+  Future<int> addSquadToMatch(String matchId, String squadId, {int side = 0});
+
   Future<void> assignMatchScorer(String matchId, String scorerId);
   Future<void> revokeMatchScorer(String matchId);
   Future<void> startMatch(String matchId);
@@ -171,6 +187,15 @@ abstract class MatchRepository extends SportikaRepository {
   /// Withdraws the newest active entry. Anything older is refused.
   Future<void> voidEvent(String matchId, String eventId);
 
+  /// Puts the official result on the record and moves the match to review.
+  ///
+  /// Padel, futsal and badminton are not told what their score was: both
+  /// backends re-derive the set/game lines, the totals and the winner from the
+  /// point or rally log the server holds (`complete_padel_match`, 0013;
+  /// `submit_match_result`, 0021/0024), so a device that sends a friendlier
+  /// number cannot put it on the official record. The three score arguments are
+  /// therefore only authoritative for cricket, whose engine result the app
+  /// still submits itself.
   Future<void> submitResult(
     String matchId, {
     required String headline,
@@ -193,6 +218,18 @@ abstract class MatchRepository extends SportikaRepository {
   });
 
   Future<void> recordMatchWalkover(
+    String matchId, {
+    required int winnerIndex,
+    required String reason,
+  });
+
+  /// Retires a live badminton match that will not reach the winning game.
+  ///
+  /// The winner is the side that takes the result, the reason is required and
+  /// audited, and the partial score comes from the rally log the server holds
+  /// (`retire_match`, migration 0024). The match keeps the walkover terminal
+  /// status, because a retirement is a walkover with a score attached.
+  Future<void> retireMatch(
     String matchId, {
     required int winnerIndex,
     required String reason,
@@ -365,6 +402,17 @@ abstract class ProfileModuleRepository implements Listenable {
 
   /// Renames the handle through the server's unique index.
   Future<void> changeUsername(String username);
+
+  /// The optional athlete attributes (height, weight, laterality, preferred
+  /// jersey). Every argument is nullable so a member can leave any single field
+  /// blank; a null clears the stored value rather than being ignored.
+  Future<void> saveAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required ProfileSide? dominantHand,
+    required ProfileSide? dominantFoot,
+    required int? preferredJersey,
+  });
 
   /// Replaces the whole preferred-sport set.
   Future<void> saveSportsPreferences(List<ProfileSportPreference> sports);
@@ -557,76 +605,4 @@ abstract class TournamentRepository extends SportikaRepository {
     String? note,
   });
   Future<int> generateDraw(String tournamentId);
-}
-
-/// Read/write surface for the monetization module.
-///
-/// Purchases and entitlements are server-owned in every build. The only
-/// implementation that can mark a purchase paid is the demo adapter's simulator,
-/// which exists so a device-only build can show the flow; a release build reads
-/// payment state from PostgreSQL and nothing else.
-abstract class MonetizationRepository extends SportikaRepository {
-  /// One consistent read of the catalogue and the caller's own billing records.
-  BillingSnapshot get snapshot;
-
-  /// True while a refresh is in flight, so a screen can tell "empty" from
-  /// "not loaded yet".
-  bool get loading;
-
-  /// The last load failure, or null. A live build with no migration applied
-  /// reports this instead of inventing a catalogue.
-  String? get error;
-
-  List<MonetizationStream> get streams => snapshot.streams;
-  List<BillingPlan> get plans => snapshot.plans;
-  List<Purchase> get purchases => snapshot.purchases;
-  List<Subscription> get subscriptions => snapshot.subscriptions;
-  List<Entitlement> get entitlements => snapshot.entitlements;
-  List<PaymentRecord> get payments => snapshot.payments;
-
-  /// Creates (or reuses) a pending purchase. [idempotencyKey] makes a retry
-  /// converge on the same row, so a dropped connection never charges twice.
-  Future<Purchase> startPurchase({
-    required String planCode,
-    PurchaseTargetKind targetKind = PurchaseTargetKind.account,
-    String? targetId,
-    required String idempotencyKey,
-  });
-
-  /// The authoritative check. This asks the server on every call; the loaded
-  /// snapshot is only a hint for painting.
-  Future<bool> hasEntitlement({
-    required String featureKey,
-    PurchaseTargetKind targetKind = PurchaseTargetKind.account,
-    String? targetId,
-  });
-
-  /// Schedules the end of a subscription at the close of its paid period.
-  Future<void> cancelSubscription(String planCode);
-
-  /// Demo builds only. A release implementation leaves this as-is, so no member
-  /// can ever mark their own purchase paid.
-  Future<void> simulateVerification(String purchaseId) async {
-    throw const MonetizationException(
-      'Payments are confirmed by an operator, not in the app.',
-    );
-  }
-}
-
-/// The read-side of [MonetizationRepository], derived from one snapshot.
-///
-/// A billing adapter owns exactly one thing - the [snapshot] - and this mixin
-/// turns it into the six lists the controller and the screens read. It exists
-/// because the repositories are consumed through `implements`, where an
-/// interface's own method bodies are never inherited, so without it every
-/// adapter would repeat the same six delegating getters.
-abstract mixin class MonetizationSnapshotAccess {
-  BillingSnapshot get snapshot;
-
-  List<MonetizationStream> get streams => snapshot.streams;
-  List<BillingPlan> get plans => snapshot.plans;
-  List<Purchase> get purchases => snapshot.purchases;
-  List<Subscription> get subscriptions => snapshot.subscriptions;
-  List<Entitlement> get entitlements => snapshot.entitlements;
-  List<PaymentRecord> get payments => snapshot.payments;
 }

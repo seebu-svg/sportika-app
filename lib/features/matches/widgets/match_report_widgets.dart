@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 class MatchReportLegend extends StatelessWidget {
   const MatchReportLegend({super.key, required this.match});

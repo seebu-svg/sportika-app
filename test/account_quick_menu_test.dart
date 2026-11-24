@@ -7,10 +7,14 @@ import 'package:sportika/shared/navigation/navigation.dart';
 
 import 'helpers/harness.dart';
 
+/// The sheet has no visible title row that survives redesigns, so the open and
+/// dismissed probes are the modal sheet itself.
+Finder quickMenu() => find.byType(BottomSheet);
+
 Future<void> openMenu(WidgetTester tester) async {
   await tester.tap(find.byTooltip('Account menu'));
   await tester.pumpAndSettle();
-  expect(find.text('Account quick menu'), findsOneWidget);
+  expect(quickMenu(), findsOneWidget);
 }
 
 void main() {
@@ -25,18 +29,18 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Account quick menu'), findsNothing);
+      expect(quickMenu(), findsNothing);
       await openMenu(tester);
       await tester.tapAt(const Offset(4, 4));
       await tester.pumpAndSettle();
-      expect(find.text('Account quick menu'), findsNothing);
+      expect(quickMenu(), findsNothing);
       await openMenu(tester);
       await tester.dragFrom(
         tester.getTopLeft(find.byType(BottomSheet)) + const Offset(240, 16),
         const Offset(0, 600),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Account quick menu'), findsNothing);
+      expect(quickMenu(), findsNothing);
       expect(state.isSignedIn, isTrue);
       expect(tester.takeException(), isNull);
     });
@@ -52,7 +56,7 @@ void main() {
     await tester.tap(find.text('Edit Profile'));
     await tester.pumpAndSettle();
     expect(find.byType(EditProfileScreen), findsOneWidget);
-    expect(find.text('Account quick menu'), findsNothing);
+    expect(quickMenu(), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
     await openMenu(tester);
@@ -62,10 +66,12 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     await openMenu(tester);
-    await tester.tap(find.text('View Profile'));
+    // The identity card is the profile affordance; its brand eyebrow sits
+    // inside the tap target that opens the athlete tab.
+    await tester.tap(find.text('SPORTIKA ATHLETE'));
     await tester.pumpAndSettle();
     expect(homeTabRequest.value, 4);
-    expect(find.text('Account quick menu'), findsNothing);
+    expect(quickMenu(), findsNothing);
   });
 
   testWidgets(

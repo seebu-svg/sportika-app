@@ -6,7 +6,6 @@ import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Match-specific selection; squad membership is never modified here.

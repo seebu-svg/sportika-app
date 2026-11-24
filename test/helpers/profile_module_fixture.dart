@@ -20,6 +20,7 @@ class ProfileModuleFixture extends ChangeNotifier
     ProfilePersonalInformation? personal,
     List<ProfileSportPreference>? sports,
     this.identity,
+    this.athlete = ProfileAthleteDetails.empty,
     this.supportsIdentityDocuments = true,
   }) : personal =
            personal ??
@@ -40,6 +41,7 @@ class ProfileModuleFixture extends ChangeNotifier
   ProfilePersonalInformation personal;
   List<ProfileSportPreference> sports;
   ProfileIdentityRecord? identity;
+  ProfileAthleteDetails athlete;
 
   @override
   final bool supportsIdentityDocuments;
@@ -68,6 +70,7 @@ class ProfileModuleFixture extends ChangeNotifier
   PlayStyle? savedPlayStyle;
   String? savedUsername;
   List<ProfileSportPreference>? savedSports;
+  ProfileAthleteDetails? savedAthlete;
   final List<IdentitySubmission> submittedIdentities = <IdentitySubmission>[];
   int deletedIdentities = 0;
   final List<String> claimedTournaments = <String>[];
@@ -89,6 +92,7 @@ class ProfileModuleFixture extends ChangeNotifier
       personal: personal,
       sports: sports,
       identity: identity,
+      athlete: athlete,
     );
   }
 
@@ -149,6 +153,26 @@ class ProfileModuleFixture extends ChangeNotifier
     _throwIfSet(writeError);
     savedSports = sports;
     this.sports = sports;
+    notifyListeners();
+  }
+
+  @override
+  Future<void> saveAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required ProfileSide? dominantHand,
+    required ProfileSide? dominantFoot,
+    required int? preferredJersey,
+  }) async {
+    _throwIfSet(writeError);
+    athlete = ProfileAthleteDetails(
+      heightCm: heightCm,
+      weightKg: weightKg,
+      dominantHand: dominantHand,
+      dominantFoot: dominantFoot,
+      preferredJersey: preferredJersey,
+    );
+    savedAthlete = athlete;
     notifyListeners();
   }
 

@@ -1,43 +1,220 @@
-import 'package:sportika/shared/widgets/editorial.dart';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/models/community_game.dart';
-import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/state/games_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
-import 'package:sportika/shared/widgets/widgets.dart';
-import 'package:sportika/app/routes.dart';
+import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
+import 'package:sportika/shared/models/community_game.dart';
+import 'package:sportika/shared/models/enums.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
+import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
+import 'package:sportika/shared/widgets/widgets.dart';
 
-/// One name on the roster. Shows the player's imported picture when the account
-/// behind the membership is known, and a neutral face when it is not, instead of
-/// borrowing somebody else's name.
-class _GameMemberTile extends StatelessWidget {
-  const _GameMemberTile({required this.accountId, required this.index});
+// ============================================================
+// SHARED UI
+// ============================================================
 
-  final String accountId;
-  final int index;
+class _GameSectionHeading extends StatelessWidget {
+  const _GameSectionHeading({
+    required this.number,
+    required this.title,
+    this.subtitle,
+  });
+
+  final String number;
+  final String title;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final account = context.watch<SessionController>().accountById(accountId);
-    return ListTile(
-      leading: account == null
-          ? const CircleAvatar(child: Icon(Icons.person_outline))
-          : AccountAvatar(account: account, size: 36),
-      title: Text(account?.displayName ?? 'Sportika player'),
-      subtitle: Text(index == 0 ? 'Captain' : 'Confirmed player'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SportikaSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(SportikaSpacing.sm),
+            decoration: BoxDecoration(
+              color: SportikaColors.blueSubtle,
+              borderRadius: BorderRadius.circular(SportikaRadius.sm),
+            ),
+            child: Text(
+              number,
+              style: SportikaType.label.copyWith(
+                color: SportikaColors.blueBright,
+              ),
+            ),
+          ),
+          const SizedBox(width: SportikaSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: SportikaType.titleMedium),
+                if (subtitle != null) ...[
+                  const SizedBox(height: SportikaSpacing.xs),
+                  Text(subtitle!, style: SportikaType.caption),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// Pickup games board for the Match tab: pickup matches you can find or manage.
+class _GameInfoRow extends StatelessWidget {
+  const _GameInfoRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: SportikaIconSize.sm, color: SportikaColors.textMuted),
+        const SizedBox(width: SportikaSpacing.sm),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: SportikaType.caption.copyWith(
+              color: SportikaColors.textBody,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GameStatusPill extends StatelessWidget {
+  const _GameStatusPill({required this.full});
+
+  final bool full;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = full ? SportikaColors.gold : SportikaColors.mint;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SportikaSpacing.sm,
+        vertical: SportikaSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: SportikaOpacity.muted),
+        borderRadius: BorderRadius.circular(SportikaRadius.pill),
+        border: Border.all(
+          color: tone.withValues(alpha: SportikaOpacity.muted),
+        ),
+      ),
+      child: Text(
+        full ? 'FULL' : 'OPEN TO JOIN',
+        style: SportikaType.micro.copyWith(color: tone),
+      ),
+    );
+  }
+}
+
+class _GameCapacity extends StatelessWidget {
+  const _GameCapacity({required this.game});
+
+  final CommunityGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = game.members.length;
+    final capacity = game.capacity;
+    final remaining = capacity > count ? capacity - count : 0;
+
+    final progress = capacity > 0
+        ? (count / capacity).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+
+    final tone = game.full ? SportikaColors.gold : SportikaColors.mint;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(SportikaRadius.pill),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: SportikaSpacing.xs,
+            color: tone,
+            backgroundColor: SportikaColors.border,
+          ),
+        ),
+        const SizedBox(height: SportikaSpacing.sm),
+        Row(
+          children: [
+            const Icon(
+              Icons.groups_outlined,
+              size: SportikaIconSize.sm,
+              color: SportikaColors.textMuted,
+            ),
+            const SizedBox(width: SportikaSpacing.xs),
+            Expanded(
+              child: Text(
+                game.full ? 'All spots reserved' : '$remaining spots left',
+                style: SportikaType.caption,
+              ),
+            ),
+            Text('$count / $capacity', style: SportikaType.label),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _GameSportBadge extends StatelessWidget {
+  const _GameSportBadge({required this.sport});
+
+  final Sport sport;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = sportColor(sport);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: SportikaSpacing.sm,
+        vertical: SportikaSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: SportikaColors.deepest.withValues(alpha: SportikaOpacity.strong),
+        borderRadius: BorderRadius.circular(SportikaRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(sportGlyph(sport), color: tone, size: SportikaIconSize.sm),
+          const SizedBox(width: SportikaSpacing.xs),
+          Text(
+            sport.label.toUpperCase(),
+            style: SportikaType.micro.copyWith(color: SportikaColors.onAccent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// GAMES DISCOVERY
+// ============================================================
+
 class GamesTab extends StatefulWidget {
   const GamesTab({super.key});
+
   @override
   State<GamesTab> createState() => _GamesTabState();
 }
@@ -45,127 +222,203 @@ class GamesTab extends StatefulWidget {
 class _GamesTabState extends State<GamesTab> {
   Sport? sport;
   int tab = 0;
-  String query = '', category = 'All Games';
+  String query = '';
+  String category = 'All Games';
   bool available = false;
   int? withinDays;
-  double distance = 25;
   String status = 'Any';
   String myScope = 'All';
+
+  int get _activeFilters =>
+      (withinDays != null ? 1 : 0) +
+      (status != 'Any' ? 1 : 0) +
+      (available ? 1 : 0);
+
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<ProfileController>();
-    final games = context
-        .read<GamesController>()
-        .games
-        .where(
-          (g) =>
-              (sport == null || g.sport == sport) &&
-              (g.visibility == 'Public' ||
-                  g.organizerId == state.currentAccount?.id ||
-                  g.members.contains(state.currentAccount?.id)) &&
-              (withinDays == null ||
-                  g.at.isBefore(
-                    DateTime.now().add(Duration(days: withinDays!)),
-                  )) &&
-              ((g.sport.index + 1) * 2.5 <= distance) &&
-              (status == 'Any' || (status == 'Full' ? g.full : !g.full)) &&
-              (tab != 1 ||
-                  myScope == 'All' ||
-                  (myScope == 'Organized'
-                      ? g.organizerId == state.currentAccount?.id
-                      : g.members.contains(state.currentAccount?.id))) &&
-              (category == 'All Games' || g.category == category) &&
-              (!available || !g.full) &&
-              (tab != 1 ||
-                  g.members.contains(state.currentAccount?.id) ||
-                  g.organizerId == state.currentAccount?.id) &&
-              '${g.title} ${g.venue} ${g.sport.label}'.toLowerCase().contains(
-                query.toLowerCase(),
-              ),
-        )
-        .toList();
+    final profile = context.watch<ProfileController>();
+    final allGames = context.watch<GamesController>().games;
+    final accountId = profile.currentAccount?.id;
+    final now = DateTime.now();
+
+    final games = allGames.where((game) {
+      final isOrganizer = game.organizerId == accountId;
+      final isMember = accountId != null && game.members.contains(accountId);
+
+      if (game.visibility != 'Public' && !isOrganizer && !isMember) {
+        return false;
+      }
+
+      if (tab == 1 && !isOrganizer && !isMember) {
+        return false;
+      }
+
+      if (tab == 1 && myScope == 'Organized' && !isOrganizer) {
+        return false;
+      }
+
+      if (tab == 1 && myScope == 'Joined' && !isMember) {
+        return false;
+      }
+
+      if (sport != null && game.sport != sport) {
+        return false;
+      }
+
+      if (category != 'All Games' && game.category != category) {
+        return false;
+      }
+
+      if (withinDays != null) {
+        final end = now.add(Duration(days: withinDays!));
+        if (game.at.isBefore(now) || game.at.isAfter(end)) {
+          return false;
+        }
+      }
+
+      if (status == 'Open' && game.full) return false;
+      if (status == 'Full' && !game.full) return false;
+      if (available && game.full) return false;
+
+      final searchable = '${game.title} ${game.venue} ${game.sport.label}'
+          .toLowerCase();
+
+      return searchable.contains(query.trim().toLowerCase());
+    }).toList()..sort((a, b) => a.at.compareTo(b.at));
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: FilterChipRow<int>(
-            label: 'Game list',
-            selected: tab,
-            onChanged: (v) => setState(() => tab = v),
-            choices: const [
-              FilterChoice(0, 'Find Games'),
-              FilterChoice(1, 'My Games'),
+          padding: const EdgeInsets.fromLTRB(
+            SportikaSpacing.lg,
+            SportikaSpacing.md,
+            SportikaSpacing.lg,
+            SportikaSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FilterChipRow<int>(
+                label: 'Game list',
+                selected: tab,
+                onChanged: (value) => setState(() => tab = value),
+                choices: const [
+                  FilterChoice(0, 'Find Games'),
+                  FilterChoice(1, 'My Games'),
+                ],
+              ),
+
+              if (tab == 1) ...[
+                const SizedBox(height: SportikaSpacing.sm),
+                FilterChipRow<String>(
+                  label: 'My games filter',
+                  selected: myScope,
+                  onChanged: (value) => setState(() => myScope = value),
+                  choices: const [
+                    FilterChoice('All', 'All'),
+                    FilterChoice('Joined', 'Joined'),
+                    FilterChoice('Organized', 'Organized'),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              TextField(
+                onChanged: (value) => setState(() => query = value),
+                decoration: InputDecoration(
+                  hintText: 'Search games or locations',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: 'Advanced filters',
+                    onPressed: _showFilters,
+                    icon: Icon(
+                      Icons.tune_rounded,
+                      color: _activeFilters > 0
+                          ? SportikaColors.mint
+                          : SportikaColors.textMuted,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
-        if (tab == 1)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: FilterChipRow<String>(
-              label: 'My games filter',
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              selected: myScope,
-              onChanged: (v) => setState(() => myScope = v),
-              choices: const [
-                FilterChoice('All', 'All'),
-                FilterChoice('Joined', 'Joined'),
-                FilterChoice('Organized', 'Organized'),
-              ],
-            ),
-          ),
+
         SportFilterBar(
           selected: sport,
-          onChanged: (v) => setState(() => sport = v),
+          onChanged: (value) => setState(() => sport = value),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-          child: TextField(
-            onChanged: (v) => setState(() => query = v),
-            decoration: InputDecoration(
-              hintText: 'Search games, sports or locations',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                tooltip: 'Filter games',
-                onPressed: _showFilters,
-                icon: Icon(
-                  Icons.tune,
-                  color: available ? SportikaColors.mint : null,
-                ),
-              ),
-            ),
-          ),
-        ),
+
         SizedBox(
-          height: 48,
+          height: SportikaSpacing.xxl * 1.5,
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: SportikaSpacing.lg),
             children: [
-              for (final c in ['All Games', 'Friendly', 'League', 'Tournament'])
+              for (final value in const [
+                'All Games',
+                'Friendly',
+                'League',
+                'Tournament',
+              ])
                 Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: SportikaSpacing.sm),
                   child: ChoiceChip(
-                    label: Text(c),
-                    selected: c == category,
-                    onSelected: (_) => setState(() => category = c),
+                    label: Text(value),
+                    selected: category == value,
+                    onSelected: (_) => setState(() => category = value),
                   ),
                 ),
             ],
           ),
         ),
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            SportikaSpacing.lg,
+            SportikaSpacing.sm,
+            SportikaSpacing.lg,
+            SportikaSpacing.md,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  tab == 0 ? 'Available games' : 'My games',
+                  style: SportikaType.titleMedium,
+                ),
+              ),
+              Text('${games.length} found', style: SportikaType.caption),
+            ],
+          ),
+        ),
+
         Expanded(
           child: games.isEmpty
-              ? const EmptyState(
+              ? EmptyState(
                   title: 'No games found',
                   body:
-                      'Try another sport or search, or create your own match.',
-                  icon: Icons.sports,
+                      _activeFilters > 0 ||
+                          sport != null ||
+                          query.isNotEmpty ||
+                          category != 'All Games'
+                      ? 'Try adjusting your filters or search.'
+                      : 'There are no games to show yet.',
+                  icon: Icons.sports_outlined,
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.all(20),
+                  key: PageStorageKey<String>('sportika-games-$tab'),
+                  padding: const EdgeInsets.fromLTRB(
+                    SportikaSpacing.lg,
+                    0,
+                    SportikaSpacing.lg,
+                    SportikaSpacing.xl,
+                  ),
                   itemCount: games.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => GameCard(game: games[i]),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: SportikaSpacing.md),
+                  itemBuilder: (context, index) => GameCard(game: games[index]),
                 ),
         ),
       ],
@@ -173,358 +426,587 @@ class _GamesTabState extends State<GamesTab> {
   }
 
   Future<void> _showFilters() async {
-    await showModalBottomSheet<void>(
+    var draftDays = withinDays;
+    var draftStatus = status;
+    var draftAvailable = available;
+
+    final apply = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (sheet) => StatefulBuilder(
-        builder: (_, update) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Find your next match',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 20),
-                const Text('Date'),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final days in [0, 7, 30])
-                      ChoiceChip(
-                        label: Text(days == 0 ? 'Any date' : 'Next $days days'),
-                        selected: (withinDays ?? 0) == days,
-                        onSelected: (_) =>
-                            update(() => withinDays = days == 0 ? null : days),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text('Match status'),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final value in ['Any', 'Open', 'Full'])
-                      ChoiceChip(
-                        label: Text(value),
-                        selected: status == value,
-                        onSelected: (_) => update(() => status = value),
-                      ),
-                  ],
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Available slots only'),
-                  value: available,
-                  onChanged: (v) => update(() => available = v),
-                ),
-                Text('Distance · ${distance.round()} km'),
-                Slider(
-                  value: distance,
-                  min: 1,
-                  max: 25,
-                  divisions: 24,
-                  onChanged: (v) => update(() => distance = v),
-                ),
-                const Text(
-                  'Distances are fictional estimates from Clifton, Karachi.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: SportikaColors.textMuted,
+      backgroundColor: SportikaColors.surfaceElevated,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SportikaRadius.xl),
+        ),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, update) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              SportikaSpacing.lg,
+              SportikaSpacing.lg,
+              SportikaSpacing.lg,
+              MediaQuery.viewInsetsOf(context).bottom + SportikaSpacing.lg,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter games', style: SportikaType.titleMedium),
+                  const SizedBox(height: SportikaSpacing.lg),
+
+                  const Text('DATE', style: SportikaType.label),
+                  const SizedBox(height: SportikaSpacing.sm),
+                  Wrap(
+                    spacing: SportikaSpacing.sm,
+                    children: [
+                      for (final days in const [0, 7, 30])
+                        ChoiceChip(
+                          label: Text(
+                            days == 0 ? 'Any date' : 'Next $days days',
+                          ),
+                          selected: (draftDays ?? 0) == days,
+                          onSelected: (_) =>
+                              update(() => draftDays = days == 0 ? null : days),
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () {
-                      Navigator.pop(sheet);
-                    },
-                    child: const Text('Show games'),
+
+                  const SizedBox(height: SportikaSpacing.lg),
+
+                  const Text('AVAILABILITY', style: SportikaType.label),
+                  const SizedBox(height: SportikaSpacing.sm),
+                  Wrap(
+                    spacing: SportikaSpacing.sm,
+                    children: [
+                      for (final value in const ['Any', 'Open', 'Full'])
+                        ChoiceChip(
+                          label: Text(value),
+                          selected: draftStatus == value,
+                          onSelected: (_) => update(() => draftStatus = value),
+                        ),
+                    ],
                   ),
-                ),
-                TextButton(
-                  onPressed: () => update(() {
-                    withinDays = null;
-                    distance = 25;
-                    status = 'Any';
-                    available = false;
-                  }),
-                  child: const Text('Reset filters'),
+
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Available slots only',
+                      style: SportikaType.bodyStrong,
+                    ),
+                    value: draftAvailable,
+                    activeTrackColor: SportikaColors.mint,
+                    onChanged: (value) => update(() => draftAvailable = value),
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(sheetContext, true),
+                      child: const Text('Show games'),
+                    ),
+                  ),
+
+                  Center(
+                    child: TextButton(
+                      onPressed: () => update(() {
+                        draftDays = null;
+                        draftStatus = 'Any';
+                        draftAvailable = false;
+                      }),
+                      child: const Text('Reset filters'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (!mounted || apply != true) return;
+
+    setState(() {
+      withinDays = draftDays;
+      status = draftStatus;
+      available = draftAvailable;
+    });
+  }
+}
+
+// ============================================================
+// PREMIUM GAME CARD
+// ============================================================
+
+class GameCard extends StatelessWidget {
+  const GameCard({super.key, required this.game, this.openable = true});
+
+  final CommunityGame game;
+  final bool openable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: openable
+            ? () => pushRoute(
+                context,
+                AppRoute.gameDetail,
+                args: GameDetailArgs(game),
+              )
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(SportikaSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: SportikaSpacing.xxl * 3.2,
+                    height: SportikaSpacing.xxl * 3.6,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(
+                        SportikaRadius.thumbnail,
+                      ),
+                      child: SportPhoto(
+                        sport: game.sport,
+                        height: SportikaSpacing.xxl * 3.6,
+                        radius: 0,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: SportikaSpacing.md),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          game.sport.label.toUpperCase(),
+                          style: SportikaType.micro.copyWith(
+                            color: sportColor(game.sport),
+                          ),
+                        ),
+
+                        const SizedBox(height: SportikaSpacing.xs),
+
+                        Text(
+                          game.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SportikaType.cardTitle,
+                        ),
+
+                        const SizedBox(height: SportikaSpacing.sm),
+
+                        _GameInfoRow(
+                          icon: Icons.calendar_today_outlined,
+                          text: '${dayLabel(game.at)} · ${timeLabel(game.at)}',
+                        ),
+
+                        const SizedBox(height: SportikaSpacing.xs),
+
+                        _GameInfoRow(
+                          icon: Icons.location_on_outlined,
+                          text: game.venue,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              Row(
+                children: [
+                  _GameStatusPill(full: game.full),
+                  const SizedBox(width: SportikaSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      '${game.category} · ${game.format}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: SportikaType.caption,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              _GameCapacity(game: game),
+
+              if (openable) ...[
+                const SizedBox(height: SportikaSpacing.md),
+                const Divider(color: SportikaColors.borderSubtle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'View game',
+                      style: SportikaType.label.copyWith(
+                        color: SportikaColors.mint,
+                      ),
+                    ),
+                    const SizedBox(width: SportikaSpacing.xs),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: SportikaIconSize.sm,
+                      color: SportikaColors.mint,
+                    ),
+                  ],
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ),
     );
-    if (mounted) setState(() {});
   }
 }
 
-class GameCard extends StatelessWidget {
-  const GameCard({super.key, required this.game, this.openable = true});
-  final bool openable;
-  final CommunityGame game;
+// ============================================================
+// ROSTER MEMBER
+// ============================================================
+
+class _GameMemberTile extends StatelessWidget {
+  const _GameMemberTile({
+    required this.accountId,
+    required this.index,
+    required this.isOrganizer,
+  });
+
+  final String accountId;
+  final int index;
+  final bool isOrganizer;
+
   @override
-  Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: openable
-          ? () => pushRoute(
-              context,
-              AppRoute.gameDetail,
-              args: GameDetailArgs(game),
-            )
+  Widget build(BuildContext context) {
+    final account = context.watch<SessionController>().accountById(accountId);
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: account == null
+          ? const BrandedDefaultAvatar(size: 40)
+          : AccountAvatar(account: account, size: 40),
+      title: Text(
+        account?.displayName ?? 'Sportika player',
+        style: SportikaType.bodyStrong,
+      ),
+      subtitle: Text(
+        isOrganizer ? 'Organizer' : 'Confirmed player',
+        style: SportikaType.caption,
+      ),
+      trailing: isOrganizer
+          ? const Icon(Icons.verified_outlined, color: SportikaColors.mint)
           : null,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+}
+
+// ============================================================
+// GAME DETAIL SCREEN
+// ============================================================
+
+class GameDetailScreen extends StatelessWidget {
+  const GameDetailScreen({super.key, required this.game});
+
+  final CommunityGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>();
+    final controller = context.watch<GamesController>();
+
+    // Resolve the latest game instead of relying on
+    // the navigation-time snapshot.
+    final matches = controller.games.where((item) => item.id == game.id);
+
+    final current = matches.isNotEmpty ? matches.first : game;
+
+    final accountId = profile.currentAccount?.id;
+
+    final joined = accountId != null && current.members.contains(accountId);
+
+    final organizer = context.watch<SessionController>().accountById(
+      current.organizerId,
+    );
+
+    final canJoin = accountId != null && (joined || !current.full);
+
+    return Scaffold(
+      appBar: sportikaAppBar('Game details', subtitle: current.sport.label),
+
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: SportikaSpacing.xxl),
         children: [
-          Stack(
-            children: [
-              SportPhoto(sport: game.sport, height: 164, radius: 0),
-              Positioned(
-                top: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
+          // ----------------------------------------------------
+          // CINEMATIC COVER
+          // ----------------------------------------------------
+
+          SizedBox(
+            height: SportikaSpacing.xxl * 6,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                SportPhoto(
+                  sport: current.sport,
+                  height: SportikaSpacing.xxl * 6,
+                  radius: 0,
+                ),
+
+                const DecoratedBox(
                   decoration: BoxDecoration(
-                    color: SportikaColors.deepest.withValues(alpha: .9),
-                    borderRadius: BorderRadius.circular(6),
+                    gradient: SportikaGradients.imageFadeStrong,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                ),
+
+                Positioned(
+                  left: SportikaSpacing.lg,
+                  right: SportikaSpacing.lg,
+                  bottom: SportikaSpacing.lg,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        sportGlyph(game.sport),
-                        color: SportikaColors.mint,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 6),
+                      _GameSportBadge(sport: current.sport),
+
+                      const SizedBox(height: SportikaSpacing.sm),
+
                       Text(
-                        game.sport.label.toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 9,
-                          letterSpacing: 1.4,
-                          fontWeight: FontWeight.w800,
+                        current.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: SportikaType.hero.copyWith(
+                          color: SportikaColors.onAccent,
                         ),
                       ),
+
+                      const SizedBox(height: SportikaSpacing.sm),
+
+                      _GameStatusPill(full: current.full),
                     ],
                   ),
                 ),
-              ),
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: game.full
-                        ? SportikaColors.gold
-                        : SportikaColors.mint,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    game.full ? 'FULL' : 'OPEN TO JOIN',
-                    style: const TextStyle(
-                      color: SportikaColors.deepest,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
+
           Padding(
-            padding: const EdgeInsets.all(17),
+            padding: const EdgeInsets.all(SportikaSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${game.category.toUpperCase()}  /  ${game.format}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: SportikaColors.textMuted,
-                    letterSpacing: .5,
-                  ),
+                // ----------------------------------------------
+                // ESSENTIALS
+                // ----------------------------------------------
+
+                const _GameSectionHeading(
+                  number: '01',
+                  title: 'Match essentials',
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  game.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _detail(
-                  Icons.calendar_today_outlined,
-                  '${dayLabel(game.at)} · ${timeLabel(game.at)}',
-                ),
-                const SizedBox(height: 9),
-                _detail(Icons.location_on_outlined, game.venue),
-                const SizedBox(height: 17),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: game.members.length / game.capacity,
-                    minHeight: 3,
-                    color: game.full
-                        ? SportikaColors.gold
-                        : SportikaColors.mint,
-                    backgroundColor: SportikaColors.border,
-                  ),
-                ),
-                const SizedBox(height: 13),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.group_outlined,
-                      size: 15,
-                      color: SportikaColors.textMuted,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        game.full
-                            ? 'All spots reserved'
-                            : '${game.capacity - game.members.length} spots left · ${game.members.length} going',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: SportikaColors.textMuted,
-                        ),
+
+                SurfaceCard(
+                  child: Column(
+                    children: [
+                      _GameInfoRow(
+                        icon: Icons.calendar_today_outlined,
+                        text:
+                            '${dayLabel(current.at)} · ${timeLabel(current.at)}',
                       ),
-                    ),
-                    if (openable) ...[
-                      const Text(
-                        'Match details',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: SportikaColors.mint,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      const SizedBox(height: SportikaSpacing.md),
+                      _GameInfoRow(
+                        icon: Icons.location_on_outlined,
+                        text: current.venue,
                       ),
-                      const SizedBox(width: 7),
-                      const Icon(
-                        Icons.arrow_forward,
-                        size: 16,
-                        color: SportikaColors.mint,
+                      const SizedBox(height: SportikaSpacing.md),
+                      _GameInfoRow(
+                        icon: Icons.sports_outlined,
+                        text: '${current.category} · ${current.format}',
+                      ),
+                      const SizedBox(height: SportikaSpacing.md),
+                      _GameInfoRow(
+                        icon: Icons.visibility_outlined,
+                        text: current.visibility,
                       ),
                     ],
-                  ],
+                  ),
+                ),
+
+                const SizedBox(height: SportikaSpacing.xl),
+
+                // ----------------------------------------------
+                // CAPACITY
+                // ----------------------------------------------
+                _GameSectionHeading(
+                  number: '02',
+                  title: 'Player availability',
+                  subtitle: '${current.members.length} confirmed participants',
+                ),
+
+                SurfaceCard(child: _GameCapacity(game: current)),
+
+                const SizedBox(height: SportikaSpacing.xl),
+
+                // ----------------------------------------------
+                // ORGANIZER
+                // ----------------------------------------------
+                const _GameSectionHeading(number: '03', title: 'Organizer'),
+
+                SurfaceCard(
+                  child: Row(
+                    children: [
+                      organizer == null
+                          ? const BrandedDefaultAvatar(size: 44)
+                          : AccountAvatar(account: organizer, size: 44),
+                      const SizedBox(width: SportikaSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              organizer?.displayName ?? 'Sportika community',
+                              style: SportikaType.bodyStrong,
+                            ),
+                            const Text(
+                              'Match organizer',
+                              style: SportikaType.caption,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: SportikaSpacing.xl),
+
+                // ----------------------------------------------
+                // DESCRIPTION
+                // ----------------------------------------------
+                const _GameSectionHeading(
+                  number: '04',
+                  title: 'Match overview',
+                ),
+
+                Text(
+                  current.description.trim().isEmpty
+                      ? 'No additional match details provided.'
+                      : current.description,
+                  style: SportikaType.bodyStrong,
+                ),
+
+                const SizedBox(height: SportikaSpacing.xl),
+
+                // ----------------------------------------------
+                // ROSTER
+                // ----------------------------------------------
+                _GameSectionHeading(
+                  number: '05',
+                  title: 'Confirmed players',
+                  subtitle:
+                      '${current.members.length} / ${current.capacity} players',
+                ),
+
+                SurfaceCard(
+                  child: Column(
+                    children: [
+                      for (final (index, memberId) in current.members.indexed)
+                        _GameMemberTile(
+                          accountId: memberId,
+                          index: index,
+                          isOrganizer: memberId == current.organizerId,
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
         ],
       ),
-    ),
-  );
-  Widget _detail(IconData icon, String text) => Row(
-    children: [
-      Icon(icon, size: 14, color: SportikaColors.textMuted),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: SportikaColors.textBody),
-        ),
-      ),
-    ],
-  );
-}
 
-class GameDetailScreen extends StatelessWidget {
-  const GameDetailScreen({super.key, required this.game});
-  final CommunityGame game;
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<ProfileController>();
-    final joined = game.members.contains(state.currentAccount?.id);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Match details')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          GameCard(game: game, openable: false),
-          const SizedBox(height: 24),
-          Text('Match overview', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Text(game.description),
-          const SizedBox(height: 20),
-          Text(
-            'Organizer · ${context.read<SessionController>().accountById(game.organizerId)?.displayName ?? 'Sportika community'}',
+      // --------------------------------------------------------
+      // STICKY JOIN ACTION
+      // --------------------------------------------------------
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(SportikaSpacing.lg),
+          decoration: const BoxDecoration(
+            color: SportikaColors.surface,
+            border: Border(top: BorderSide(color: SportikaColors.borderSubtle)),
           ),
-          Text('Visibility · ${game.visibility}'),
-          const SizedBox(height: 20),
-          Text(
-            'Players · ${game.members.length}/${game.capacity}',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          for (final (i, memberId) in game.members.indexed)
-            _GameMemberTile(accountId: memberId, index: i),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: !joined && game.full
+          child: FilledButton.icon(
+            onPressed: !canJoin
                 ? null
                 : () {
-                    context.read<GamesController>().toggleGameJoin(game);
+                    controller.toggleGameJoin(current);
+
+                    if (!context.mounted) return;
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
                           joined
                               ? 'You left the match.'
-                              : 'You’re in! Your spot is confirmed.',
+                              : 'Your spot is confirmed.',
                         ),
                       ),
                     );
                   },
-            child: Text(
+            icon: Icon(joined ? Icons.logout_rounded : Icons.sports_rounded),
+            label: Text(
               joined
                   ? 'Leave match'
-                  : game.full
+                  : current.full
                   ? 'Match full'
                   : 'Join match',
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
+// ============================================================
+// CREATE GAME SCREEN
+// ============================================================
+
 class CreateGameScreen extends StatefulWidget {
   const CreateGameScreen({super.key});
+
   @override
   State<CreateGameScreen> createState() => _CreateGameScreenState();
 }
 
 class _CreateGameScreenState extends State<CreateGameScreen> {
   final keyForm = GlobalKey<FormState>();
-  final title = TextEditingController(),
-      venue = TextEditingController(),
-      capacity = TextEditingController(text: '22'),
-      description = TextEditingController();
+
+  final title = TextEditingController();
+  final venue = TextEditingController();
+  final capacity = TextEditingController(text: '22');
+  final description = TextEditingController();
+
   Sport sport = Sport.cricket;
   String? format;
   String visibility = 'Public';
+
   DateTime date = DateTime.now().add(const Duration(days: 1));
+
+  bool publishing = false;
+
   @override
   void dispose() {
     title.dispose();
@@ -535,155 +1017,428 @@ class _CreateGameScreenState extends State<CreateGameScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Create match')),
-    body: Form(
-      key: keyForm,
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Text(
-            'BRING YOUR PEOPLE. MAKE A MATCH.',
-            style: TextStyle(
-              color: SportikaColors.mint,
-              letterSpacing: 1.5,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 24),
-          DropdownButtonFormField<Sport>(
-            initialValue: sport,
-            decoration: const InputDecoration(labelText: 'Sport'),
-            items: Sport.values
-                .map((s) => DropdownMenuItem(value: s, child: Text(s.label)))
-                .toList(),
-            onChanged: (v) => setState(() {
-              sport = v!;
-              format = null;
-              capacity.text = ['22', '4', '10', '4'][sport.index];
-            }),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            key: ValueKey(sport),
-            initialValue: format ?? SportEngines.formatsFor(sport).first,
-            decoration: const InputDecoration(labelText: 'Match format'),
-            items: SportEngines.formatsFor(sport)
-                .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                .toList(),
-            onChanged: (v) => format = v,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: title,
-            decoration: const InputDecoration(labelText: 'Match title'),
-            validator: (v) => (v?.trim().length ?? 0) < 4
-                ? 'Enter at least 4 characters'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: venue,
-            decoration: const InputDecoration(labelText: 'Location / facility'),
-            validator: (v) =>
-                (v?.trim().isEmpty ?? true) ? 'Enter a location' : null,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: capacity,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Participant capacity',
-            ),
-            validator: (v) =>
-                (int.tryParse(v ?? '') ?? 0) < 2 ||
-                    (int.tryParse(v ?? '') ?? 0) > 100
-                ? 'Choose 2–100 players'
-                : null,
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Date and time'),
-            subtitle: Text('$date'.substring(0, 16)),
-            trailing: const Icon(Icons.calendar_month),
-            onTap: () async {
-              final d = await showDatePicker(
-                context: context,
-                initialDate: date,
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-              );
-              if (d == null || !context.mounted) return;
-              final t = await showTimePicker(
-                context: context,
-                initialTime: TimeOfDay.fromDateTime(date),
-              );
-              if (t != null) {
-                setState(
-                  () =>
-                      date = DateTime(d.year, d.month, d.day, t.hour, t.minute),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: description,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Description and rules',
-            ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: visibility,
-            decoration: const InputDecoration(labelText: 'Visibility'),
-            items: [
-              'Public',
-              'Private',
-            ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-            onChanged: (v) => visibility = v!,
-          ),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {
-              if (!keyForm.currentState!.validate()) return;
-              if (!date.isAfter(DateTime.now())) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Choose a future date and time.'),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: sportikaAppBar('Create game', subtitle: 'Sportika community'),
+
+      body: Form(
+        key: keyForm,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: SportikaSpacing.xxl),
+          children: [
+            // --------------------------------------------------
+            // CINEMATIC HERO
+            // --------------------------------------------------
+
+            SizedBox(
+              height: SportikaSpacing.xxl * 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  SportPhoto(
+                    sport: sport,
+                    height: SportikaSpacing.xxl * 5,
+                    radius: 0,
                   ),
-                );
-                return;
-              }
-              final state = context.read<ProfileController>();
-              context.read<GamesController>().publishGame(
-                CommunityGame(
-                  id: DateTime.now().microsecondsSinceEpoch.toString(),
-                  title: title.text.trim(),
-                  sport: sport,
-                  venue: venue.text.trim(),
-                  at: date,
-                  capacity: int.parse(capacity.text),
-                  organizerId: state.currentAccount!.id,
-                  description: description.text.trim(),
-                  visibility: visibility,
-                  members: [state.currentAccount!.id],
-                  format: format ?? SportEngines.formatsFor(sport).first,
-                ),
-              );
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Match published. Let the game begin!'),
-                ),
-              );
-            },
-            child: const Text('Publish match'),
-          ),
-        ],
+
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: SportikaGradients.imageFadeStrong,
+                    ),
+                  ),
+
+                  Positioned(
+                    left: SportikaSpacing.lg,
+                    right: SportikaSpacing.lg,
+                    bottom: SportikaSpacing.lg,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SPORTIKA / CREATE',
+                          style: SportikaType.micro.copyWith(
+                            color: SportikaColors.mint,
+                          ),
+                        ),
+                        const SizedBox(height: SportikaSpacing.sm),
+                        Text(
+                          'Bring your people.\nMake a match.',
+                          style: SportikaType.hero.copyWith(
+                            color: SportikaColors.onAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(SportikaSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --------------------------------------------
+                  // SPORT & FORMAT
+                  // --------------------------------------------
+
+                  const _GameSectionHeading(
+                    number: '01',
+                    title: 'Sport & format',
+                    subtitle: 'Choose the sport and match rules.',
+                  ),
+
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final gap = SportikaSpacing.sm;
+                      final width = (constraints.maxWidth - gap) / 2;
+
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final item in Sport.values)
+                            SizedBox(
+                              width: width,
+                              child: _CreateSportTile(
+                                sport: item,
+                                selected: sport == item,
+                                onTap: () => setState(() {
+                                  sport = item;
+                                  format = null;
+
+                                  capacity.text = const [
+                                    '22',
+                                    '4',
+                                    '10',
+                                    '4',
+                                  ][item.index];
+                                }),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  DropdownButtonFormField<String>(
+                    key: ValueKey(sport),
+                    initialValue:
+                        format ?? SportEngines.formatsFor(sport).first,
+                    decoration: const InputDecoration(
+                      labelText: 'Match format',
+                      prefixIcon: Icon(Icons.account_tree_outlined),
+                    ),
+                    items: SportEngines.formatsFor(sport)
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => format = value),
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.xl),
+
+                  // --------------------------------------------
+                  // GAME IDENTITY
+                  // --------------------------------------------
+                  const _GameSectionHeading(
+                    number: '02',
+                    title: 'Game identity',
+                    subtitle: 'Help players recognize your game.',
+                  ),
+
+                  TextFormField(
+                    controller: title,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Match title',
+                      prefixIcon: Icon(Icons.edit_note_outlined),
+                    ),
+                    validator: (value) => (value?.trim().length ?? 0) < 4
+                        ? 'Enter at least 4 characters'
+                        : null,
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  TextFormField(
+                    controller: venue,
+                    decoration: const InputDecoration(
+                      labelText: 'Location / facility',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                    validator: (value) => (value?.trim().isEmpty ?? true)
+                        ? 'Enter a location'
+                        : null,
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.xl),
+
+                  // --------------------------------------------
+                  // SCHEDULE & CAPACITY
+                  // --------------------------------------------
+                  const _GameSectionHeading(
+                    number: '03',
+                    title: 'Schedule & players',
+                    subtitle: 'Choose when and how many can join.',
+                  ),
+
+                  SurfaceCard(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.calendar_month_outlined,
+                        color: SportikaColors.blueBright,
+                      ),
+                      title: const Text(
+                        'Match date & time',
+                        style: SportikaType.bodyStrong,
+                      ),
+                      subtitle: Text(
+                        '${dayLabel(date)} · ${timeLabel(date)}',
+                        style: SportikaType.caption,
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _pickDate,
+                    ),
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  TextFormField(
+                    controller: capacity,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Participant capacity',
+                      prefixIcon: Icon(Icons.groups_outlined),
+                    ),
+                    validator: (value) {
+                      final count = int.tryParse(value ?? '') ?? 0;
+
+                      if (count < 2 || count > 100) {
+                        return 'Choose 2 to 100 players';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.xl),
+
+                  // --------------------------------------------
+                  // GAME SETTINGS
+                  // --------------------------------------------
+                  const _GameSectionHeading(
+                    number: '04',
+                    title: 'Game settings',
+                    subtitle: 'Add rules and choose visibility.',
+                  ),
+
+                  TextFormField(
+                    controller: description,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Description and rules',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  DropdownButtonFormField<String>(
+                    initialValue: visibility,
+                    decoration: const InputDecoration(
+                      labelText: 'Visibility',
+                      prefixIcon: Icon(Icons.visibility_outlined),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Public', child: Text('Public')),
+                      DropdownMenuItem(
+                        value: 'Private',
+                        child: Text('Private'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => visibility = value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+
+      // --------------------------------------------------------
+      // STICKY PUBLISH ACTION
+      // --------------------------------------------------------
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(SportikaSpacing.lg),
+          decoration: const BoxDecoration(
+            color: SportikaColors.surface,
+            border: Border(top: BorderSide(color: SportikaColors.borderSubtle)),
+          ),
+          child: FilledButton.icon(
+            onPressed: publishing ? null : _publish,
+            icon: publishing
+                ? const SizedBox(
+                    width: SportikaIconSize.sm,
+                    height: SportikaIconSize.sm,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.campaign_outlined),
+            label: Text(publishing ? 'Publishing...' : 'Publish game'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: date,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (picked == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(date),
+    );
+
+    if (time == null || !mounted) return;
+
+    setState(() {
+      date = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        time.hour,
+        time.minute,
+      );
+    });
+  }
+
+  Future<void> _publish() async {
+    if (publishing) return;
+
+    if (!keyForm.currentState!.validate()) return;
+
+    if (!date.isAfter(DateTime.now())) {
+      showSnack(context, 'Choose a future date and time.', error: true);
+      return;
+    }
+
+    final account = context.read<ProfileController>().currentAccount;
+
+    if (account == null) {
+      showSnack(context, 'Sign in to publish a game.', error: true);
+      return;
+    }
+
+    setState(() => publishing = true);
+
+    try {
+      context.read<GamesController>().publishGame(
+        CommunityGame(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          title: title.text.trim(),
+          sport: sport,
+          venue: venue.text.trim(),
+          at: date,
+          capacity: int.parse(capacity.text),
+          organizerId: account.id,
+          description: description.text.trim(),
+          visibility: visibility,
+          members: [account.id],
+          format: format ?? SportEngines.formatsFor(sport).first,
+        ),
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
+
+      // The previous screen can react to the successful
+      // publication through its controller listener.
+    } catch (_) {
+      if (mounted) {
+        showSnack(
+          context,
+          'Could not publish the game. Try again.',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => publishing = false);
+      }
+    }
+  }
+}
+
+// ============================================================
+// SPORT SELECTION TILE
+// ============================================================
+
+class _CreateSportTile extends StatelessWidget {
+  const _CreateSportTile({
+    required this.sport,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Sport sport;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = sportColor(sport);
+
+    return Material(
+      color: selected ? SportikaColors.blueSubtle : SportikaColors.surface,
+      borderRadius: BorderRadius.circular(SportikaRadius.card),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(SportikaRadius.card),
+        child: Container(
+          padding: const EdgeInsets.all(SportikaSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(SportikaRadius.card),
+            border: Border.all(color: selected ? tone : SportikaColors.border),
+          ),
+          child: Column(
+            children: [
+              Icon(sportGlyph(sport), color: tone, size: SportikaIconSize.lg),
+              const SizedBox(height: SportikaSpacing.sm),
+              Text(sport.label, style: SportikaType.bodyStrong),
+              if (selected) ...[
+                const SizedBox(height: SportikaSpacing.xs),
+                Icon(
+                  Icons.check_circle_rounded,
+                  color: tone,
+                  size: SportikaIconSize.sm,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Brand introduction. Startup timing and destination belong to the auth flow.
@@ -17,7 +16,7 @@ class SplashScreen extends StatelessWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
+        statusBarColor: SportikaColors.transparent,
         systemNavigationBarColor: SportikaColors.deepest,
       ),
       child: Scaffold(
@@ -54,8 +53,9 @@ class SplashScreen extends StatelessWidget {
                                 'PLAY. CONNECT. COMPETE.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
+                                  fontFamily: SportikaType.bodyFamily,
                                   fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: SportikaFontWeight.bold,
                                   letterSpacing: 2.4,
                                   color: SportikaColors.textMuted,
                                 ),
@@ -89,14 +89,7 @@ class SplashScreen extends StatelessWidget {
                                         fit: BoxFit.scaleDown,
                                         child: Text(
                                           'SPORTIKA',
-                                          style: TextStyle(
-                                            fontFamily: 'Barlow Condensed',
-                                            fontSize: 52,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 5,
-                                            height: 1,
-                                            color: SportikaColors.text,
-                                          ),
+                                          style: SportikaType.wordmark,
                                         ),
                                       ),
                                       const SizedBox(height: 24),
@@ -115,8 +108,10 @@ class SplashScreen extends StatelessWidget {
                                         'The game connects us.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
+                                          fontFamily: SportikaType.bodyFamily,
                                           fontSize: 20,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight:
+                                              SportikaFontWeight.semibold,
                                           height: 1.3,
                                           color: SportikaColors.text,
                                         ),
@@ -126,6 +121,7 @@ class SplashScreen extends StatelessWidget {
                                         'Your people. Your next game.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
+                                          fontFamily: SportikaType.bodyFamily,
                                           fontSize: 13,
                                           height: 1.5,
                                           color: SportikaColors.textMuted,
@@ -198,8 +194,9 @@ class _SportLabel extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     label,
     style: const TextStyle(
+      fontFamily: SportikaType.bodyFamily,
       fontSize: 9,
-      fontWeight: FontWeight.w600,
+      fontWeight: SportikaFontWeight.semibold,
       letterSpacing: 1.5,
       color: SportikaColors.textMuted,
     ),
@@ -213,22 +210,16 @@ class _SplashCourtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final glow = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              SportikaColors.mint.withValues(alpha: .09),
-              SportikaColors.deepest.withValues(alpha: 0),
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(size.width * .5, size.height * .4),
-              radius: size.longestSide * .48,
-            ),
-          );
+      ..shader = SportikaGradients.splashGlow.createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * .5, size.height * .4),
+          radius: size.longestSide * .48,
+        ),
+      );
     canvas.drawRect(Offset.zero & size, glow);
 
     final lines = Paint()
-      ..color = SportikaColors.mint.withValues(alpha: .055)
+      ..color = SportikaColors.courtLine
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.save();

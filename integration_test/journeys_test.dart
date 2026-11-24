@@ -43,7 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // The shell is the proof that the whole pre-auth chain completed.
-    for (final tab in ['Home', 'Discover', 'Live', 'Team', 'Me']) {
+    for (final tab in ['Home', 'Tournaments', 'Matches', 'Team', 'Me']) {
       expect(find.text(tab), findsWidgets, reason: 'shell is missing $tab');
     }
     expect(find.text('Your sports'), findsOneWidget);
@@ -54,9 +54,13 @@ void main() {
     await state.signIn('acc-seebu');
     await pumpApp(tester, state: state);
 
-    openTab(tester, 'Discover');
+    // Pickup games live under the Matches overflow menu now that Discover has
+    // been replaced by the Tournaments and Matches tabs.
+    openTab(tester, 'Matches');
     await tester.pumpAndSettle();
-    await tapVisible(tester, find.text('Games').first);
+    await tapVisible(tester, find.byTooltip('More match options'));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, find.text('Pickup games').last);
     await tester.pumpAndSettle();
 
     final games = state.games.where((g) => !g.members.contains('acc-seebu'));

@@ -46,6 +46,17 @@ class Account {
   /// False while a freshly created account is still inside profile setup.
   bool setupComplete;
 
+  // ── Optional athlete attributes (Me -> Personal information) ──────────────
+  // Stored on the device document so a demo build behaves like the server:
+  // every value is nullable and a null means "not provided", never zero.
+  // Laterality is kept as the wire key (`left` / `right` / `ambidextrous`) so
+  // this core model does not depend on the profile-module enums.
+  int? heightCm;
+  double? weightKg;
+  String? dominantHand;
+  String? dominantFoot;
+  int? preferredJersey;
+
   Account({
     required this.id,
     required this.displayName,
@@ -65,6 +76,11 @@ class Account {
     this.photoPath,
     this.photoUrl,
     this.setupComplete = true,
+    this.heightCm,
+    this.weightKg,
+    this.dominantHand,
+    this.dominantFoot,
+    this.preferredJersey,
   }) : sports = sports ?? {},
        levels = levels ?? {},
        playingPositions = playingPositions ?? {};
@@ -114,6 +130,11 @@ class Account {
     'photoPath': photoPath,
     'photoUrl': photoUrl,
     'setupComplete': setupComplete,
+    'heightCm': heightCm,
+    'weightKg': weightKg,
+    'dominantHand': dominantHand,
+    'dominantFoot': dominantFoot,
+    'preferredJersey': preferredJersey,
   };
 
   factory Account.fromJson(Map<String, dynamic> j) => Account(
@@ -147,6 +168,11 @@ class Account {
     photoPath: j['photoPath'] as String?,
     photoUrl: j['photoUrl'] as String?,
     setupComplete: j['setupComplete'] as bool? ?? true,
+    heightCm: (j['heightCm'] as num?)?.toInt(),
+    weightKg: (j['weightKg'] as num?)?.toDouble(),
+    dominantHand: j['dominantHand'] as String?,
+    dominantFoot: j['dominantFoot'] as String?,
+    preferredJersey: (j['preferredJersey'] as num?)?.toInt(),
   );
 }
 

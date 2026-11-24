@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/profile_avatar.dart';
 
 void main() {
@@ -51,7 +52,8 @@ void main() {
         ),
       ),
     );
-    expect(find.text('?'), findsOneWidget);
+    expect(find.byType(BrandedDefaultAvatar), findsOneWidget);
+    expect(find.text('?'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     await tester.tap(find.byTooltip('Updating profile picture'));
     expect(edits, 0);

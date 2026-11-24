@@ -49,7 +49,7 @@ Widget officialFixtureTile(
           dateShort(fixture.scheduledAt),
           style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: SportikaFontWeight.semibold,
             color: SportikaColors.textMuted,
           ),
         ),
@@ -126,7 +126,7 @@ Widget personalScorecardTile(
           match.formatLabel,
           style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: SportikaFontWeight.semibold,
             color: SportikaColors.textMuted,
           ),
         ),

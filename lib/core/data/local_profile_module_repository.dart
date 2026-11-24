@@ -79,6 +79,13 @@ class LocalProfileModuleRepository extends ChangeNotifier
       // Documents are never written to the device document, so there is
       // nothing to read back.
       identity: null,
+      athlete: ProfileAthleteDetails(
+        heightCm: account.heightCm,
+        weightKg: account.weightKg,
+        dominantHand: ProfileSideX.fromKey(account.dominantHand),
+        dominantFoot: ProfileSideX.fromKey(account.dominantFoot),
+        preferredJersey: account.preferredJersey,
+      ),
     );
   }
 
@@ -189,6 +196,24 @@ class LocalProfileModuleRepository extends ChangeNotifier
     } on StateError catch (error) {
       throw ProfileModuleException(error.message, code: '23505');
     }
+  }
+
+  @override
+  Future<void> saveAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required ProfileSide? dominantHand,
+    required ProfileSide? dominantFoot,
+    required int? preferredJersey,
+  }) async {
+    _account;
+    await _device.applyProfileAthleteDetails(
+      heightCm: heightCm,
+      weightKg: weightKg,
+      dominantHand: dominantHand?.key,
+      dominantFoot: dominantFoot?.key,
+      preferredJersey: preferredJersey,
+    );
   }
 
   @override

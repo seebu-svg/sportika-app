@@ -114,6 +114,22 @@ class ProfileModuleController extends ChangeNotifier {
   Future<void> changeUsername(String username) =>
       _mutate(() => _repo.changeUsername(username));
 
+  Future<void> saveAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required ProfileSide? dominantHand,
+    required ProfileSide? dominantFoot,
+    required int? preferredJersey,
+  }) => _mutate(
+    () => _repo.saveAthleteDetails(
+      heightCm: heightCm,
+      weightKg: weightKg,
+      dominantHand: dominantHand,
+      dominantFoot: dominantFoot,
+      preferredJersey: preferredJersey,
+    ),
+  );
+
   Future<void> saveSportsPreferences(List<ProfileSportPreference> sports) =>
       _mutate(() => _repo.saveSportsPreferences(sports));
 

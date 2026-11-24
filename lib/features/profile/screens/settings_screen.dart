@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:sportika/core/state/profile_photo_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';

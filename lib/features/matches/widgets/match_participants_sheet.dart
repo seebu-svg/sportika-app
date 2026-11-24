@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:sportika/features/matches/widgets/match_management_widgets.dart';
 import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/core/state/teams_controller.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/core/state/match_controller.dart';
 import 'package:sportika/core/state/profile_module_controller.dart';
 import 'package:sportika/shared/models/match.dart';
+import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/models/profile_module.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -31,7 +32,9 @@ Future<void> showMatchParticipantsSheet(
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) => SingleChildScrollView(
       child: _MatchParticipantsSheet(
@@ -116,6 +119,51 @@ class _MatchParticipantsSheetState extends State<_MatchParticipantsSheet> {
     }
   }
 
+  /// Invites a whole squad in one call: the server writes one invitation per
+  /// accepted member, so a four- or five-a-side roster does not have to be
+  /// rebuilt player by player.
+  Future<void> _addSquad(Squad squad) async {
+    final matches = context.read<MatchController>();
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final added = await matches.addSquadToMatch(
+      widget.matchId,
+      squad.id,
+      side: _side,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (added == null) _error = matches.lastError;
+    });
+    if (added != null && mounted) {
+      showSnack(
+        context,
+        added == 1
+            ? '1 player from ${squad.name} was invited'
+            : '$added players from ${squad.name} were invited',
+      );
+    }
+  }
+
+  /// A squad can only be added to the side that still has room, and only by the
+  /// organizer or the official scorer, which is what `add_match_squad` checks.
+  bool _canAddSquad(SportMatch match, String? me) =>
+      match.canScore(me) &&
+      match.status == FixtureStatus.upcoming &&
+      match.startedAt == null &&
+      match.acceptedCount < match.capacity;
+
+  /// The squad type that matches the match's discipline: a team squad for a
+  /// team match, a pair for doubles, a single-player entry for singles.
+  EntryType _entryTypeFor(MatchDiscipline discipline) => switch (discipline) {
+    MatchDiscipline.team => EntryType.team,
+    MatchDiscipline.doubles => EntryType.pair,
+    MatchDiscipline.singles => EntryType.individual,
+  };
+
   Future<void> _remove(MatchParticipant participant) async {
     final matches = context.read<MatchController>();
     setState(() {
@@ -150,6 +198,19 @@ class _MatchParticipantsSheetState extends State<_MatchParticipantsSheet> {
         (match.status == FixtureStatus.upcoming ||
             match.status == FixtureStatus.live);
     final full = match.acceptedCount >= match.capacity;
+    final canAddSquad = _canAddSquad(match, me?.id);
+    final squads = canAddSquad
+        ? context
+              .watch<TeamsController>()
+              .mySquads
+              .where(
+                (s) =>
+                    s.sport == match.sport &&
+                    s.type == _entryTypeFor(match.discipline),
+              )
+              .toList()
+        : const <Squad>[];
+    final sideName = _side < sides.length ? sides[_side] : 'side ${_side + 1}';
 
     return AppSheet(
       title: 'Players',
@@ -197,7 +258,7 @@ class _MatchParticipantsSheetState extends State<_MatchParticipantsSheet> {
             const SizedBox(height: SportikaSpacing.sm),
           ],
           const SizedBox(height: SportikaSpacing.md),
-          if (canManage && !full) ...[
+          if ((canManage && !full) || canAddSquad) ...[
             const Text('INVITE TO', style: SportikaType.label),
             const SizedBox(height: 6),
             Row(
@@ -220,66 +281,108 @@ class _MatchParticipantsSheetState extends State<_MatchParticipantsSheet> {
               ],
             ),
             const SizedBox(height: SportikaSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    enabled: !_busy,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _runSearch(),
-                    decoration: const InputDecoration(
-                      labelText: 'Find a registered player',
-                      isDense: true,
+            if (canAddSquad) ...[
+              const Text('ADD A SQUAD', style: SportikaType.label),
+              const SizedBox(height: 6),
+              HelperText(
+                squads.isEmpty
+                    ? 'You have no ${match.sport.label} squad of the right '
+                          'size for this match. Create one on the Teams tab.'
+                    : 'Invites every accepted member of a squad to $sideName. '
+                          'They join once they accept.',
+              ),
+              const SizedBox(height: SportikaSpacing.sm),
+              for (final squad in squads)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: SportikaSpacing.sm),
+                  child: SurfaceCard(
+                    padding: const EdgeInsets.all(SportikaSpacing.sm),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(squad.name, style: SportikaType.bodyStrong),
+                              Text(
+                                '${squad.size} '
+                                '${squad.size == 1 ? 'member' : 'members'}',
+                                style: SportikaType.caption,
+                              ),
+                            ],
+                          ),
+                        ),
+                        GhostButton(
+                          label: 'Add to $sideName',
+                          onPressed: _busy ? null : () => _addSquad(squad),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(width: SportikaSpacing.sm),
-                GhostButton(
-                  label: 'Search',
-                  onPressed: _searching || _busy ? null : _runSearch,
-                ),
+            ],
+            if (canManage && !full) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _search,
+                      enabled: !_busy,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => _runSearch(),
+                      decoration: const InputDecoration(
+                        labelText: 'Find a registered player',
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: SportikaSpacing.sm),
+                  GhostButton(
+                    label: 'Search',
+                    onPressed: _searching || _busy ? null : _runSearch,
+                  ),
+                ],
+              ),
+              if (_searching) const LinearProgressIndicator(),
+              if (_results != null) ...[
+                const SizedBox(height: SportikaSpacing.sm),
+                if (_results!.isEmpty)
+                  const HelperText('No member matched that search.')
+                else
+                  SurfaceCard(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Column(
+                      children: [
+                        for (final player in _results!)
+                          MatchMemberSearchTile(
+                            player: player,
+                            inviting: true,
+                            note:
+                                match.participantOf(player.id)?.status ==
+                                    MatchParticipantStatus.accepted
+                                ? 'Already joined'
+                                : match.participantOf(player.id)?.status ==
+                                      MatchParticipantStatus.invited
+                                ? 'Invitation pending'
+                                : null,
+                            onTap:
+                                _busy ||
+                                    const {
+                                      MatchParticipantStatus.accepted,
+                                      MatchParticipantStatus.invited,
+                                    }.contains(
+                                      match.participantOf(player.id)?.status,
+                                    )
+                                ? null
+                                : () => _invite(player),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
-            ),
-            if (_searching) const LinearProgressIndicator(),
-            if (_results != null) ...[
-              const SizedBox(height: SportikaSpacing.sm),
-              if (_results!.isEmpty)
-                const HelperText('No member matched that search.')
-              else
-                SurfaceCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  child: Column(
-                    children: [
-                      for (final player in _results!)
-                        MatchMemberSearchTile(
-                          player: player,
-                          inviting: true,
-                          note:
-                              match.participantOf(player.id)?.status ==
-                                  MatchParticipantStatus.accepted
-                              ? 'Already joined'
-                              : match.participantOf(player.id)?.status ==
-                                    MatchParticipantStatus.invited
-                              ? 'Invitation pending'
-                              : null,
-                          onTap:
-                              _busy ||
-                                  const {
-                                    MatchParticipantStatus.accepted,
-                                    MatchParticipantStatus.invited,
-                                  }.contains(
-                                    match.participantOf(player.id)?.status,
-                                  )
-                              ? null
-                              : () => _invite(player),
-                        ),
-                    ],
-                  ),
-                ),
             ],
           ],
           if (_error != null) ...[
@@ -306,13 +409,13 @@ class _SideChoice extends StatelessWidget {
         : SportikaColors.textMuted;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(SportikaRadius.sm),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         constraints: const BoxConstraints(maxWidth: 140),
         decoration: BoxDecoration(
           color: tone.withValues(alpha: selected ? 0.16 : 0.06),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(SportikaRadius.sm),
           border: Border.all(color: tone.withValues(alpha: 0.45)),
         ),
         child: Text(

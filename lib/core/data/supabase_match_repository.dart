@@ -391,6 +391,41 @@ class SupabaseMatchRepository extends ChangeNotifier
   }
 
   @override
+  Future<void> joinMatch(String matchId, {int side = 0}) async {
+    await _rpc<dynamic>('join_match', {
+      'p_match_id': matchId,
+      'p_side': side,
+    }, fallback: 'You could not join this match.');
+    await _refreshMatch(matchId);
+    _sync = MatchSyncState.idle;
+  }
+
+  @override
+  Future<void> leaveMatch(String matchId) async {
+    await _rpc<dynamic>('leave_match', {
+      'p_match_id': matchId,
+    }, fallback: 'You could not leave this match.');
+    await _refreshMatch(matchId);
+    _sync = MatchSyncState.idle;
+  }
+
+  @override
+  Future<int> addSquadToMatch(
+    String matchId,
+    String squadId, {
+    int side = 0,
+  }) async {
+    final added = await _rpc<dynamic>('add_match_squad', {
+      'p_match_id': matchId,
+      'p_side': side,
+      'p_squad_id': squadId,
+    }, fallback: 'The squad could not be added.');
+    await _refreshMatch(matchId);
+    _sync = MatchSyncState.idle;
+    return added is int ? added : int.tryParse('$added') ?? 0;
+  }
+
+  @override
   Future<void> assignMatchScorer(String matchId, String scorerId) async {
     await _rpc<dynamic>('assign_match_scorer', {
       'p_match_id': matchId,
@@ -521,6 +556,15 @@ class SupabaseMatchRepository extends ChangeNotifier
     required List<int> sideValues,
     required int winnerIndex,
   }) async {
+    // Padel is the one sport whose result the server folds itself, so it is
+    // submitted through the door that takes no score at all. The device's own
+    // reading is still what the workspace paints, but it never becomes the
+    // official record: `complete_padel_match` derives both sides' set strings,
+    // the set totals and the winner from the point log it has locked.
+    if (await _isPadel(matchId)) {
+      await _completePadel(matchId);
+      return;
+    }
     await _rpc<dynamic>('submit_match_result', {
       'p_match_id': matchId,
       'p_headline': headline.trim(),
@@ -529,6 +573,54 @@ class SupabaseMatchRepository extends ChangeNotifier
       'p_side_values': sideValues,
       'p_winner_index': winnerIndex,
     }, fallback: 'The result could not be submitted.');
+    await _refreshMatch(matchId);
+    _sync = MatchSyncState.idle;
+  }
+
+  /// Whether [matchId] names a padel match, which is the only case that changes
+  /// which RPC may be called. The loaded snapshot normally already knows; a
+  /// one-column read answers when the match is not in it, and a read that fails
+  /// falls through to the generic door, where migration 0013 still re-checks
+  /// the totals and the winner against the server's own fold.
+  Future<bool> _isPadel(String matchId) async {
+    final loaded = matchById(matchId);
+    if (loaded != null) return loaded.sport == Sport.padel;
+    try {
+      final row = await _client
+          .from('matches')
+          .select('sport_key')
+          .eq('id', matchId)
+          .maybeSingle();
+      return row?['sport_key'] == 'padel';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// `complete_padel_match(p_match_id)` of migration 0013, plus the retry
+  /// semantics the submission button needs: a scorer can tap twice, and a
+  /// completion whose answer was lost in transit has already been written.
+  /// The RPC refuses both by the lifecycle rule alone - it only accepts a live
+  /// match - so the row is read back to tell "already submitted" (success) from
+  /// "nothing was written yet" (the error the scorer has to see).
+  Future<void> _completePadel(String matchId) async {
+    try {
+      await _rpc<dynamic>('complete_padel_match', {
+        'p_match_id': matchId,
+      }, fallback: 'The result could not be submitted.');
+    } on MatchRepositoryException catch (error) {
+      if (error.code != '22023') rethrow;
+      await _refreshMatch(matchId);
+      final current = matchById(matchId);
+      final settled =
+          current?.result != null &&
+          (current!.status == FixtureStatus.submitted ||
+              current.status == FixtureStatus.published);
+      if (!settled) rethrow;
+      // Nothing failed: the submission the scorer asked for is on the record.
+      _sync = MatchSyncState.idle;
+      return;
+    }
     await _refreshMatch(matchId);
     _sync = MatchSyncState.idle;
   }
@@ -576,6 +668,21 @@ class SupabaseMatchRepository extends ChangeNotifier
       'p_winner_index': winnerIndex,
       'p_reason': reason.trim(),
     }, fallback: 'The walkover could not be recorded.');
+    await _refreshMatch(matchId);
+    _sync = MatchSyncState.idle;
+  }
+
+  @override
+  Future<void> retireMatch(
+    String matchId, {
+    required int winnerIndex,
+    required String reason,
+  }) async {
+    await _rpc<dynamic>('retire_match', {
+      'p_match_id': matchId,
+      'p_winner_index': winnerIndex,
+      'p_reason': reason.trim(),
+    }, fallback: 'The retirement could not be recorded.');
     await _refreshMatch(matchId);
     _sync = MatchSyncState.idle;
   }
@@ -1029,6 +1136,22 @@ class SupabaseMatchRepository extends ChangeNotifier
         'Only the organizer or the assigned official scorer can do that.',
       'invalid_match_transition' => 'That match can no longer change that way.',
       'match_full' => 'This match is already full.',
+      'side_full' =>
+        'That side is full. Join the other side or wait for a place.',
+      'match_not_public' =>
+        'This match is invite-only, so it cannot be joined.',
+      'organizer_cannot_leave' => 'The organizer cannot leave their own match.',
+      'not_participant' => 'You are not on this match.',
+      'not_squad_member' => 'You can only add a squad you belong to.',
+      'squad_not_found' => 'That squad could not be found. Pull to refresh.',
+      'squad_below_minimum' =>
+        'A futsal team needs at least five members on the squad.',
+      'draw_needs_full_squads' =>
+        'Every confirmed squad needs five members before the draw can run.',
+      'entry_type_mismatch' =>
+        'That squad does not match the kind of entry this tournament takes.',
+      'lineup_incomplete' =>
+        'A starting five needs five players from that side who accepted.',
       'not_last_event' => 'Only the newest entry can be undone.',
       'invalid_result_payload' => 'A result needs a score for both sides.',
       'invalid_correction_reason' => 'Say why the result is being corrected.',
@@ -1093,6 +1216,9 @@ class SupabaseMatchRepository extends ChangeNotifier
       'invalid_event_side' => 'Pick which side the entry belongs to.',
       'invalid_event_data' => 'That entry carries data the server cannot read.',
       'invalid_void_reason' => 'Say why the entry is being withdrawn.',
+      'invalid_rally_side' => 'Pick which side won the rally.',
+      'invalid_retire_reason' =>
+        'Say why the match is being retired in 3 to 200 characters.',
       'invalid_padel_rules' ||
       'invalid_rules' => 'Those padel rules are not a format the server knows.',
       'invalid_tournament_id' => 'That tournament id is not valid.',

@@ -15,7 +15,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/profile_module.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/widgets/editorial.dart' show SportGlyph;
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -152,6 +152,22 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
     super.dispose();
   }
 
+  void _selectFormat(String format) {
+    setState(() {
+      _format = format;
+      if (_sport == Sport.badminton &&
+          (format.contains('Singles') || format.contains('Doubles'))) {
+        _discipline = format.contains('Singles')
+            ? MatchDiscipline.singles
+            : MatchDiscipline.doubles;
+        _capacity = _discipline == MatchDiscipline.singles ? 2 : 4;
+        for (final players in _badmintonPlayers) {
+          players.clear();
+        }
+      }
+    });
+  }
+
   void _selectSport(Sport sport) {
     setState(() {
       _futsal = {};
@@ -216,7 +232,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                 icon: Icons.emoji_events_outlined,
               ),
             ),
-          _CreationHero(tone: sportColor(_sport)),
+          const _CreationHero(),
           const SizedBox(height: SportikaSpacing.lg),
           _CreationSection(
             number: '01',
@@ -224,15 +240,14 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
             subtitle: 'Set the sport and the rules of play.',
             children: [
               const Text('SPORT', style: SportikaType.label),
-              const SizedBox(height: 8),
+              const SizedBox(height: SportikaSpacing.sm),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final columns = constraints.maxWidth >= 480 ? 4 : 2;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 10) / columns;
+                  const gap = SportikaSpacing.sm;
+                  final width = (constraints.maxWidth - gap) / 2;
                   return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: gap,
+                    runSpacing: gap,
                     children: [
                       for (final sport in Sport.values)
                         SizedBox(
@@ -251,40 +266,36 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
               ),
               const SizedBox(height: SportikaSpacing.lg),
               const Text('FORMAT', style: SportikaType.label),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: [
-                  for (final format in [
-                    ...SportEngines.formatsFor(_sport),
-                    if (_sport == Sport.cricket) 'Custom overs',
-                  ])
-                    _Chip(
-                      label: format,
-                      active: format == _format,
-                      tone: sportColor(_sport),
-                      onTap: _busy || widget._isTournament
-                          ? null
-                          : () => setState(() {
-                              _format = format;
-                              if (_sport == Sport.badminton &&
-                                  (format.contains('Singles') ||
-                                      format.contains('Doubles'))) {
-                                _discipline = format.contains('Singles')
-                                    ? MatchDiscipline.singles
-                                    : MatchDiscipline.doubles;
-                                _capacity =
-                                    _discipline == MatchDiscipline.singles
-                                    ? 2
-                                    : 4;
-                                for (final players in _badmintonPlayers) {
-                                  players.clear();
-                                }
-                              }
-                            }),
-                    ),
-                ],
+              const SizedBox(height: SportikaSpacing.sm),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const gap = SportikaSpacing.sm;
+                  final width =
+                      constraints.maxWidth >= SportikaBreakpoints.compact
+                      ? (constraints.maxWidth - gap) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: gap,
+                    runSpacing: gap,
+                    children: [
+                      for (final format in [
+                        ...SportEngines.formatsFor(_sport),
+                        if (_sport == Sport.cricket) 'Custom overs',
+                      ])
+                        SizedBox(
+                          width: width,
+                          child: _FormatCard(
+                            label: format,
+                            selected: format == _format,
+                            sport: _sport,
+                            onTap: _busy || widget._isTournament
+                                ? null
+                                : () => _selectFormat(format),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               if (_sport == Sport.cricket &&
                   _format == 'Custom overs' &&
@@ -732,7 +743,9 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
       backgroundColor: SportikaColors.surfaceElevated,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SportikaRadius.xl),
+        ),
       ),
       builder: (_) => _ScorerPickerSheet(organizerName: organizerName),
     );
@@ -888,69 +901,122 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
     if (_capacity < 2 || _capacity > 100) {
       return 'Capacity has to be between 2 and 100 players.';
     }
+    // A personal badminton match is created with its full roster: the games are
+    // scored per side, so an empty side or a half-filled pair is a match nobody
+    // can serve. The organizer occupies the first place on side A.
+    if (_sport == Sport.badminton && !widget._isTournament) {
+      final perSide = _discipline == MatchDiscipline.singles ? 1 : 2;
+      final sideCounts = [
+        _badmintonPlayers[0].length + 1,
+        _badmintonPlayers[1].length,
+      ];
+      for (var side = 0; side < 2; side++) {
+        final label = side == 0 ? 'side A' : 'side B';
+        if (sideCounts[side] < perSide) {
+          return perSide == 1
+              ? 'Pick $label before creating the match.'
+              : 'Pick ${perSide - (side == 0 ? 1 : 0)} more player(s) for $label.';
+        }
+        if (sideCounts[side] > perSide) {
+          return '${_discipline.label} allows one ${perSide == 1 ? 'player' : 'pair'} per side.';
+        }
+      }
+      final picked = {
+        for (final players in _badmintonPlayers)
+          for (final player in players) player.id,
+      };
+      if (picked.length !=
+          _badmintonPlayers[0].length + _badmintonPlayers[1].length) {
+        return 'A player cannot appear on both sides.';
+      }
+    }
     return null;
   }
 }
 
 class _CreationHero extends StatelessWidget {
-  const _CreationHero({required this.tone});
-  final Color tone;
+  const _CreationHero();
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(24),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [tone.withValues(alpha: 0.22), SportikaColors.surfaceSunken],
-      ),
-      border: Border.all(color: tone.withValues(alpha: 0.3)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ClipRRect(
+      borderRadius: BorderRadius.circular(SportikaRadius.xl),
+      child: ColoredBox(
+        color: SportikaColors.deepest,
+        child: Stack(
           children: [
-            const Icon(
-              Icons.sports_score_rounded,
-              color: SportikaColors.gold,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'SPORTIKA / MATCHDAY',
-                style: SportikaType.label.copyWith(
-                  color: SportikaColors.gold,
-                  letterSpacing: 2,
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              // Keep all four panels in frame at narrow widths.
+              height: constraints.maxWidth / 3,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(
+                      'assets/images/sports/create_match_hero.webp',
+                    ),
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
                 ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: SportikaGradients.imageFade,
+                  ),
+                ),
+              ),
+            ),
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: SportikaGradients.cinematicHeroScrim,
+                ),
+              ),
+            ),
+            Container(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxWidth < 480 ? 220 : 240,
+              ),
+              alignment: Alignment.bottomLeft,
+              padding: const EdgeInsets.all(SportikaSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SPORTIKA / MATCHDAY',
+                    style: SportikaType.label.copyWith(
+                      color: SportikaColors.mint,
+                    ),
+                  ),
+                  const SizedBox(height: SportikaSpacing.xs),
+                  const Text(
+                    'Great games start here.',
+                    style: SportikaType.hero,
+                  ),
+                  const SizedBox(height: SportikaSpacing.xs),
+                  const Text(
+                    'Your teams. Your stage. Every point recorded.',
+                    style: SportikaType.caption,
+                  ),
+                  const SizedBox(height: SportikaSpacing.sm),
+                  const SizedBox(
+                    width: SportikaSpacing.xxl,
+                    height: SportikaSpacing.xxs,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: SportikaGradients.heroWedge,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        Text(
-          'Great games\nstart here.',
-          style: SportikaType.hero.copyWith(height: 1.08),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Your teams. Your stage. Every point recorded.',
-          style: SportikaType.caption,
-        ),
-        const SizedBox(height: 20),
-        const Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            Text('01  GAME', style: SportikaType.label),
-            Text('02  SIDES', style: SportikaType.label),
-            Text('03  MATCHDAY', style: SportikaType.label),
-          ],
-        ),
-      ],
+      ),
     ),
   );
 }
@@ -972,7 +1038,7 @@ class _CreationSection extends StatelessWidget {
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: SportikaColors.surfaceSunken,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(SportikaRadius.dialog),
       border: Border.all(color: SportikaColors.borderSubtle),
     ),
     child: Column(
@@ -987,7 +1053,7 @@ class _CreationSection extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: SportikaColors.goldSubtle,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(SportikaRadius.sm),
               ),
               child: Text(
                 number,
@@ -1020,61 +1086,311 @@ class _CreationSection extends StatelessWidget {
   );
 }
 
-class _SportTile extends StatelessWidget {
+class _SportTile extends StatefulWidget {
   const _SportTile({required this.sport, required this.selected, this.onTap});
+
   final Sport sport;
   final bool selected;
   final VoidCallback? onTap;
 
   @override
+  State<_SportTile> createState() => _SportTileState();
+}
+
+class _SportTileState extends State<_SportTile> {
+  bool _pressed = false;
+
+  @override
+  void didUpdateWidget(covariant _SportTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onTap == null) _pressed = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final tone = sportColor(sport);
-    final icon = switch (sport) {
-      Sport.cricket => Icons.sports_cricket_rounded,
-      Sport.futsal => Icons.sports_soccer_rounded,
-      Sport.padel => Icons.sports_tennis_rounded,
-      Sport.badminton => Icons.sports_tennis_rounded,
-    };
+    final enabled = widget.onTap != null;
+    final selected = widget.selected;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final transition = reduceMotion ? Duration.zero : SportikaMotion.base;
+    final identity = SportIdentities.of(widget.sport);
+    final radius = BorderRadius.circular(SportikaRadius.thumbnail);
+
     return Semantics(
       selected: selected,
       button: true,
-      enabled: onTap != null,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: AnimatedContainer(
-            duration: SportikaMotion.base,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: selected
-                  ? tone.withValues(alpha: 0.14)
-                  : SportikaColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selected ? tone : SportikaColors.border,
-              ),
+      enabled: enabled,
+      child: AnimatedScale(
+        scale: enabled && _pressed && !reduceMotion ? .97 : 1,
+        duration: reduceMotion ? Duration.zero : SportikaMotion.fast,
+        curve: SportikaMotion.standard,
+        child: AnimatedContainer(
+          duration: transition,
+          curve: SportikaMotion.standard,
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: selected
+                ? SportikaShadows.accent(SportikaColors.mint)
+                : SportikaShadows.none,
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: selected ? SportikaColors.mint : SportikaColors.border,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: Stack(
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      icon,
-                      color: selected ? tone : SportikaColors.textMuted,
-                      size: 26,
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: SportikaGradients.coverSurface,
+                      image: DecorationImage(
+                        image: ResizeImage(
+                          AssetImage(identity.actionPhoto),
+                          width: 960,
+                        ),
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                    const Spacer(),
-                    if (selected)
-                      Icon(Icons.check_circle_rounded, color: tone, size: 18),
-                  ],
+                    child: const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: SportikaGradients.sportCardScrim,
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 14),
-                Text(sport.label, style: SportikaType.bodyStrong),
+                PositionedDirectional(
+                  top: SportikaSpacing.lg,
+                  end: -SportikaSpacing.xl,
+                  child: Transform.rotate(
+                    angle: -.65,
+                    child: const SizedBox(
+                      width: SportikaSpacing.xxxl * 2,
+                      height: SportikaSpacing.md,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: SportikaGradients.heroWedge,
+                          border: Border(
+                            top: BorderSide(color: SportikaColors.courtLine),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Material(
+                  type: MaterialType.transparency,
+                  child: InkWell(
+                    onTap: widget.onTap,
+                    onHighlightChanged: enabled
+                        ? (pressed) => setState(() => _pressed = pressed)
+                        : null,
+                    borderRadius: radius,
+                    focusColor: SportikaColors.overlay,
+                    hoverColor: SportikaColors.overlayHairline,
+                    child: Padding(
+                      padding: const EdgeInsets.all(SportikaSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                width: SportikaSpacing.xl,
+                                height: SportikaSpacing.xl,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: SportikaColors.glass,
+                                  gradient: SportikaGradients.glassPanel,
+                                  borderRadius: BorderRadius.circular(
+                                    SportikaRadius.badge,
+                                  ),
+                                  border: Border.all(
+                                    color: SportikaColors.overlaySoft,
+                                  ),
+                                ),
+                                child: SportGlyph(
+                                  sport: widget.sport,
+                                  size: SportikaIconSize.sm,
+                                  color: selected
+                                      ? SportikaColors.mint
+                                      : SportikaColors.textBody,
+                                ),
+                              ),
+                              AnimatedOpacity(
+                                opacity: selected ? 1 : 0,
+                                duration: transition,
+                                child: Container(
+                                  width: SportikaSpacing.lg,
+                                  height: SportikaSpacing.lg,
+                                  decoration: const BoxDecoration(
+                                    gradient: SportikaGradients.metallicMint,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check_rounded,
+                                    size: SportikaIconSize.sm,
+                                    color: SportikaColors.onMint,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: SportikaSpacing.xxxl),
+                          Text(
+                            widget.sport.label,
+                            style: SportikaType.bodyStrong,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FormatCard extends StatelessWidget {
+  const _FormatCard({
+    required this.label,
+    required this.selected,
+    required this.sport,
+    this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Sport sport;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : SportikaMotion.base;
+    final radius = BorderRadius.circular(SportikaRadius.control);
+
+    return Semantics(
+      selected: selected,
+      enabled: onTap != null,
+      button: true,
+      child: AnimatedContainer(
+        duration: duration,
+        curve: SportikaMotion.standard,
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          gradient: selected
+              ? SportikaGradients.holographicSurface
+              : SportikaGradients.mediaSurface,
+          boxShadow: selected
+              ? SportikaShadows.accent(SportikaColors.mint)
+              : SportikaShadows.none,
+        ),
+        foregroundDecoration: BoxDecoration(
+          borderRadius: radius,
+          border: Border.all(
+            color: selected ? SportikaColors.mint : SportikaColors.borderSubtle,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: Stack(
+            children: [
+              PositionedDirectional(
+                end: SportikaSpacing.xl,
+                bottom: -SportikaSpacing.sm,
+                child: IgnorePointer(
+                  child: Transform.rotate(
+                    angle: -.35,
+                    child: SportGlyph(
+                      sport: sport,
+                      size: SportikaSpacing.xxxl,
+                      color: SportikaColors.courtLine,
+                    ),
+                  ),
+                ),
+              ),
+              PositionedDirectional(
+                start: SportikaSpacing.xxs,
+                top: SportikaSpacing.sm,
+                bottom: SportikaSpacing.sm,
+                width: SportikaSpacing.xxs,
+                child: AnimatedOpacity(
+                  opacity: selected ? 1 : 0,
+                  duration: duration,
+                  child: const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: SportikaGradients.metallicMint,
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(SportikaRadius.pill),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: onTap,
+                  borderRadius: radius,
+                  focusColor: SportikaColors.overlay,
+                  hoverColor: SportikaColors.overlayHairline,
+                  highlightColor: SportikaColors.mintSubtle,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: SportikaSpacing.xxxl + SportikaSpacing.sm,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SportikaSpacing.md,
+                        vertical: SportikaSpacing.sm,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(label, style: SportikaType.bodyStrong),
+                          ),
+                          const SizedBox(width: SportikaSpacing.xs),
+                          AnimatedContainer(
+                            duration: duration,
+                            width: SportikaSpacing.lg,
+                            height: SportikaSpacing.lg,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: selected
+                                  ? SportikaGradients.metallicMint
+                                  : null,
+                              border: Border.all(
+                                color: selected
+                                    ? SportikaColors.mint
+                                    : SportikaColors.borderStrong,
+                              ),
+                            ),
+                            child: AnimatedOpacity(
+                              opacity: selected ? 1 : 0,
+                              duration: duration,
+                              child: const Icon(
+                                Icons.check_rounded,
+                                color: SportikaColors.onMint,
+                                size: SportikaIconSize.sm,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1103,14 +1419,14 @@ class _Chip extends StatelessWidget {
       enabled: onTap != null,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SportikaRadius.control),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: active
                 ? tone.withValues(alpha: 0.18)
                 : SportikaColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(SportikaRadius.control),
             border: Border.all(
               color: active
                   ? tone.withValues(alpha: 0.65)

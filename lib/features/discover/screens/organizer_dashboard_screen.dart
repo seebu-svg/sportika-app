@@ -1,172 +1,410 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/models/enums.dart';
-import 'package:sportika/shared/models/models.dart';
+import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
-import 'package:sportika/core/state/monetization_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/tournaments_controller.dart';
-import 'package:sportika/shared/widgets/fixture_tile.dart';
-import 'package:sportika/app/routes.dart';
-import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/features/discover/widgets/tournament_card.dart';
-import 'package:sportika/features/monetization/widgets/billing_widgets.dart';
-import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/models/enums.dart';
+import 'package:sportika/shared/models/models.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/fixture_tile.dart';
+import 'package:sportika/shared/widgets/results_actions.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// Organizer home (spec §4, §5): what needs a decision now, plus every event
-/// the organizer runs.
+// ============================================================
+// ORGANIZER COMMAND CENTER
+// ============================================================
+
 class OrganizerDashboardScreen extends StatelessWidget {
   const OrganizerDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
-    final billing = context.watch<MonetizationController>();
-    final me = context.read<ProfileController>().currentAccount;
-    final mine = state.tournamentsForOrganizer(me?.id);
+    final tournaments = context.watch<TournamentsController>();
+    final fixtures = context.watch<FixturesController>();
+    final profile = context.watch<ProfileController>();
+
+    final mine = tournaments.tournamentsForOrganizer(
+      profile.currentAccount?.id,
+    );
+
     final pending = <Entry>[
-      for (final t in mine) ...state.pendingEntriesFor(t.id),
+      for (final tournament in mine)
+        ...tournaments.pendingEntriesFor(tournament.id),
     ];
-    final review = context.read<FixturesController>().fixturesAwaitingReview;
-    final disputes = context.read<FixturesController>().myOrganizerDisputes;
-    final live = context
-        .read<FixturesController>()
-        .myOrganizerFixtures
-        .where((f) => f.status == FixtureStatus.live)
+
+    final review = fixtures.fixturesAwaitingReview;
+    final disputes = fixtures.myOrganizerDisputes;
+    final live = fixtures.myOrganizerFixtures
+        .where((fixture) => fixture.status == FixtureStatus.live)
         .toList();
+
+    final attentionCount = pending.length + review.length + disputes.length;
 
     return Scaffold(
       appBar: sportikaAppBar(
-        'My tournaments',
-        subtitle: '${mine.length} events · ${pending.length} entries to review',
+        'Organizer',
+        subtitle: 'Tournament command center',
         actions: [
           IconButton(
             tooltip: 'Create tournament',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => pushRoute(context, AppRoute.createTournament),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: SportikaSpacing.sm),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+        padding: const EdgeInsets.fromLTRB(
+          SportikaSpacing.lg,
+          SportikaSpacing.sm,
+          SportikaSpacing.lg,
+          SportikaSpacing.xxl,
+        ),
         children: [
-          PremiumStatusCard(billing: billing),
+          // --------------------------------------------------
+          // BRANDED HERO
+          // --------------------------------------------------
+
+          _OrganizerHero(
+            eventCount: mine.length,
+            onCreate: () => pushRoute(context, AppRoute.createTournament),
+          ),
+
+          const SizedBox(height: SportikaSpacing.lg),
+
+          // --------------------------------------------------
+          // OPERATIONAL KPIS
+          // --------------------------------------------------
           Row(
             children: [
               Expanded(
-                child: StatTile(
+                child: _OrganizerMetric(
                   value: '${pending.length}',
                   label: 'Entries',
+                  icon: Icons.group_add_outlined,
                   tone: SportikaColors.gold,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: SportikaSpacing.sm),
               Expanded(
-                child: StatTile(
+                child: _OrganizerMetric(
                   value: '${review.length}',
-                  label: 'To publish',
+                  label: 'To review',
+                  icon: Icons.fact_check_outlined,
                   tone: SportikaColors.mint,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: SportikaSpacing.sm),
               Expanded(
-                child: StatTile(
+                child: _OrganizerMetric(
                   value: '${live.length}',
                   label: 'Live',
+                  icon: Icons.sensors_outlined,
                   tone: SportikaColors.blueBright,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          PrimaryButton(
-            label: 'Create a tournament',
-            icon: Icons.emoji_events_outlined,
-            onPressed: () => pushRoute(context, AppRoute.createTournament),
+
+          const SizedBox(height: SportikaSpacing.xl),
+
+          // --------------------------------------------------
+          // ACTION REQUIRED
+          // --------------------------------------------------
+          _OrganizerSectionHeader(
+            title: 'Needs attention',
+            subtitle: attentionCount == 0
+                ? 'Everything is up to date'
+                : '$attentionCount items need your attention',
+            icon: Icons.assignment_turned_in_outlined,
           ),
-          const SectionTitle('Needs your decision'),
-          if (pending.isEmpty && review.isEmpty)
-            const EmptyState(
-              title: 'Nothing waiting',
-              body:
-                  'New entries and submitted scores land here for confirmation and '
-                  'publication.',
-              icon: Icons.task_alt,
+
+          const SizedBox(height: SportikaSpacing.md),
+
+          if (attentionCount == 0)
+            const _OrganizerCompactEmpty(
+              icon: Icons.check_circle_outline,
+              title: 'All caught up',
+              description:
+                  'New registrations, results and disputes will appear here.',
             )
           else ...[
-            for (final entry in pending)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _PendingEntryCard(entry: entry),
-              ),
-            for (final fixture in review)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  children: [
-                    officialFixtureTile(context, fixture),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: PrimaryButton(
-                            label: 'Review & publish',
-                            icon: Icons.verified_outlined,
-                            small: true,
-                            tone: SportikaColors.mint,
-                            onPressed: () => publishFixture(context, fixture),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GhostButton(
-                          label: 'Walkover',
-                          icon: Icons.flag_outlined,
-                          onPressed: () => recordWalkoverFor(context, fixture),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            // Disputes first because they require resolution.
+            for (final fixture in disputes) ...[
+              _OrganizerDisputeCard(fixture: fixture),
+              const SizedBox(height: SportikaSpacing.sm),
+            ],
+
+            for (final entry in pending) ...[
+              _PendingEntryCard(entry: entry),
+              const SizedBox(height: SportikaSpacing.sm),
+            ],
+
+            for (final fixture in review) ...[
+              _OrganizerReviewCard(fixture: fixture),
+              const SizedBox(height: SportikaSpacing.sm),
+            ],
           ],
-          const SectionTitle('Disputed results'),
-          if (disputes.isEmpty)
-            const EmptyState(
-              title: 'No open disputes',
-              body:
-                  'Players can flag a questionable result from the fixture '
-                  'page, and it lands here for you to close.',
-              icon: Icons.gavel,
-            )
-          else
-            for (final fixture in disputes)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _OrganizerDisputeCard(fixture: fixture),
-              ),
-          const SectionTitle('Your tournaments'),
+
+          const SizedBox(height: SportikaSpacing.xl),
+
+          // --------------------------------------------------
+          // TOURNAMENTS
+          // --------------------------------------------------
+          _OrganizerSectionHeader(
+            title: 'Your tournaments',
+            subtitle: '${mine.length} events under your management',
+            icon: Icons.emoji_events_outlined,
+          ),
+
+          const SizedBox(height: SportikaSpacing.md),
+
           if (mine.isEmpty)
-            const EmptyState(
-              title: 'No tournaments yet',
-              body: 'Create an event, confirm entries, then publish the draw.',
+            _OrganizerCompactEmpty(
               icon: Icons.emoji_events_outlined,
+              title: 'Your arena is waiting',
+              description: 'Create a tournament to manage entries, fixtures and results.',
+              action: PrimaryButton(
+                label: 'Create tournament',
+                icon: Icons.add,
+                onPressed: () => pushRoute(context, AppRoute.createTournament),
+              ),
             )
           else
-            for (final tournament in mine)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _OrganizerTournamentCard(tournament: tournament),
-              ),
+            for (final tournament in mine) ...[
+              _OrganizerTournamentCard(tournament: tournament),
+              const SizedBox(height: SportikaSpacing.md),
+            ],
         ],
       ),
     );
   }
 }
+
+// ============================================================
+// CINEMATIC ORGANIZER HERO
+// ============================================================
+
+class _OrganizerHero extends StatelessWidget {
+  const _OrganizerHero({required this.eventCount, required this.onCreate});
+
+  final int eventCount;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(SportikaRadius.card),
+      child: Container(
+        decoration: const BoxDecoration(gradient: SportikaGradients.sportPanel),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -SportikaSpacing.xl,
+              top: -SportikaSpacing.xl,
+              child: Icon(
+                Icons.emoji_events_outlined,
+                size: SportikaSpacing.xxl * 5,
+                color: SportikaColors.mint.withValues(
+                  alpha: SportikaOpacity.faint,
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(SportikaSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SPORTIKA / ORGANIZER',
+                    style: SportikaType.micro.copyWith(
+                      color: SportikaColors.mint,
+                    ),
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  const Text(
+                    'Your events.\nYour arena.',
+                    style: SportikaType.hero,
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.sm),
+
+                  const Text(
+                    'Create tournaments, manage entries '
+                    'and publish official results.',
+                    style: SportikaType.caption,
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.md),
+
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.emoji_events_outlined,
+                        size: SportikaIconSize.sm,
+                        color: SportikaColors.mint,
+                      ),
+                      const SizedBox(width: SportikaSpacing.xs),
+                      Text(
+                        '$eventCount tournaments',
+                        style: SportikaType.label.copyWith(
+                          color: SportikaColors.mint,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: SportikaSpacing.lg),
+
+                  PrimaryButton(
+                    label: 'Create tournament',
+                    icon: Icons.add_circle_outline,
+                    onPressed: onCreate,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// METRIC CARD
+// ============================================================
+
+class _OrganizerMetric extends StatelessWidget {
+  const _OrganizerMetric({
+    required this.value,
+    required this.label,
+    required this.icon,
+    required this.tone,
+  });
+
+  final String value;
+  final String label;
+  final IconData icon;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: SportikaIconSize.lg, color: tone),
+
+          const SizedBox(height: SportikaSpacing.md),
+
+          Text(value, style: SportikaType.titleMedium),
+
+          const SizedBox(height: SportikaSpacing.xs),
+
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SportikaType.caption,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SECTION HEADING
+// ============================================================
+
+class _OrganizerSectionHeader extends StatelessWidget {
+  const _OrganizerSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: SportikaIconSize.lg, color: SportikaColors.mint),
+
+        const SizedBox(width: SportikaSpacing.sm),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: SportikaType.titleMedium),
+              const SizedBox(height: SportikaSpacing.xs),
+              Text(subtitle, style: SportikaType.caption),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// COMPACT EMPTY STATE
+// ============================================================
+
+class _OrganizerCompactEmpty extends StatelessWidget {
+  const _OrganizerCompactEmpty({
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: SportikaColors.mint, size: SportikaIconSize.lg),
+
+          const SizedBox(height: SportikaSpacing.sm),
+
+          Text(title, style: SportikaType.bodyStrong),
+
+          const SizedBox(height: SportikaSpacing.xs),
+
+          Text(description, style: SportikaType.caption),
+
+          if (action != null) ...[
+            const SizedBox(height: SportikaSpacing.md),
+            action!,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PENDING ENTRY
+// ============================================================
 
 class _PendingEntryCard extends StatelessWidget {
   const _PendingEntryCard({required this.entry});
@@ -175,70 +413,75 @@ class _PendingEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<TournamentsController>();
-    final tournament = state.tournamentById(entry.tournamentId);
+    final tournaments = context.watch<TournamentsController>();
+    final tournament = tournaments.tournamentById(entry.tournamentId);
 
     return SurfaceCard(
-      borderColor: SportikaColors.gold.withValues(alpha: 0.35),
+      borderColor: SportikaColors.gold.withValues(alpha: SportikaOpacity.muted),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              const Icon(
+                Icons.person_add_alt_1_outlined,
+                color: SportikaColors.gold,
+                size: SportikaIconSize.lg,
+              ),
+
+              const SizedBox(width: SportikaSpacing.sm),
+
               Expanded(
                 child: Text(
                   entry.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: SportikaColors.text,
-                  ),
+                  style: SportikaType.bodyStrong,
                 ),
               ),
+
               const StatusPill('Pending', color: SportikaColors.gold),
             ],
           ),
-          const SizedBox(height: 3),
+
+          const SizedBox(height: SportikaSpacing.sm),
+
           Text(
-            '${tournament?.name ?? 'Tournament'} · ${tournament?.entryType.label ?? ''} entry',
-            style: const TextStyle(
-              fontSize: 11,
-              color: SportikaColors.textMuted,
-            ),
+            '${tournament?.name ?? 'Tournament'} · '
+            '${tournament?.entryType.label ?? ''} entry',
+            style: SportikaType.caption,
           ),
-          const SizedBox(height: 9),
+
+          const SizedBox(height: SportikaSpacing.md),
+
           Row(
             children: [
               Expanded(
                 child: PrimaryButton(
                   label: 'Confirm',
-                  icon: Icons.check,
+                  icon: Icons.check_rounded,
                   small: true,
                   tone: SportikaColors.mint,
                   onPressed: () {
-                    final state = context.read<TournamentsController>();
-                    state.decideEntry(entry.id, approve: true);
+                    context.read<TournamentsController>().decideEntry(
+                      entry.id,
+                      approve: true,
+                    );
+
                     showSnack(context, '${entry.label} confirmed');
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+
+              const SizedBox(width: SportikaSpacing.sm),
+
               Expanded(
                 child: GhostButton(
                   label: 'Reject',
+                  icon: Icons.close_rounded,
                   tone: SportikaColors.danger,
                   expand: true,
-                  onPressed: () {
-                    final state = context.read<TournamentsController>();
-                    state.decideEntry(
-                      entry.id,
-                      approve: false,
-                      note: 'Entry did not meet the tournament requirements',
-                    );
-                    showSnack(context, '${entry.label} rejected');
-                  },
+                  onPressed: () => _confirmRejection(context),
                 ),
               ),
             ],
@@ -247,102 +490,84 @@ class _PendingEntryCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _confirmRejection(BuildContext context) async {
+    final reject = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reject entry?'),
+        content: Text('Reject ${entry.label} from this tournament?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reject entry'),
+          ),
+        ],
+      ),
+    );
+
+    if (reject != true || !context.mounted) return;
+
+    context.read<TournamentsController>().decideEntry(
+      entry.id,
+      approve: false,
+      note: 'Entry did not meet the tournament requirements',
+    );
+
+    showSnack(context, '${entry.label} rejected');
+  }
 }
 
-class _OrganizerTournamentCard extends StatelessWidget {
-  const _OrganizerTournamentCard({required this.tournament});
+// ============================================================
+// RESULT REVIEW
+// ============================================================
 
-  final Tournament tournament;
+class _OrganizerReviewCard extends StatelessWidget {
+  const _OrganizerReviewCard({required this.fixture});
+
+  final Fixture fixture;
 
   @override
   Widget build(BuildContext context) {
-    final state = context.watch<TournamentsController>();
-    context.watch<TournamentsController>();
-    final pending = state.pendingEntriesFor(tournament.id).length;
-    final fixtures = context.read<FixturesController>().fixturesFor(
-      tournament.id,
-    );
-    final review = context
-        .read<FixturesController>()
-        .fixturesAwaitingReview
-        .where((f) => f.tournamentId == tournament.id)
-        .length;
-    final confirmed = state.confirmedCountFor(tournament);
-
     return Column(
       children: [
-        TournamentCard(
-          tournament: tournament,
-          trailing: pending > 0
-              ? StatusPill('$pending pending', color: SportikaColors.gold)
-              : null,
-        ),
-        const SizedBox(height: 6),
+        officialFixtureTile(context, fixture),
+
+        const SizedBox(height: SportikaSpacing.sm),
+
         Row(
           children: [
             Expanded(
-              child: GhostButton(
-                label: 'Entries ($confirmed)',
-                icon: Icons.people_outline,
-                expand: true,
-                onPressed: () => pushRoute(
-                  context,
-                  AppRoute.tournamentDetail,
-                  args: TournamentDetailArgs(tournament.id),
-                ),
+              child: PrimaryButton(
+                label: 'Review & publish',
+                icon: Icons.verified_outlined,
+                small: true,
+                tone: SportikaColors.mint,
+                onPressed: () => publishFixture(context, fixture),
               ),
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: GhostButton(
-                label: review > 0 ? 'Review ($review)' : 'Results',
-                icon: Icons.fact_check_outlined,
-                expand: true,
-                tone: review > 0
-                    ? SportikaColors.mint
-                    : SportikaColors.textBody,
-                onPressed: () => pushRoute(
-                  context,
-                  AppRoute.resultsReview,
-                  args: ResultsReviewArgs(tournamentId: tournament.id),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: GhostButton(
-                label: fixtures.isEmpty ? 'Publish draw' : 'Manage',
-                icon: Icons.account_tree_outlined,
-                expand: true,
-                onPressed: () async {
-                  if (fixtures.isEmpty) {
-                    final state = context.read<TournamentsController>();
-                    final count = await state.generateDraw(tournament.id);
-                    if (!context.mounted) return;
-                    showSnack(
-                      context,
-                      count == 0
-                          ? 'Confirm at least two entries first'
-                          : 'Draw published · $count fixtures created',
-                      error: count == 0,
-                    );
-                  } else {
-                    pushRoute(
-                      context,
-                      AppRoute.tournamentDetail,
-                      args: TournamentDetailArgs(tournament.id),
-                    );
-                  }
-                },
-              ),
+
+            const SizedBox(width: SportikaSpacing.sm),
+
+            GhostButton(
+              label: 'Walkover',
+              icon: Icons.flag_outlined,
+              onPressed: () => recordWalkoverFor(context, fixture),
             ),
           ],
         ),
-        const SizedBox(height: 4),
       ],
     );
   }
 }
+
+// ============================================================
+// DISPUTED RESULT
+// ============================================================
 
 class _OrganizerDisputeCard extends StatelessWidget {
   const _OrganizerDisputeCard({required this.fixture});
@@ -351,61 +576,64 @@ class _OrganizerDisputeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<TournamentsController>();
-    final tournament = context.read<FixturesController>().tournamentOf(fixture);
-    final sides = context.read<FixturesController>().sideLabelsOf(fixture);
+    final fixtures = context.watch<FixturesController>();
+    final tournament = fixtures.tournamentOf(fixture);
+    final sides = fixtures.sideLabelsOf(fixture);
+
+    final reporter = context.watch<SessionController>().accountById(
+      fixture.disputeRaisedBy,
+    );
 
     return SurfaceCard(
-      borderColor: SportikaColors.danger.withValues(alpha: 0.35),
+      borderColor: SportikaColors.danger.withValues(
+        alpha: SportikaOpacity.muted,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.gavel, size: 15, color: SportikaColors.danger),
-              const SizedBox(width: 7),
+              const Icon(
+                Icons.gavel_outlined,
+                color: SportikaColors.danger,
+                size: SportikaIconSize.lg,
+              ),
+
+              const SizedBox(width: SportikaSpacing.sm),
+
               Expanded(
                 child: Text(
-                  '${tournament?.name ?? 'Tournament'} · ${fixture.stage}',
+                  '${tournament?.name ?? 'Tournament'} · '
+                  '${fixture.stage}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: SportikaColors.text,
-                  ),
+                  style: SportikaType.bodyStrong,
                 ),
               ),
-              const StatusPill('Open', color: SportikaColors.danger),
+
+              const StatusPill('Disputed', color: SportikaColors.danger),
             ],
           ),
-          const SizedBox(height: 6),
+
+          const SizedBox(height: SportikaSpacing.md),
+
+          Text('${sides[0]} vs ${sides[1]}', style: SportikaType.bodyStrong),
+
+          if ((fixture.disputeNote ?? '').isNotEmpty) ...[
+            const SizedBox(height: SportikaSpacing.sm),
+            Text(fixture.disputeNote!, style: SportikaType.caption),
+          ],
+
+          const SizedBox(height: SportikaSpacing.sm),
+
           Text(
-            '${sides[0]} vs ${sides[1]}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: SportikaColors.textBody,
-            ),
+            'Raised by ${reporter?.displayName ?? 'player'}'
+            '${fixture.result == null ? '' : ' · Published: ${fixture.result!.headline}'}',
+            style: SportikaType.caption,
           ),
-          const SizedBox(height: 4),
-          Text(
-            fixture.disputeNote ?? '',
-            style: const TextStyle(
-              fontSize: 11.5,
-              height: 1.4,
-              color: SportikaColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Raised by ${context.read<SessionController>().accountById(fixture.disputeRaisedBy)?.displayName ?? 'player'}'
-            '${fixture.result == null ? '' : ' · published: ${fixture.result!.headline}'}',
-            style: const TextStyle(
-              fontSize: 10.5,
-              color: SportikaColors.textDim,
-            ),
-          ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: SportikaSpacing.md),
+
           Row(
             children: [
               Expanded(
@@ -420,10 +648,13 @@ class _OrganizerDisputeCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+
+              const SizedBox(width: SportikaSpacing.sm),
+
               Expanded(
                 child: PrimaryButton(
                   label: 'Resolve',
+                  icon: Icons.gavel_outlined,
                   small: true,
                   tone: SportikaColors.danger,
                   onPressed: () => resolveDisputeFor(context, fixture),
@@ -437,67 +668,195 @@ class _OrganizerDisputeCard extends StatelessWidget {
   }
 }
 
-/// Whether this organizer's events carry the premium toolkit, and the one tap
-/// that changes it.
-///
-/// The card is worded so the free layer stays named as free, and it never
-/// describes the member as a kind of account: one universal account buys tools
-/// or does not, and loses nothing it already had either way.
-class PremiumStatusCard extends StatelessWidget {
-  const PremiumStatusCard({super.key, required this.billing});
+// ============================================================
+// TOURNAMENT MANAGEMENT CARD
+// ============================================================
 
-  final MonetizationController billing;
+class _OrganizerTournamentCard extends StatelessWidget {
+  const _OrganizerTournamentCard({required this.tournament});
+
+  final Tournament tournament;
 
   @override
   Widget build(BuildContext context) {
-    final pro = billing.isPro;
-    final periodEnd = billing.proSubscription?.currentPeriodEnd;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: SurfaceCard(
-        borderColor: pro
-            ? SportikaColors.gold.withValues(alpha: 0.42)
-            : SportikaColors.borderSubtle,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    pro ? 'Organizer Pro is active' : 'Free tournament tools',
-                    style: SportikaType.bodyStrong,
-                  ),
-                ),
-                if (pro) const PremiumBadge(compact: true),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              pro
-                  ? 'Premium entry ceilings, group draw controls and rule '
-                        'presets are on for every event you organise'
-                        '${periodEnd == null ? '.' : ' until ${billingDate(periodEnd)}.'}'
-                  : 'Creating matches, scoring officially and publishing '
-                        'results stay free. Pro raises the entry ceiling to '
-                        '${billing.premiumEntryCap} and unlocks the draw '
-                        'controls on your events.',
-              style: SportikaType.caption,
-            ),
-            const SizedBox(height: 12),
-            GhostButton(
-              label: pro ? 'Manage plan' : 'Go premium',
-              icon: pro ? Icons.tune : Icons.workspace_premium_outlined,
-              tone: pro ? SportikaColors.textBody : SportikaColors.gold,
-              expand: true,
-              onPressed: () => pushRoute(
-                context,
-                pro ? AppRoute.subscription : AppRoute.pricing,
-              ),
-            ),
-          ],
+    final tournaments = context.watch<TournamentsController>();
+    final fixtureController = context.watch<FixturesController>();
+
+    final pending = tournaments.pendingEntriesFor(tournament.id).length;
+
+    final fixtures = fixtureController.fixturesFor(tournament.id);
+
+    final review = fixtureController.fixturesAwaitingReview
+        .where((fixture) => fixture.tournamentId == tournament.id)
+        .length;
+
+    final confirmed = tournaments.confirmedCountFor(tournament);
+
+    return Column(
+      children: [
+        TournamentCard(
+          tournament: tournament,
+          trailing: pending > 0
+              ? StatusPill('$pending pending', color: SportikaColors.gold)
+              : null,
         ),
+
+        const SizedBox(height: SportikaSpacing.sm),
+
+        SurfaceCard(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _TournamentMetricLabel(
+                      icon: Icons.people_outline,
+                      value: '$confirmed',
+                      label: 'Entries',
+                    ),
+                  ),
+                  Expanded(
+                    child: _TournamentMetricLabel(
+                      icon: Icons.fact_check_outlined,
+                      value: '$review',
+                      label: 'Review',
+                    ),
+                  ),
+                  Expanded(
+                    child: _TournamentMetricLabel(
+                      icon: Icons.account_tree_outlined,
+                      value: '${fixtures.length}',
+                      label: 'Fixtures',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              PrimaryButton(
+                label: 'Manage tournament',
+                icon: Icons.arrow_forward_rounded,
+                onPressed: () => pushRoute(
+                  context,
+                  AppRoute.tournamentDetail,
+                  args: TournamentDetailArgs(tournament.id),
+                ),
+              ),
+
+              const SizedBox(height: SportikaSpacing.sm),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: GhostButton(
+                      label: review > 0 ? 'Review ($review)' : 'Results',
+                      icon: Icons.fact_check_outlined,
+                      expand: true,
+                      tone: review > 0
+                          ? SportikaColors.mint
+                          : SportikaColors.textBody,
+                      onPressed: () => pushRoute(
+                        context,
+                        AppRoute.resultsReview,
+                        args: ResultsReviewArgs(tournamentId: tournament.id),
+                      ),
+                    ),
+                  ),
+
+                  if (fixtures.isEmpty) ...[
+                    const SizedBox(width: SportikaSpacing.sm),
+                    Expanded(
+                      child: GhostButton(
+                        label: 'Publish draw',
+                        icon: Icons.account_tree_outlined,
+                        expand: true,
+                        onPressed: () => _confirmDraw(context),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDraw(BuildContext context) async {
+    final confirmed = context.read<TournamentsController>().confirmedCountFor(
+      tournament,
+    );
+
+    if (confirmed < 2) {
+      showSnack(context, 'Confirm at least two entries first', error: true);
+      return;
+    }
+
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Publish tournament draw?'),
+        content: Text(
+          'Generate fixtures for $confirmed confirmed entries? '
+          'Review the tournament setup before continuing.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Generate draw'),
+          ),
+        ],
       ),
+    );
+
+    if (approved != true || !context.mounted) return;
+
+    final count = await context.read<TournamentsController>().generateDraw(
+      tournament.id,
+    );
+
+    if (!context.mounted) return;
+
+    showSnack(
+      context,
+      count == 0
+          ? 'Unable to generate draw'
+          : 'Draw published · $count fixtures created',
+      error: count == 0,
+    );
+  }
+}
+
+// ============================================================
+// TOURNAMENT METRIC
+// ============================================================
+
+class _TournamentMetricLabel extends StatelessWidget {
+  const _TournamentMetricLabel({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: SportikaColors.textMuted, size: SportikaIconSize.sm),
+        const SizedBox(height: SportikaSpacing.xs),
+        Text(value, style: SportikaType.bodyStrong),
+        Text(label, style: SportikaType.caption),
+      ],
     );
   }
 }

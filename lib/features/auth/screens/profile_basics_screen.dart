@@ -7,6 +7,7 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/features/profile/widgets/profile_identity_fields.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 
 /// 10 · Basic profile information. The first setup step; identity only, no
@@ -107,7 +108,12 @@ class _ProfileBasicsScreenState extends State<ProfileBasicsScreen> {
         const SizedBox(height: 22),
         Row(
           children: [
-            AuthAvatar(initials: initials, avatarId: flow.avatar, size: 62),
+            AuthAvatar(
+              initials: initials,
+              avatarId: flow.avatar,
+              figure: defaultAvatarFigureFor(flow.gender),
+              size: 62,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

@@ -5,7 +5,6 @@ import 'package:sportika/features/auth/services/authentication_service.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';

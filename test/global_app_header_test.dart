@@ -8,6 +8,14 @@ import 'package:sportika/features/live/screens/notifications_screen.dart';
 
 import 'helpers/harness.dart';
 
+/// Both header variants name their bell action "Notifications", but the Home
+/// variant appends the unread count, so the probe matches on the prefix.
+Finder notificationsAction() => find.byWidgetPredicate(
+  (widget) =>
+      widget is Tooltip &&
+      (widget.message?.startsWith('Notifications') ?? false),
+);
+
 void main() {
   testWidgets('long label respects safe area and large accessibility text', (
     tester,
@@ -47,7 +55,7 @@ void main() {
       greaterThanOrEqualTo(32),
     );
     expect(find.byTooltip('Account menu'), findsOneWidget);
-    expect(find.byTooltip('Notifications'), findsOneWidget);
+    expect(notificationsAction(), findsOneWidget);
   });
   for (final width in [320.0, 400.0]) {
     testWidgets('all five tabs share header geometry at width $width', (
@@ -70,10 +78,13 @@ void main() {
         expect(tester.getRect(header), bounds);
         expect(
           tester.widget<GlobalAppHeader>(header).section,
-          ['Home', 'Tournament', 'Match', 'Team', 'Me'][i],
+          ['Home', 'Tournaments', 'Matches', 'Team', 'Me'][i],
         );
         expect(find.byTooltip('Account menu'), findsOneWidget);
-        expect(find.byType(NotificationBell), findsOneWidget);
+        // The Home tab swaps NotificationBell for its own action pair and
+        // folds the unread count into its label, so the shared probe is the
+        // tooltip prefix both variants expose.
+        expect(notificationsAction(), findsOneWidget);
         final avatar = tester.widget<AccountAvatar>(
           find.descendant(of: header, matching: find.byType(AccountAvatar)),
         );

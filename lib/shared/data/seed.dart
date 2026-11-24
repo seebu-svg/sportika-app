@@ -1318,9 +1318,15 @@ List<SportMatch> matchSeed(List<Account> accounts, {DateTime? now}) {
     ),
     'discipline': 'singles',
   };
-  final badmintonLog = _matchLog(
-    _badmintonMatch(seed: 7, winner: 0),
-    by: organizer,
+  final badmintonRaw = _badmintonMatch(seed: 7, winner: 0);
+  final badmintonLog = _matchLog(badmintonRaw, by: organizer);
+  // The published result is the fold of the same rally log the match carries,
+  // so the seeded result and the seeded events can never disagree.
+  final badmintonFold = SportEngines.progressOf(
+    sport: Sport.badminton,
+    sides: [name(0), name(2)],
+    rules: badmintonRules,
+    rawEvents: badmintonRaw,
   );
 
   final padelRules = {
@@ -1461,11 +1467,14 @@ List<SportMatch> matchSeed(List<Account> accounts, {DateTime? now}) {
     ],
     events: badmintonLog,
     result: OfficialResult(
-      sideScores: const ['2', '0'],
-      sideValues: const [2, 0],
-      winnerIndex: 0,
-      headline: '${name(0)} won 2-0',
-      detail: 'Straight games, 21-14 and 21-17',
+      sideScores: badmintonFold.scoreDisplay,
+      sideValues: badmintonFold.scoreValues,
+      winnerIndex: badmintonFold.winnerIndex,
+      headline:
+          '${badmintonFold.sides[badmintonFold.winnerIndex]} won '
+          '${badmintonFold.scoreValues[badmintonFold.winnerIndex]}-'
+          '${badmintonFold.scoreValues[1 - badmintonFold.winnerIndex]}',
+      detail: badmintonFold.detailRows.join(' · '),
       publishedAt: base.subtract(const Duration(days: 3, minutes: 20)),
       publishedById: organizer,
     ),

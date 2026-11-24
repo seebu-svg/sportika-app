@@ -51,9 +51,7 @@ class LocalSportikaRepository extends ChangeNotifier
   /// whole point of an internal preview.
   final bool seedOnFirstRun;
 
-  /// The device document handle. Exposed so adapters that own a separate
-  /// document (the demo billing ledger) write through the same storage instead
-  /// of opening a second one.
+  /// The device document handle.
   LocalStorage get storage => _storage;
 
   bool ready = false;
@@ -493,7 +491,41 @@ class LocalSportikaRepository extends ChangeNotifier
       ..avatar = before.avatar
       ..photoPath = before.photoPath
       ..photoUrl = before.photoUrl
-      ..setupComplete = before.setupComplete;
+      ..setupComplete = before.setupComplete
+      ..heightCm = before.heightCm
+      ..weightKg = before.weightKg
+      ..dominantHand = before.dominantHand
+      ..dominantFoot = before.dominantFoot
+      ..preferredJersey = before.preferredJersey;
+  }
+
+  /// Writes the optional athlete attributes. A null clears that one field rather
+  /// than being ignored, so the member can retract a single value. Mirrors the
+  /// server's `update_profile_athlete_details`: subject is the signed-in account.
+  Future<void> applyProfileAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required String? dominantHand,
+    required String? dominantFoot,
+    required int? preferredJersey,
+  }) async {
+    final a = currentAccount;
+    if (a == null) throw StateError('Sign in before saving your profile.');
+    final before = Account.fromJson(a.toJson());
+    a
+      ..heightCm = heightCm
+      ..weightKg = weightKg
+      ..dominantHand = dominantHand
+      ..dominantFoot = dominantFoot
+      ..preferredJersey = preferredJersey;
+    try {
+      await _persist();
+      notifyListeners();
+    } catch (_) {
+      _restoreAccount(a, before);
+      notifyListeners();
+      rethrow;
+    }
   }
 
   /// Moves the signed-in account's picture reference. The bytes belong to the
@@ -1353,9 +1385,9 @@ class LocalSportikaRepository extends ChangeNotifier
         : TournamentEngine.groupDraw(
             tournament: t,
             confirmed: confirmed,
-            // A premium organizer picks the group count in the setup form; every
-            // tournament made before that key existed, and every free one, keeps
-            // the two-group draw the engine has always used.
+            // The organizer picks the group count in the setup form; every
+            // tournament made before that key existed keeps the two-group draw
+            // the engine has always used.
             groupCount: (t.rules['groupCount'] as num?)?.toInt() ?? 2,
             scorerPool: scorerPool,
           );
@@ -2397,6 +2429,181 @@ class LocalSportikaRepository extends ChangeNotifier
     if (!saved) throw StateError('This device would not save the change.');
   }
 
+  Future<void> joinMatch(String matchId, {int side = 0}) async {
+    final me = _requireMatchActor();
+    final m = _requireMatch(matchId);
+    if (m.visibility != MatchVisibility.public) {
+      throw StateError('This match is invite-only, so it cannot be joined.');
+    }
+    if (m.status != FixtureStatus.upcoming || m.startedAt != null) {
+      throw StateError('That match can no longer be joined.');
+    }
+    if (side != 0 && side != 1) throw StateError('Pick which side to join.');
+
+    final existing = m.participantOf(me);
+    final previous = existing == null
+        ? null
+        : (existing.side, existing.status, existing.joinedAt);
+    // Joining twice is not an error: an accepted player is already in, and an
+    // outstanding invitation is simply answered yes.
+    if (existing != null &&
+        existing.status == MatchParticipantStatus.accepted) {
+      return;
+    }
+    if (existing == null &&
+        m.participantsOnSide(side).length >= m.sideCapacity) {
+      throw StateError(
+        'That side is full. Join the other side or wait for a place.',
+      );
+    }
+
+    if (existing == null) {
+      m.participants.add(
+        MatchParticipant(
+          profileId: me,
+          displayName: currentAccount?.displayName ?? 'Player',
+          side: side,
+          status: MatchParticipantStatus.accepted,
+          invitedById: me,
+          joinedAt: DateTime.now(),
+        ),
+      );
+    } else {
+      existing
+        ..side = side
+        ..status = MatchParticipantStatus.accepted
+        ..joinedAt ??= DateTime.now();
+    }
+    _notify(
+      [m.organizerId],
+      kind: NotificationKind.fixtureChange,
+      title: 'Player joined',
+      body: '${currentAccount?.displayName ?? 'A player'} joined ${m.title}.',
+      route: 'match',
+    );
+    notifyListeners();
+    final saved = await _settle(() {
+      if (previous == null) {
+        m.participants.removeWhere((p) => p.profileId == me);
+      } else {
+        existing!
+          ..side = previous.$1
+          ..status = previous.$2
+          ..joinedAt = previous.$3;
+      }
+    });
+    if (!saved) throw StateError('This device would not save the change.');
+  }
+
+  Future<void> leaveMatch(String matchId) async {
+    final me = _requireMatchActor();
+    final m = _requireMatch(matchId);
+    if (m.status != FixtureStatus.upcoming || m.startedAt != null) {
+      throw StateError('A match can only be left before it starts.');
+    }
+    if (m.organizerId == me) {
+      throw StateError('The organizer cannot leave their own match.');
+    }
+    final p = m.participantOf(me);
+    if (p == null ||
+        (p.status != MatchParticipantStatus.invited &&
+            p.status != MatchParticipantStatus.accepted)) {
+      throw StateError('You are not on this match.');
+    }
+    final previous = p.status;
+    p.status = MatchParticipantStatus.removed;
+    notifyListeners();
+    final saved = await _settle(() => p.status = previous);
+    if (!saved) throw StateError('This device would not save the change.');
+  }
+
+  Future<int> addSquadToMatch(
+    String matchId,
+    String squadId, {
+    int side = 0,
+  }) async {
+    final me = _requireMatchActor();
+    final m = _requireMatch(matchId);
+    if (m.organizerId != me && m.scorerId != me) {
+      throw StateError(
+        'Only the organizer or the assigned official scorer can add a squad.',
+      );
+    }
+    if (m.status != FixtureStatus.upcoming || m.startedAt != null) {
+      throw StateError('A squad can only be added before the match starts.');
+    }
+    if (side != 0 && side != 1) throw StateError('Pick which side to add.');
+
+    final squad = squadById(squadId);
+    if (squad == null) throw StateError('That squad could not be found.');
+    if (squad.ownerId != me && !squad.memberAccountIds.contains(me)) {
+      throw StateError('You can only add a squad you belong to.');
+    }
+
+    final cap = m.sideCapacity;
+    final invited = <MatchParticipant>[];
+    // A player who was removed or declined is re-invited on the same row rather
+    // than duplicated, and the undo puts their old answer back.
+    final restored = <(MatchParticipant, int, MatchParticipantStatus)>[];
+    for (final id in squad.memberAccountIds) {
+      if (m.participantsOnSide(side).length + invited.length >= cap) break;
+      final existing = m.participantOf(id);
+      if (existing == null) {
+        invited.add(
+          MatchParticipant(
+            profileId: id,
+            displayName: accountById(id)?.displayName ?? 'Player',
+            side: side,
+            status: MatchParticipantStatus.invited,
+            invitedById: me,
+          ),
+        );
+        continue;
+      }
+      if (existing.status != MatchParticipantStatus.removed &&
+          existing.status != MatchParticipantStatus.declined) {
+        continue;
+      }
+      restored.add((existing, existing.side, existing.status));
+      existing
+        ..side = side
+        ..status = MatchParticipantStatus.invited;
+      invited.add(existing);
+    }
+    if (invited.isEmpty) {
+      throw StateError(
+        'Everybody on that squad is already on this match, or the side is full.',
+      );
+    }
+    final fresh = invited
+        .where((p) => !restored.any((r) => r.$1.profileId == p.profileId))
+        .toList();
+    m.participants.addAll(fresh);
+    for (final p in invited) {
+      _notify(
+        [p.profileId],
+        kind: NotificationKind.fixtureChange,
+        title: 'Match invitation',
+        body:
+            '${currentAccount?.displayName ?? 'An organizer'} invited you to '
+            '${m.title}.',
+        route: 'match',
+      );
+    }
+    notifyListeners();
+    final saved = await _settle(() {
+      final ids = {for (final p in fresh) p.profileId};
+      m.participants.removeWhere((p) => ids.contains(p.profileId));
+      for (final r in restored) {
+        r.$1
+          ..side = r.$2
+          ..status = r.$3;
+      }
+    });
+    if (!saved) throw StateError('This device would not save the invitations.');
+    return invited.length;
+  }
+
   Future<void> assignMatchScorer(String matchId, String scorerId) async {
     final me = _requireMatchActor();
     final m = _requireMatch(matchId);
@@ -2612,6 +2819,22 @@ class LocalSportikaRepository extends ChangeNotifier
     }
   }
 
+  /// Mirrors `complete_padel_match` for the device store: a padel result is
+  /// re-derived from the recorded points and never taken from the payload, so
+  /// demo mode keeps the authority the server has. Returns null for the sports
+  /// whose result the app folds for itself, and refuses a match the log has not
+  /// finished, which is the same `match_not_complete` the RPC raises.
+  MatchProgress? _padelAuthority(SportMatch m) {
+    if (m.sport != Sport.padel) return null;
+    final p = progressOf(m);
+    if (!p.isComplete) {
+      throw StateError(
+        'The match is not finished yet. Keep scoring, or record a walkover.',
+      );
+    }
+    return p;
+  }
+
   Future<void> submitResult(
     String matchId, {
     required String headline,
@@ -2626,15 +2849,30 @@ class LocalSportikaRepository extends ChangeNotifier
       throw StateError('Only the organizer or the official scorer can submit.');
     }
     if (m.status != FixtureStatus.live) {
+      // The retry rule the Supabase path applies to a double tap or to a
+      // completion whose answer never arrived: what the scorer asked for is
+      // already on the record, so the second request is not reported as a
+      // failure.
+      if (m.result != null &&
+          (m.status == FixtureStatus.submitted ||
+              m.status == FixtureStatus.published)) {
+        return;
+      }
       throw StateError('Only a live match can be submitted for review.');
     }
-    _validateResultPayload(sideScores, sideValues, winnerIndex);
+
+    // Padel ignores all three score arguments; everything else is as folded.
+    final official = _padelAuthority(m);
+    final scores = official?.scoreDisplay ?? sideScores;
+    final values = official?.scoreValues ?? sideValues;
+    final winner = official?.winnerIndex ?? winnerIndex;
+    _validateResultPayload(scores, values, winner);
 
     final previous = (m.result, m.status, m.submittedAt);
     m.result = OfficialResult(
-      sideScores: List<String>.from(sideScores),
-      sideValues: List<int>.from(sideValues),
-      winnerIndex: winnerIndex,
+      sideScores: List<String>.from(scores),
+      sideValues: List<int>.from(values),
+      winnerIndex: winner,
       headline: headline.trim(),
       detail: detail.trim(),
       publishedAt: DateTime.now(),
@@ -2799,6 +3037,67 @@ class LocalSportikaRepository extends ChangeNotifier
       m.completedAt = null;
     });
     if (!saved) throw StateError('This device would not save the walkover.');
+  }
+
+  /// Mirrors `retire_match` (0024): a badminton match that will not finish is
+  /// decided by its scorer or organizer, with a reason and a winner, and the
+  /// partial score is read from the rally log rather than typed in.
+  Future<void> retireMatch(
+    String matchId, {
+    required int winnerIndex,
+    required String reason,
+  }) async {
+    final me = _requireMatchActor();
+    final m = _requireMatch(matchId);
+    if (m.sport != Sport.badminton) {
+      throw StateError('Only a badminton match can be retired.');
+    }
+    if (m.organizerId != me && !m.canScore(me)) {
+      throw StateError(
+        'Only the organizer or the official scorer can retire this match.',
+      );
+    }
+    if (m.status != FixtureStatus.live) {
+      throw StateError('Only a live match can be retired.');
+    }
+    if (winnerIndex != 0 && winnerIndex != 1) {
+      throw StateError('Pick which side takes the result.');
+    }
+    final trimmed = reason.trim();
+    if (trimmed.length < 3 || trimmed.length > 200) {
+      throw StateError(
+        'Say why the match is being retired in 3 to 200 characters.',
+      );
+    }
+
+    final progress = progressOf(m);
+    final scores = progress.scoreDisplay;
+    final partial = scores[0] == '-'
+        ? 'no game completed'
+        : '${scores[0]} / ${scores[1]}';
+
+    final previousStatus = m.status;
+    final previousResult = m.result;
+    final previousCompletedAt = m.completedAt;
+    m.result = OfficialResult(
+      sideScores: scores,
+      sideValues: progress.scoreValues,
+      winnerIndex: winnerIndex,
+      headline: '${m.sideNames[winnerIndex]} won by retirement',
+      detail: 'Retired at $partial · $trimmed',
+      publishedAt: DateTime.now(),
+      publishedById: me,
+      walkover: true,
+    );
+    m.status = FixtureStatus.walkover;
+    m.completedAt = DateTime.now();
+    notifyListeners();
+    final saved = await _settle(() {
+      m.status = previousStatus;
+      m.result = previousResult;
+      m.completedAt = previousCompletedAt;
+    });
+    if (!saved) throw StateError('This device would not save the retirement.');
   }
 
   /// Mirrors `raise_match_dispute` (0014): a result has to exist, the caller has

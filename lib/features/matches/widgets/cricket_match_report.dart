@@ -8,7 +8,6 @@ import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 export 'package:sportika/features/matches/widgets/cricket_report_projection.dart';
@@ -72,16 +71,38 @@ class _CricketMatchReportState extends State<CricketMatchReport> {
     return side == 1 ? 1 : 0;
   }
 
-  /// Innings order follows the first delivery in the log, not the side index.
+  /// Innings order follows the toss when it was recorded, then the first entry
+  /// that opened an innings, then the side index. A second innings that has not
+  /// faced a ball yet therefore still reads as the 2nd innings.
   List<int> get _inningsOrder {
-    final deliveries =
+    final toss = widget.progress.state['toss'];
+    if (toss is Map) {
+      final bat = (toss['batSide'] as num?)?.toInt();
+      if (bat == 0 || bat == 1) return [bat!, 1 - bat];
+    }
+    final openings =
         widget.match.events
-            .where((e) => !e.voided && e.kind == CricketEngine.kBall)
+            .where(
+              (e) =>
+                  !e.voided &&
+                  (e.kind == CricketEngine.kBall ||
+                      e.kind == CricketEngine.kInningsStart),
+            )
             .toList()
           ..sort((a, b) => a.seq.compareTo(b.seq));
-    if (deliveries.isEmpty) return const [0, 1];
-    final first = deliveries.first.side == 1 ? 1 : 0;
+    if (openings.isEmpty) return const [0, 1];
+    final first = openings.first.side == 1 ? 1 : 0;
     return [first, 1 - first];
+  }
+
+  /// 'Alpha won the toss and elected to bat', read from the recorded toss.
+  String? get _tossLine {
+    final toss = widget.progress.state['toss'];
+    if (toss is! Map) return null;
+    final winner = (toss['winner'] as num?)?.toInt() ?? -1;
+    if (winner < 0) return null;
+    final decision = toss['decision'] == 'bowl' ? 'bowl' : 'bat';
+    return '${_sideName(winner)} won the toss and elected to $decision';
   }
 
   String _sideName(int side) =>
@@ -175,6 +196,7 @@ class _CricketMatchReportState extends State<CricketMatchReport> {
             result: _resultText,
             official: widget.match.result != null,
             corrected: widget.match.corrections.isNotEmpty,
+            toss: _tossLine,
           ),
           const SizedBox(height: SportikaSpacing.md),
           _InningsSelector(
@@ -206,6 +228,14 @@ class _CricketMatchReportState extends State<CricketMatchReport> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  CricketInningsSummaryPanel(
+                    report: report,
+                    didNotBat: CricketInningsReport.didNotBat(
+                      widget.match,
+                      side,
+                    ),
+                  ),
+                  const CricketHairline(),
                   CricketBattingPanel(report: report),
                   const CricketHairline(),
                   CricketBowlingPanel(report: report),
@@ -235,6 +265,7 @@ class _ScoreHeader extends StatelessWidget {
     required this.result,
     required this.official,
     required this.corrected,
+    this.toss,
   });
 
   final SportMatch match;
@@ -242,6 +273,9 @@ class _ScoreHeader extends StatelessWidget {
   final String? result;
   final bool official;
   final bool corrected;
+
+  /// The toss, when one was recorded. Never invented: an old log has none.
+  final String? toss;
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +314,15 @@ class _ScoreHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SportikaSpacing.sm),
+          if (toss != null) ...[
+            Text(
+              toss!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: CricketReportType.meta,
+            ),
+            const SizedBox(height: 4),
+          ],
           for (final row in rows) _ScoreLine(data: row, dimUnbatting: batting),
           if (result != null) ...[
             const Padding(
@@ -343,7 +386,9 @@ class _ScoreLine extends StatelessWidget {
               height: 22,
               margin: const EdgeInsets.only(top: 3),
               decoration: BoxDecoration(
-                color: data.batting ? SportikaColors.mint : Colors.transparent,
+                color: data.batting
+                    ? SportikaColors.mint
+                    : SportikaColors.transparent,
                 borderRadius: BorderRadius.circular(SportikaRadius.pill),
               ),
             ),
@@ -496,7 +541,9 @@ class _InningsSegment extends StatelessWidget {
       selected: selected,
       label: '${option.label}, ${option.side}, ${option.score}',
       child: Material(
-        color: selected ? SportikaColors.surfaceAlt : Colors.transparent,
+        color: selected
+            ? SportikaColors.surfaceAlt
+            : SportikaColors.transparent,
         borderRadius: BorderRadius.circular(SportikaRadius.sm),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -635,7 +682,7 @@ class _NavTab extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected
                     ? SportikaColors.blueBright
-                    : Colors.transparent,
+                    : SportikaColors.transparent,
                 borderRadius: BorderRadius.circular(SportikaRadius.pill),
               ),
             ),

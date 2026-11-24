@@ -1,3 +1,4 @@
+import 'package:sportika/features/matches/scoring/cricket_roster.dart';
 import 'package:sportika/features/personal_games/scoring/cricket/cricket.dart';
 import 'package:sportika/shared/models/match.dart';
 
@@ -41,6 +42,32 @@ class CricketInningsReport {
   };
 
   int get legalBalls => balls.where(legal).length;
+
+  /// The innings total as recorded, extras included.
+  int get totalRuns => balls.fold<int>(0, (n, e) => n + total(e));
+
+  int get wicketCount => balls.where((e) => e.data['wicket'] == true).length;
+
+  String get oversLabel => _oversLabel(legalBalls);
+
+  String get scoreLabel => '$totalRuns/$wicketCount';
+
+  String get runRate => legalBalls == 0
+      ? '\u2014'
+      : (totalRuns * 6 / legalBalls).toStringAsFixed(2);
+
+  /// The named XI members who never came out to bat, in batting order.
+  ///
+  /// Empty when no XI was recorded: an ad-hoc game has no bench to report.
+  static List<String> didNotBat(SportMatch match, int side) {
+    final recorded = <String>{
+      for (final e in deliveries(match, side))
+        for (final field in const ['striker', 'nonStriker', 'dismissedBatter'])
+          if ((e.data[field] as String?)?.trim().isNotEmpty == true)
+            (e.data[field] as String).trim(),
+    };
+    return CricketRoster.didNotBat(match, side, recorded);
+  }
 
   int extra(String type) => balls
       .where((e) => e.data['extra'] == type)

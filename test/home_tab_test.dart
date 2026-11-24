@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sportika/app/providers.dart';
 import 'package:sportika/features/home/screens/home_tab.dart';
+import 'package:sportika/features/home/widgets/home_header.dart';
 import 'package:sportika/shared/data/local_storage.dart';
 import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/models/enums.dart';
 
 void main() {
@@ -42,7 +42,7 @@ void main() {
           200,
           scrollable: find.byType(Scrollable).first,
         );
-        expect(find.text('Matches for you'), findsOneWidget);
+        expect(find.text('Discover matches'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('home-sports-filter')),
           findsOneWidget,
@@ -62,13 +62,15 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Padel').first);
         await tester.pumpAndSettle();
-        // Return to the top so the full-bleed hero is back in the tree;
-        // its photograph must follow the selected sport.
+        // Return to the top so the full-bleed hero is back in the tree. The
+        // hero photographs the athlete's own primary sport, while the filter
+        // drives the discovery list underneath it.
         position.jumpTo(0);
         await tester.pumpAndSettle();
+        final me = state.currentAccount!;
         expect(
-          tester.widget<SportPhoto>(find.byType(SportPhoto).first).sport,
-          Sport.padel,
+          tester.widget<HomeGreeting>(find.byType(HomeGreeting)).sport,
+          me.sports.isEmpty ? Sport.cricket : me.sports.first,
         );
         for (
           double offset = 0;

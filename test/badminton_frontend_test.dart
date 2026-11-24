@@ -70,8 +70,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await pump(tester, fold([0]));
-      expect(find.text('Serving · left court'), findsOneWidget);
-      expect(find.text('Rally won by'), findsNothing);
+      expect(find.text('left court'), findsOneWidget);
+      expect(find.text('RALLY WON BY'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -80,14 +80,14 @@ void main() {
       for (var i = 0; i < 20; i++) ...[0, 1],
     ];
     await pump(tester, fold(deuce), scorer: true);
-    expect(find.text('DEUCE · WIN BY 2'), findsOneWidget);
+    expect(find.text('Deuce · win by 2'), findsOneWidget);
     await pump(
       tester,
       fold([
         for (var i = 0; i < 29; i++) ...[0, 1],
       ]),
     );
-    expect(find.text('GOLDEN POINT · NEXT RALLY WINS'), findsOneWidget);
+    expect(find.text('Golden point · next rally wins'), findsOneWidget);
   });
   testWidgets(
     'completed matches show only finished games and no scoring controls',
@@ -95,8 +95,8 @@ void main() {
       await pump(tester, fold(List.filled(42, 0)), scorer: true);
       expect(find.text('Match complete'), findsOneWidget);
       expect(find.text('In progress'), findsNothing);
-      expect(find.text('Rally won by'), findsNothing);
-      expect(find.text('Games won · 2 – 0'), findsOneWidget);
+      expect(find.text('RALLY WON BY'), findsNothing);
+      expect(find.text('GAMES WON    2  –  0'), findsOneWidget);
     },
   );
 }

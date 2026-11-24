@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
+import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Neutral placeholder block. Deliberately static: a repeating pulse would keep
 /// `pumpAndSettle` waiting forever in widget tests, and the local-first reads
@@ -170,12 +170,17 @@ class InlineBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(SportikaRadius.md),
           border: Border.all(color: tone.withValues(alpha: 0.32)),
         ),
-        child: Row(
+        child: TrailingRow(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          maxFraction: 0.5,
+          leading: [
             Icon(icon, size: 16, color: tone),
             const SizedBox(width: SportikaSpacing.sm),
             Expanded(child: Text(text, style: SportikaType.caption)),
+          ],
+          // Narrow columns and the 1.3 text ceiling shrink the action cluster
+          // instead of pushing it past the banner edge.
+          trailing: [
             ?action,
             if (onDismiss != null)
               IconAction(

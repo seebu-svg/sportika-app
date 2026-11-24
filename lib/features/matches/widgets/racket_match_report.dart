@@ -3,7 +3,6 @@ import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Completed rounds come directly from the sport engine's event fold.
@@ -34,6 +33,11 @@ class RacketMatchReport extends StatelessWidget {
     final raw = progress.state[padel ? 'completedSets' : 'completedGames'];
     final rounds = raw is List ? raw : const [];
     final kind = padel ? 'Set' : 'Game';
+    // A racket match is played as singles or doubles; saying which removes the
+    // ambiguity a two-name header leaves for a pair.
+    final discipline = match.discipline == MatchDiscipline.team
+        ? null
+        : match.discipline.label;
     final labels = match.sideLabels;
 
     Widget cell(Widget child, {bool team = false}) => Padding(
@@ -51,7 +55,10 @@ class RacketMatchReport extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('$kind Scores', style: SportikaType.bodyStrong),
+          Text(
+            discipline == null ? '$kind Scores' : '$kind Scores · $discipline',
+            style: SportikaType.bodyStrong,
+          ),
           const SizedBox(height: SportikaSpacing.md),
           if (match.corrections.isNotEmpty)
             const Padding(

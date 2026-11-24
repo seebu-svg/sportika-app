@@ -17,7 +17,9 @@ Future<T?> _sheet<T>(BuildContext context, Widget child) {
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) => child,
   );
@@ -61,7 +63,7 @@ Future<void> publishFixture(BuildContext context, Fixture fixture) async {
                   preview.headline,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: SportikaFontWeight.extraBold,
                     color: SportikaColors.text,
                   ),
                 ),
@@ -80,7 +82,7 @@ Future<void> publishFixture(BuildContext context, Fixture fixture) async {
                     style: TextStyle(
                       fontSize: 10,
                       letterSpacing: 1,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: SportikaFontWeight.extraBold,
                       color: SportikaColors.textDim,
                     ),
                   ),
@@ -440,7 +442,7 @@ class _ScorerRow extends StatelessWidget {
                   account.displayName,
                   style: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: SportikaFontWeight.bold,
                     color: SportikaColors.text,
                   ),
                 ),

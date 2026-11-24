@@ -13,8 +13,8 @@ import 'package:sportika/features/profile_photo/profile_photo_flow.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/onboarding.dart';
 import 'package:sportika/shared/models/profile_setup.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -139,7 +139,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             style: TextStyle(
               fontFamily: SportikaType.displayFamily,
               fontSize: 23,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               letterSpacing: 0,
             ),
           ),
@@ -155,7 +155,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 _saving ? 'Saving…' : 'Save',
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: SportikaFontWeight.bold,
                   color: SportikaColors.mint,
                 ),
               ),
@@ -203,7 +203,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             key: ValueKey('save'),
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: SportikaFontWeight.extraBold,
                             ),
                           ),
                   ),
@@ -222,15 +222,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 vertical: 16,
               ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
                 borderSide: const BorderSide(color: SportikaColors.border),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
                 borderSide: const BorderSide(color: SportikaColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
                 borderSide: const BorderSide(
                   color: SportikaColors.mint,
                   width: 1.4,
@@ -258,6 +258,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         size: 104,
                         initials: me.initials,
                         avatarId: me.avatar,
+                        figure: defaultAvatarFigureFor(me.gender),
                         photoPath: me.photoPath,
                         photoUrl: me.photoUrl,
                         busy: photos.busy || _saving,

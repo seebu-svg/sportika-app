@@ -28,7 +28,9 @@ Future<void> showMatchScorerSheet(
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) =>
         SingleChildScrollView(child: _MatchScorerSheet(matchId: match.id)),

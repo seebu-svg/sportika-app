@@ -43,7 +43,7 @@ NotificationTarget? resolveNotificationTarget(
     case 'dispute':
       return _disputeTarget(context, notification);
     case 'account':
-      return const NotificationTarget.tab(4);
+      return const NotificationTarget.tab(HomeTabIndex.me);
     default:
       return notificationTargets[notification.route];
   }
@@ -93,7 +93,7 @@ NotificationTarget? _matchTarget(
     // The list may simply not be loaded yet. Only a loaded list that does
     // not hold the match proves that it is gone.
     return matches.discoverableMatches.isEmpty
-        ? const NotificationTarget.tab(2)
+        ? const NotificationTarget.tab(HomeTabIndex.matches)
         : null;
   }
 
@@ -123,7 +123,7 @@ NotificationTarget? _resultTarget(
   final fixtureTarget = _fixtureTarget(context, notification, id);
   if (fixtureTarget?.route == AppRoute.fixtureDetail) return fixtureTarget;
 
-  return const NotificationTarget.tab(2);
+  return const NotificationTarget.tab(HomeTabIndex.matches);
 }
 
 /// A tournament fixture, or the scoring duty that goes with it.
@@ -137,7 +137,9 @@ NotificationTarget? _fixtureTarget(
   if (fixture != null) {
     final tournaments = context.read<TournamentRepository>();
     final tournament = tournaments.tournamentById(fixture.tournamentId);
-    if (tournament == null) return const NotificationTarget.tab(1);
+    if (tournament == null) {
+      return const NotificationTarget.tab(HomeTabIndex.tournaments);
+    }
     return NotificationTarget.route(
       AppRoute.fixtureDetail,
       args: FixtureDetailArgs(fixtureId),
@@ -151,7 +153,7 @@ NotificationTarget? _fixtureTarget(
   // The fixture lives on the server and this build keeps tournament fixtures
   // on the device, so the sheet is not reachable from here. The tournament
   // section is where the member finds it.
-  return const NotificationTarget.tab(1);
+  return const NotificationTarget.tab(HomeTabIndex.tournaments);
 }
 
 /// The tournament the notification is about.
@@ -160,7 +162,7 @@ NotificationTarget? _tournamentTarget(BuildContext context, String id) {
   final tournament = tournaments.tournamentById(id);
   if (tournament == null) {
     return tournaments.tournaments.isEmpty
-        ? const NotificationTarget.tab(1)
+        ? const NotificationTarget.tab(HomeTabIndex.tournaments)
         : null;
   }
   return NotificationTarget.route(
@@ -174,7 +176,9 @@ NotificationTarget? _teamTarget(BuildContext context, String id) {
   final teams = context.read<TeamRepository>();
   final squad = teams.squadById(id);
   if (squad == null) {
-    return teams.squads.isEmpty ? const NotificationTarget.tab(3) : null;
+    return teams.squads.isEmpty
+        ? const NotificationTarget.tab(HomeTabIndex.teams)
+        : null;
   }
   final me = teams.currentAccountId;
   final onRoster = squad.ownerId == me || squad.memberAccountIds.contains(me);
@@ -195,5 +199,5 @@ NotificationTarget? _disputeTarget(
     final target = _matchTarget(context, notification, matchId);
     if (target?.route == AppRoute.matchDetail) return target;
   }
-  return const NotificationTarget.tab(2);
+  return const NotificationTarget.tab(HomeTabIndex.matches);
 }

@@ -226,7 +226,7 @@ class _StrengthBar extends StatelessWidget {
               height: 3,
               decoration: BoxDecoration(
                 color: i < (score * 4).ceil() ? tone : SportikaColors.border,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(SportikaRadius.xxs),
               ),
             ),
           ),
@@ -236,7 +236,7 @@ class _StrengthBar extends StatelessWidget {
           label.toUpperCase(),
           style: TextStyle(
             fontSize: 8.5,
-            fontWeight: FontWeight.w800,
+            fontWeight: SportikaFontWeight.extraBold,
             letterSpacing: 1.2,
             color: tone,
           ),

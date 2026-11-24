@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Newest-first event history. Withdrawn entries remain visible for audit.
@@ -388,6 +387,18 @@ String eventTitle(MatchEvent event, SportMatch match) {
           'end_match' => 'Match ended',
           _ => 'Clock updated',
         }
+      : event.kind == 'toss'
+      ? (event.data['decision'] == 'bowl'
+            ? 'Won the toss and elected to bowl'
+            : 'Won the toss and elected to bat')
+      : event.kind == 'innings_start'
+      ? 'Innings started'
+      : event.kind == 'innings_end'
+      ? 'Innings closed'
+      : event.kind == 'lineup'
+      ? 'XI named'
+      : event.kind == 'match_end'
+      ? 'Match ended'
       : event.kind == 'point' || event.kind == 'rally'
       ? 'Point won'
       : humanizeEventKind(event.kind);
@@ -419,6 +430,8 @@ String eventDetail(MatchEvent event) {
     'dot',
     'wicket',
     'clientId',
+    'decision',
+    'players',
   };
   final parts = <String>[];
   for (final entry in event.data.entries) {

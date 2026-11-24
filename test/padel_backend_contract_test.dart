@@ -533,14 +533,29 @@ void main() {
       return store.matchById(created.id)!;
     }
 
-    Future<void> submit(SportMatch m) => store.submitResult(
-      m.id,
-      headline: 'Rao won 6-3',
-      detail: '1 set · first to 6',
-      sideScores: const ['6', '3'],
-      sideValues: const [6, 3],
-      winnerIndex: 0,
-    );
+    /// A padel result the server would accept. Both backends re-derive a padel
+    /// submission from the recorded points - `complete_padel_match` on the
+    /// server, `_padelAuthority` on the device - so the log has to have played
+    /// the set out, and the two strings below are what that fold says rather
+    /// than what this file would like the match to have been.
+    Future<void> submit(SportMatch m) async {
+      for (var i = 0; i < 24; i++) {
+        await store.recordEvent(
+          m.id,
+          kind: 'point',
+          side: 0,
+          clientId: 'sub-tap-$i',
+        );
+      }
+      await store.submitResult(
+        m.id,
+        headline: 'Rao won 6-0',
+        detail: '1 set · first to 6',
+        sideScores: const ['6-0', '0-6'],
+        sideValues: const [1, 0],
+        winnerIndex: 0,
+      );
+    }
 
     test('pause keeps the match live and records who and why', () async {
       final m = await liveMatch();

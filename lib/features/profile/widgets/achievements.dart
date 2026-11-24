@@ -10,7 +10,6 @@ import 'package:sportika/features/profile/widgets/sporting_record.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -209,100 +208,48 @@ class PassportAchievements extends StatelessWidget {
       sports: sports,
     );
     final unlocked = achievements.where((a) => a.unlocked).toList();
-    final next = nextAchievement(achievements);
 
     // Earned medals lead the showcase; if fewer than three are earned, the
-    // nearest locked ones fill the shelf in their muted state.
+    // nearest locked ones fill the shelf in their muted state. Each medal
+    // name appears once here: the full set lives behind View all.
     final showcase = <Achievement>[
       ...unlocked,
       ...achievements.where((a) => !a.unlocked),
     ].take(3).toList();
 
     return PassportSection(
-      title: 'Achievements',
-      detail: unlocked.isEmpty
-          ? null
-          : '${unlocked.length} of ${achievements.length} unlocked',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _MedalCabinet(
-            showcase: showcase,
-            earned: unlocked.length,
-            total: achievements.length,
-          ),
-          if (next != null) ...[
-            const SizedBox(height: 12),
-            _NextMilestoneCard(achievement: next),
-          ],
-        ],
-      ),
+      title: 'Medal cabinet',
+      detail: '${unlocked.length} of ${achievements.length} earned',
+      action: 'View all ${achievements.length}',
+      onAction: () => showAllAchievements(context, achievements),
+      child: _MedalCabinet(showcase: showcase),
     );
   }
 }
 
 /// The collectible shelf: a dimensional navy panel holding up to three medals.
 class _MedalCabinet extends StatelessWidget {
-  const _MedalCabinet({
-    required this.showcase,
-    required this.earned,
-    required this.total,
-  });
+  const _MedalCabinet({required this.showcase});
 
   final List<Achievement> showcase;
-  final int earned;
-  final int total;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            SportikaColors.surfaceAlt,
-            SportikaColors.surface,
-            SportikaColors.surfaceSunken,
-          ],
-        ),
+        borderRadius: BorderRadius.circular(SportikaRadius.card),
+        gradient: SportikaGradients.medalCabinet,
         border: Border.all(color: SportikaColors.borderSubtle),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x59000000),
-            blurRadius: 20,
-            offset: Offset(0, 12),
-          ),
-        ],
+        boxShadow: SportikaShadows.lifted,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('MEDAL CABINET', style: SportikaType.micro),
-              ),
-              Text(
-                '$earned of $total collected',
-                style: SportikaType.micro.copyWith(
-                  color: SportikaColors.textDim,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (var i = 0; i < showcase.length; i++) ...[
-                if (i > 0) const SizedBox(width: 6),
-                Expanded(child: _MedalTile(achievement: showcase[i])),
-              ],
-            ],
-          ),
+          for (var i = 0; i < showcase.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(child: _MedalTile(achievement: showcase[i])),
+          ],
         ],
       ),
     );
@@ -334,11 +281,11 @@ class _MedalTileState extends State<_MedalTile> {
           '${a.title}. ${a.unlocked ? "Earned" : "Locked"}. '
           '${a.unlocked ? a.description : "Progress ${a.progressLabel}"}',
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        color: SportikaColors.transparent,
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         child: InkWell(
           key: Key('achievement-${a.kind.asset}'),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(SportikaRadius.md),
           onTap: () => showAchievementDetail(context, a),
           onHighlightChanged: (value) => setState(() => _pressed = value),
           child: Padding(
@@ -366,7 +313,7 @@ class _MedalTileState extends State<_MedalTile> {
                   maxLines: 1,
                   style: SportikaType.micro.copyWith(
                     color: tone,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: SportikaFontWeight.extraBold,
                     letterSpacing: .6,
                   ),
                 ),
@@ -379,132 +326,13 @@ class _MedalTileState extends State<_MedalTile> {
   }
 }
 
-/// The nearest locked milestone, elevated into its own progress card.
-class _NextMilestoneCard extends StatefulWidget {
-  const _NextMilestoneCard({required this.achievement});
-
-  final Achievement achievement;
-
-  @override
-  State<_NextMilestoneCard> createState() => _NextMilestoneCardState();
-}
-
-class _NextMilestoneCardState extends State<_NextMilestoneCard> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final a = widget.achievement;
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    return Semantics(
-      button: true,
-      label: 'Next milestone. ${a.title}. Progress ${a.progressLabel}',
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          key: const Key('next-milestone'),
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => showAchievementDetail(context, a),
-          onHighlightChanged: (value) => setState(() => _pressed = value),
-          child: AnimatedScale(
-            scale: _pressed ? .99 : 1,
-            duration: reduce ? Duration.zero : SportikaMotion.fast,
-            curve: SportikaMotion.standard,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    SportikaColors.surfaceAlt,
-                    SportikaColors.surface,
-                    SportikaColors.surfaceSunken,
-                  ],
-                ),
-                border: Border.all(color: SportikaColors.borderSubtle),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x4D000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 9),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      _MedalCoin(achievement: a, size: 58, lit: _pressed),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'NEXT MILESTONE',
-                              style: SportikaType.micro,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              a.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SportikaType.bodyStrong.copyWith(
-                                fontSize: 15,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              a.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: SportikaType.caption,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('Progress', style: SportikaType.caption),
-                      ),
-                      Text(
-                        a.progressLabel,
-                        style: SportikaType.bodyStrong.copyWith(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _MilestoneProgress(
-                    value: a.progress,
-                    tone: SportikaColors.gold,
-                    animate: !reduce,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The medal's accent used for its rim light and status colour.
 Color _medalTone(MedalKind kind) => switch (kind) {
   MedalKind.firstWhistle => SportikaColors.mint,
   MedalKind.firstVictory => SportikaColors.gold,
-  MedalKind.hatTrick => const Color(0xFFE1A868),
+  MedalKind.hatTrick => SportikaColors.bronze,
   MedalKind.squadBuilder => SportikaColors.blueBright,
-  MedalKind.entryList => const Color(0xFFC4894E),
+  MedalKind.entryList => SportikaColors.copper,
   MedalKind.multiSport => SportikaColors.padel,
   MedalKind.seasonRegular => SportikaColors.gold,
 };
@@ -566,23 +394,18 @@ class _MedalCoin extends StatelessWidget {
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(
-                center: const Alignment(-.3, -.4),
-                radius: 1.15,
-                colors: a.unlocked
-                    ? const [SportikaColors.surfaceAlt, SportikaColors.deepest]
-                    : const [
-                        SportikaColors.surfaceSunken,
-                        SportikaColors.deepest,
-                      ],
-              ),
+              gradient: a.unlocked
+                  ? SportikaGradients.medalCoin
+                  : SportikaGradients.medalCoinLocked,
               border: Border.all(
                 color: tone.withValues(alpha: a.unlocked ? .45 : .22),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: lit ? .55 : .4),
+                  color: SportikaColors.shadowBase.withValues(
+                    alpha: lit ? .55 : .4,
+                  ),
                   blurRadius: lit ? 16 : 10,
                   offset: Offset(0, lit ? 5 : 3),
                 ),
@@ -633,16 +456,13 @@ class _FallbackMedal extends StatelessWidget {
       margin: EdgeInsets.all(size * .18),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          center: const Alignment(-.3, -.4),
-          colors: [tone, Color.lerp(tone, Colors.black, .55)!],
-        ),
+        gradient: SportikaGradients.medalShade(tone),
       ),
       child: Center(
         child: Icon(
           Icons.military_tech_outlined,
           size: size * .4,
-          color: Colors.white.withValues(alpha: .9),
+          color: SportikaColors.onAccent.withValues(alpha: .9),
         ),
       ),
     );
@@ -680,16 +500,7 @@ class _MilestoneProgress extends StatelessWidget {
                 children: [
                   const DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF08182C),
-                          SportikaColors.surfaceSunken,
-                          Color(0x1FFFFFFF),
-                        ],
-                        stops: [0, .55, 1],
-                      ),
+                      gradient: SportikaGradients.progressTrack,
                     ),
                   ),
                   if (fill > 0)
@@ -703,21 +514,8 @@ class _MilestoneProgress extends StatelessWidget {
                           borderRadius: BorderRadius.circular(
                             SportikaRadius.pill,
                           ),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color.lerp(tone, Colors.white, .35)!,
-                              tone,
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: tone.withValues(alpha: .35),
-                              blurRadius: 6,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                          gradient: SportikaGradients.progressFill(tone),
+                          boxShadow: SportikaShadows.accent(tone),
                         ),
                       ),
                     ),
@@ -841,6 +639,134 @@ class _AchievementDetailSheet extends StatelessWidget {
   }
 }
 
+/// Opens the full medal set: every milestone once, with its live status.
+Future<void> showAllAchievements(
+  BuildContext context,
+  List<Achievement> achievements,
+) {
+  final reduce = MediaQuery.disableAnimationsOf(context);
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: SportikaColors.surfaceElevated,
+    useSafeArea: true,
+    showDragHandle: true,
+    constraints: const BoxConstraints(maxWidth: 480),
+    clipBehavior: Clip.antiAlias,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
+      side: BorderSide(color: SportikaColors.border),
+    ),
+    sheetAnimationStyle: reduce
+        ? AnimationStyle.noAnimation
+        : const AnimationStyle(
+            duration: SportikaMotion.base,
+            reverseDuration: SportikaMotion.fast,
+          ),
+    builder: (_) => _AllMedalsSheet(achievements: achievements),
+  );
+}
+
+class _AllMedalsSheet extends StatelessWidget {
+  const _AllMedalsSheet({required this.achievements});
+
+  final List<Achievement> achievements;
+
+  @override
+  Widget build(BuildContext context) {
+    final earned = achievements.where((a) => a.unlocked).length;
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Medal cabinet',
+              style: SportikaType.title.copyWith(fontSize: 22),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$earned of ${achievements.length} earned · every medal is '
+              'proved by your official record.',
+              style: SportikaType.caption,
+            ),
+            const SizedBox(height: 14),
+            for (var i = 0; i < achievements.length; i++) ...[
+              if (i > 0) const Divider(height: 1),
+              _AllMedalRow(achievement: achievements[i]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One line in the full set: the medal, what it asks for, and its status.
+class _AllMedalRow extends StatelessWidget {
+  const _AllMedalRow({required this.achievement});
+
+  final Achievement achievement;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = achievement;
+    final tone = a.unlocked ? _medalTone(a.kind) : SportikaColors.textDim;
+    return Semantics(
+      container: true,
+      label:
+          '${a.title}. ${a.unlocked ? "Earned" : "Locked"}. '
+          '${a.progressLabel}',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            _MedalCoin(achievement: a, size: 42),
+            const SizedBox(width: SportikaSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    a.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.bodyStrong,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    a.unlocked
+                        ? a.progressLabel
+                        : '${a.description} · ${a.progressLabel}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.caption,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: SportikaSpacing.xs),
+            Text(
+              a.unlocked ? 'Earned' : 'Locked',
+              style: SportikaType.micro.copyWith(
+                color: tone,
+                fontWeight: SportikaFontWeight.extraBold,
+                letterSpacing: .6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Per-sport appearances and win rate, computed from the same official fixtures
 /// the journey list shows. Renders nothing while there is none.
 class SportStatisticsCard extends StatelessWidget {
@@ -878,28 +804,30 @@ class SportStatisticsCard extends StatelessWidget {
       ..sort((a, b) => b.value.played.compareTo(a.value.played));
 
     return PassportSection(
-      title: 'Sports performance',
+      title: 'Sport performance',
       detail: 'Official results by sport',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < ordered.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
-            _SportPanel(
-              sport: ordered[i].key,
-              played: ordered[i].value.played,
-              won: ordered[i].value.won,
-            ),
+      child: SurfaceCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        child: Column(
+          children: [
+            for (var i = 0; i < ordered.length; i++) ...[
+              if (i > 0) const Divider(height: 1),
+              _SportRow(
+                sport: ordered[i].key,
+                played: ordered[i].value.played,
+                won: ordered[i].value.won,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 }
 
-/// One sport as a dimensional panel: real matches, real wins, real win rate.
-class _SportPanel extends StatelessWidget {
-  const _SportPanel({
+/// One sport as a compact row: match counts first, win rate trailing.
+class _SportRow extends StatelessWidget {
+  const _SportRow({
     required this.sport,
     required this.played,
     required this.won,
@@ -913,67 +841,48 @@ class _SportPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = sportColor(sport);
     final winRate = played == 0 ? null : (won * 100 / played).round();
-    final ratio = played == 0 ? 0.0 : (won / played).clamp(0.0, 1.0).toDouble();
+    final matches = played == 1 ? 'match' : 'matches';
+    final wins = won == 1 ? 'win' : 'wins';
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [SportikaColors.surfaceAlt, SportikaColors.surface],
+    return Semantics(
+      label: '${sport.label}: $won $wins in $played $matches',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            _SportCoin(sport: sport, tone: tone),
+            const SizedBox(width: SportikaSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    sport.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.bodyStrong.copyWith(fontSize: 14),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$won $wins in $played $matches',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.caption,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: SportikaSpacing.xs),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                winRate == null ? '—' : '$winRate%',
+                style: SportikaType.score.copyWith(fontSize: 20, color: tone),
+              ),
+            ),
+          ],
         ),
-        border: Border.all(color: SportikaColors.borderSubtle),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000),
-            blurRadius: 14,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              _SportCoin(sport: sport, tone: tone),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      sport.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SportikaType.bodyStrong.copyWith(fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$won of $played ${played == 1 ? "match" : "matches"} won',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: SportikaType.caption,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  winRate == null ? '—' : '$winRate%',
-                  style: SportikaType.score.copyWith(fontSize: 24, color: tone),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _MilestoneProgress(value: ratio, tone: tone, animate: false),
-        ],
       ),
     );
   }
@@ -992,12 +901,8 @@ class _SportCoin extends StatelessWidget {
       height: 38,
       width: 38,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(11),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [tone.withValues(alpha: .22), SportikaColors.surfaceSunken],
-        ),
+        borderRadius: BorderRadius.circular(SportikaRadius.control),
+        gradient: SportikaGradients.sportCoin(tone),
         border: Border.all(color: tone.withValues(alpha: .4)),
       ),
       child: Center(

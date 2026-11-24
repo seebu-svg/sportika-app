@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// The actions a member can take on a match right now.
@@ -27,11 +26,14 @@ class MatchLifecycleBar extends StatelessWidget {
     this.onPublish,
     this.onCorrect,
     this.onWalkover,
+    this.onRetire,
     this.onDispute,
     this.onCancel,
     this.onInvite,
     this.onAssignScorer,
     this.onRespond,
+    this.onJoinSide,
+    this.onLeave,
   });
 
   final SportMatch match;
@@ -52,6 +54,11 @@ class MatchLifecycleBar extends StatelessWidget {
   final VoidCallback? onCorrect;
   final VoidCallback? onWalkover;
 
+  /// `retire_match`: a badminton match that will not reach the winning game.
+  /// The scorer or the organizer names the winner and gives a reason, and the
+  /// partial score comes from the rally log.
+  final VoidCallback? onRetire;
+
   /// `raise_match_dispute`: any member of the match, once a result exists.
   /// Never gated on an entitlement.
   final VoidCallback? onDispute;
@@ -64,12 +71,35 @@ class MatchLifecycleBar extends StatelessWidget {
   /// `invited`.
   final void Function(bool accept)? onRespond;
 
+  /// `join_match`: a public match, before kick-off, for somebody who is not
+  /// already in it. The side is 0 or 1.
+  final void Function(int side)? onJoinSide;
+
+  /// `leave_match`: the caller is on the match and may still walk away.
+  final VoidCallback? onLeave;
+
   bool get _isOrganizer => match.organizerId == accountId;
   bool get _canScore =>
       match.canScore(accountId) &&
       (match.status == FixtureStatus.upcoming ||
           match.status == FixtureStatus.live) &&
       match.status != FixtureStatus.cancelled;
+
+  /// A spectator on a public match that has not started can take a free place.
+  bool get _canJoin =>
+      onJoinSide != null &&
+      match.isOpenToJoin &&
+      !_isOrganizer &&
+      match.participantOf(accountId)?.status !=
+          MatchParticipantStatus.accepted &&
+      match.participantOf(accountId)?.status != MatchParticipantStatus.invited;
+
+  /// Somebody who is on the match may leave it, unless they organize it.
+  bool get _canLeave =>
+      onLeave != null &&
+      match.isOpenToJoin &&
+      !_isOrganizer &&
+      match.participantOf(accountId)?.status == MatchParticipantStatus.accepted;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +137,20 @@ class MatchLifecycleBar extends StatelessWidget {
     if (!awaitingAnswer) {
       switch (match.status) {
         case FixtureStatus.upcoming:
+          if (_canJoin) {
+            buttons.addAll(_joinButtons(match));
+          }
+          if (_canLeave) {
+            moreOptions.add(
+              GhostButton(
+                label: 'Leave match',
+                icon: Icons.logout,
+                tone: SportikaColors.danger,
+                expand: true,
+                onPressed: busy ? null : onLeave,
+              ),
+            );
+          }
           if (_canScore && onStart != null) {
             buttons.add(
               PrimaryButton(
@@ -208,6 +252,16 @@ class MatchLifecycleBar extends StatelessWidget {
                 icon: Icons.handshake_outlined,
                 expand: true,
                 onPressed: busy ? null : onWalkover,
+              ),
+            );
+          }
+          if (match.sport == Sport.badminton && onRetire != null) {
+            moreOptions.add(
+              GhostButton(
+                label: 'Retire / concede',
+                icon: Icons.flag_outlined,
+                expand: true,
+                onPressed: busy ? null : onRetire,
               ),
             );
           }
@@ -437,6 +491,27 @@ class MatchLifecycleBar extends StatelessWidget {
       );
     },
   );
+
+  /// `join_match` is the only way into a public match without an invitation, so
+  /// both sides get a button. A full side stays visible but disabled, with the
+  /// reason on the label: a side that silently disappears reads as a bug.
+  List<Widget> _joinButtons(SportMatch match) => [
+    for (final side in [0, 1])
+      PrimaryButton(
+        label: match.isSideFull(side)
+            ? 'Join side ${_sideLetter(side)} · side full'
+            : 'Join side ${_sideLetter(side)}',
+        icon: Icons.person_add_alt_1,
+        tone: SportikaColors.mint,
+        onPressed: match.isSideFull(side)
+            ? null
+            : () {
+                if (!busy) onJoinSide!(side);
+              },
+      ),
+  ];
+
+  String _sideLetter(int side) => side == 0 ? 'A' : 'B';
 
   /// A result exists from `submitted` onwards, which is exactly when the server
   /// starts accepting a dispute.

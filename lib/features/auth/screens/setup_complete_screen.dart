@@ -6,6 +6,7 @@ import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/onboarding.dart';
 import 'package:sportika/shared/models/profile_setup.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Final review before the local profile is committed and Home is unlocked.
@@ -54,6 +55,7 @@ class SetupCompleteScreen extends StatelessWidget {
           child: AuthAvatar(
             initials: initialsOf(flow.fullName),
             avatarId: flow.avatar,
+            figure: defaultAvatarFigureFor(flow.gender),
             photoPath: photos.photoPath,
             photoUrl: photos.photoUrl,
             size: 88,

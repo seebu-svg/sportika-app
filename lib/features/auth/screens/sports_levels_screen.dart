@@ -100,8 +100,8 @@ class SportsLevelsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         const AuthMicro(
-          'Private scorecards work at any level. Official entries follow each '
-          'tournament’s own rules.',
+          'Your preferences help personalize your experience. '
+          'You can update them anytime from your profile.',
           icon: Icons.insights_outlined,
         ),
         const SizedBox(height: 8),

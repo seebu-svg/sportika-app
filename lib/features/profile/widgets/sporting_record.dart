@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// How one published fixture ended for the member whose passport is open.
@@ -173,7 +172,7 @@ class SportingRecordStrip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             color: SportikaColors.surfaceSunken,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
             border: Border.all(color: SportikaColors.borderSubtle),
           ),
           child: Row(
@@ -264,7 +263,7 @@ class FirstMatchCard extends StatelessWidget {
             width: 38,
             decoration: BoxDecoration(
               color: SportikaColors.mint.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(SportikaRadius.control),
             ),
             child: const Icon(
               Icons.flag_outlined,

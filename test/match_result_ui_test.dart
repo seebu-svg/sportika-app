@@ -8,6 +8,7 @@ import 'package:sportika/shared/models/profile_module.dart';
 import 'package:sportika/features/matches/widgets/match_detail_hero.dart';
 import 'package:sportika/features/matches/widgets/match_result_card.dart';
 import 'package:sportika/features/matches/widgets/match_result_dialogs.dart';
+import 'package:sportika/features/personal_games/scoring/padel/padel.dart';
 import 'package:sportika/features/personal_games/scoring/scoring_service.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
@@ -47,6 +48,85 @@ SportMatch fixture(FixtureStatus status, OfficialResult? official) =>
       createdAt: DateTime(2026, 11, 15),
       result: official,
     );
+
+/// A doubles padel fixture, whose score strings carry a set per pair of digits.
+SportMatch padelFixture() => SportMatch(
+  id: 'padel-review',
+  sport: Sport.padel,
+  formatLabel: 'Best of 3 sets',
+  rules: SportEngines.rulesFor(Sport.padel, 'Best of 3 sets'),
+  title: 'Doubles championship',
+  venue: 'Court one',
+  scheduledAt: DateTime(2026, 11, 16, 18),
+  visibility: MatchVisibility.public,
+  organizerId: 'organizer',
+  status: FixtureStatus.live,
+  sideNames: ['Rao and Iqbal', 'Malik and Farooq'],
+  discipline: MatchDiscipline.doubles,
+  capacity: 4,
+  createdAt: DateTime(2026, 11, 15),
+);
+
+/// A 6-0 / 6-7 / 6-0 match, so each side's own reading of the log is long and
+/// the two strings differ.
+List<ScoringEvent> padelThreeSets() => [
+  ...padelPoints(0, 24),
+  for (var game = 0; game < 6; game++) ...[
+    ...padelPoints(0, 4),
+    ...padelPoints(1, 4),
+  ],
+  ...padelPoints(1, 7),
+  ...padelPoints(0, 24),
+];
+
+List<ScoringEvent> padelPoints(int side, int count) => [
+  for (var i = 0; i < count; i++)
+    ScoringEvent(
+      id: 'padel-$side-$i',
+      kind: PadelEngine.kPoint,
+      side: side,
+      data: const {},
+      at: DateTime(2026),
+      byAccountId: 'scorer',
+    ),
+];
+
+/// A short-format badminton fixture, so five rallies finish the match.
+SportMatch badmintonFixture() => SportMatch(
+  id: 'badminton-review',
+  sport: Sport.badminton,
+  formatLabel: 'Best of 3 games',
+  rules: {
+    ...SportEngines.rulesFor(Sport.badminton, 'Best of 3 games'),
+    'gamesToWin': 1,
+    'pointsToWinGame': 5,
+    'cap': 7,
+  },
+  title: 'Singles championship',
+  venue: 'Hall two',
+  scheduledAt: DateTime(2026, 11, 16, 18),
+  visibility: MatchVisibility.public,
+  organizerId: 'organizer',
+  status: FixtureStatus.live,
+  sideNames: ['Ahmed', 'Patel'],
+  discipline: MatchDiscipline.singles,
+  capacity: 2,
+  createdAt: DateTime(2026, 11, 15),
+);
+
+/// One game taken by side B without reply, so the two readings differ.
+List<ScoringEvent> badmintonRallies() => [
+  for (var i = 0; i < 5; i++)
+    ScoringEvent(
+      id: 'rally-$i',
+      kind: 'rally',
+      side: 1,
+      data: const {},
+      at: DateTime(2026),
+      byAccountId: 'scorer',
+    ),
+];
+
 Future<void> show(
   WidgetTester tester,
   Widget child, {
@@ -348,4 +428,90 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  // An AlertDialog asks its content for an intrinsic height, and a LayoutBuilder
+  // refuses that question. The scoring journeys run at 420x1000, so a 320-wide
+  // check alone never saw the throw: the review panel is proven across the
+  // widths a phone really uses, for both racket sports and a court sport.
+  testWidgets('submit review dialog lays out at every phone width', (
+    tester,
+  ) async {
+    SportMatch matchFor(Sport sport) => switch (sport) {
+      Sport.padel => padelFixture(),
+      Sport.badminton => badmintonFixture(),
+      _ => fixture(FixtureStatus.live, null),
+    };
+    List<ScoringEvent> eventsFor(Sport sport) => switch (sport) {
+      Sport.padel => padelThreeSets(),
+      Sport.badminton => badmintonRallies(),
+      _ => const <ScoringEvent>[],
+    };
+    // Each side's own reading of one log, which the panel has to print twice
+    // over; cricket folds no events here, so it contributes no readings.
+    List<String> readingsFor(Sport sport) => switch (sport) {
+      Sport.padel => const ['6-0, 6-7, 6-0', '0-6, 7-6, 0-6'],
+      Sport.badminton => const ['0-5', '5-0'],
+      _ => const <String>[],
+    };
+
+    Future<void> review(Sport sport, Size size) async {
+      final match = matchFor(sport);
+      final progress = SportEngines.forSport(sport).evaluate(
+        sides: match.sideNames,
+        rules: match.rules,
+        events: eventsFor(sport),
+      );
+      bool? submitted;
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildSportikaTheme(),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  submitted = await confirmSubmitResult(
+                    context,
+                    match: match,
+                    progress: progress,
+                  );
+                },
+                child: const Text('Review'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Review'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('FINAL SCORE REVIEW'),
+        findsOneWidget,
+        reason: '$sport at $size',
+      );
+      expect(tester.takeException(), isNull, reason: '$sport at $size');
+      // Both readings of one match sit on the panel the scorer signs off.
+      for (final reading in readingsFor(sport)) {
+        expect(find.text(reading), findsOneWidget, reason: '$sport at $size');
+      }
+      for (final name in match.sideNames) {
+        expect(find.text(name), findsOneWidget, reason: '$sport at $size');
+      }
+      await tester.tap(find.text('Keep scoring'));
+      await tester.pumpAndSettle();
+      expect(submitted, isFalse, reason: '$sport at $size');
+    }
+
+    for (final size in const [
+      Size(320, 700),
+      Size(420, 1000),
+      Size(800, 600),
+    ]) {
+      for (final sport in [Sport.padel, Sport.badminton, Sport.cricket]) {
+        await review(sport, size);
+      }
+    }
+  });
 }

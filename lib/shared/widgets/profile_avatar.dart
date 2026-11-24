@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/widgets/avatar_presets.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Shared profile portrait. The edit target stays within the allocated bounds
@@ -17,6 +18,7 @@ class ProfileAvatar extends StatelessWidget {
     this.onEdit,
     this.busy = false,
     this.showRing = true,
+    this.figure,
   });
 
   final String initials;
@@ -26,6 +28,10 @@ class ProfileAvatar extends StatelessWidget {
   final VoidCallback? onEdit;
   final bool busy;
   final bool showRing;
+
+  /// The branded default portrait shown while the member has no picture. Null
+  /// keeps the initials face, which is what a name-only preview wants.
+  final DefaultAvatarFigure? figure;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +47,7 @@ class ProfileAvatar extends StatelessWidget {
                 border: Border.all(
                   color: showRing
                       ? SportikaColors.mint.withValues(alpha: .5)
-                      : Colors.transparent,
+                      : SportikaColors.transparent,
                   width: 1.5,
                 ),
               ),
@@ -49,7 +55,8 @@ class ProfileAvatar extends StatelessWidget {
                 padding: EdgeInsets.all(showRing ? 4 : 0),
                 child: ClipOval(
                   child: PlayerAvatar(
-                    initials: initials.isEmpty ? '?' : initials,
+                    initials: initials,
+                    figure: figure,
                     size: showRing ? size - 8 : size,
                     photoPath: photoPath,
                     photoUrl: photoUrl,

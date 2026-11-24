@@ -139,14 +139,14 @@ class _SportTile extends StatelessWidget {
       label: sport.label,
       child: Material(
         color: SportikaColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
               border: Border.all(
                 color: selected ? tone : SportikaColors.border,
                 width: selected ? 1.6 : 1,
@@ -158,16 +158,7 @@ class _SportTile extends StatelessWidget {
                 AuthPhoto(sport: sport, alignment: Alignment.center),
                 const DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x59061426),
-                        Color(0x33061426),
-                        Color(0xE6061426),
-                      ],
-                      stops: [0, .4, 1],
-                    ),
+                    gradient: SportikaGradients.sportCardScrim,
                   ),
                 ),
                 Padding(
@@ -183,11 +174,17 @@ class _SportTile extends StatelessWidget {
                             width: 20,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: selected ? tone : const Color(0x66061426),
+                              color: selected
+                                  ? tone
+                                  : SportikaColors.deepest.withValues(
+                                      alpha: .4,
+                                    ),
                               border: Border.all(
                                 color: selected
                                     ? tone
-                                    : Colors.white.withValues(alpha: .35),
+                                    : SportikaColors.onAccent.withValues(
+                                        alpha: SportikaOpacity.medium,
+                                      ),
                               ),
                             ),
                             child: selected
@@ -202,7 +199,9 @@ class _SportTile extends StatelessWidget {
                           Icon(
                             sportGlyph(sport),
                             size: 16,
-                            color: Colors.white.withValues(alpha: .72),
+                            color: SportikaColors.onAccent.withValues(
+                              alpha: SportikaOpacity.heavy,
+                            ),
                           ),
                         ],
                       ),
@@ -218,7 +217,7 @@ class _SportTile extends StatelessWidget {
                         selected ? 'ON YOUR PROFILE' : 'TAP TO ADD',
                         style: TextStyle(
                           fontSize: 7.5,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: SportikaFontWeight.extraBold,
                           letterSpacing: 1.2,
                           color: selected ? tone : SportikaColors.textMuted,
                         ),

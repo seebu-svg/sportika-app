@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/models/enums.dart';
+import 'package:sportika/shared/theme/theme.dart';
+import 'package:sportika/shared/widgets/cinematic_backdrop.dart';
 
 /// Real editorial photographs. Source pages and photographer credits are in
 /// assets/PHOTO_CREDITS.md. Photography never affects local match state.
@@ -23,12 +26,7 @@ class SportPhotography {
   };
 }
 
-IconData sportGlyph(Sport sport) => switch (sport) {
-  Sport.cricket => Icons.sports_cricket_outlined,
-  Sport.padel => Icons.sports_tennis_outlined,
-  Sport.futsal => Icons.sports_soccer_outlined,
-  Sport.badminton => Icons.sports_tennis_outlined,
-};
+IconData sportGlyph(Sport sport) => SportIdentities.of(sport).glyph;
 
 /// Sport-specific glyph that never repeats a silhouette: Material sport icons
 /// for cricket, padel and futsal, and a hand-drawn shuttlecock for badminton
@@ -46,15 +44,16 @@ class SportGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (sport != Sport.badminton) {
-      return Icon(sportGlyph(sport), size: size, color: color);
+    final identity = SportIdentities.of(sport);
+    if (!identity.customGlyph) {
+      return Icon(identity.glyph, size: size, color: color);
     }
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _ShuttlecockPainter(
-          color ?? IconTheme.of(context).color ?? Colors.white,
+          color ?? IconTheme.of(context).color ?? SportikaColors.onAccent,
         ),
       ),
     );
@@ -120,28 +119,47 @@ class SportPhoto extends StatelessWidget {
         width: double.infinity,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final decodeWidth =
-                (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
+            final identity = SportIdentities.of(sport);
+            final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+            final label = '${sport.label} sports photography';
+            final decodeWidth = (constraints.maxWidth * pixelRatio)
+                .round()
+                .clamp(1, 1600);
+            final actionDecodeWidth =
+                (math.max(constraints.maxWidth, constraints.maxHeight * 2) *
+                        pixelRatio)
                     .round()
                     .clamp(1, 1600);
-            return Image.asset(
-              'assets/images/sports/${sport.name}.jpg',
-              fit: BoxFit.cover,
-              alignment: alignment,
-              cacheWidth: decodeWidth,
-              semanticLabel: '${sport.label} sports photography',
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, _, _) => Image.network(
-                SportPhotography.forSport(sport),
-                fit: BoxFit.cover,
-                alignment: alignment,
-                cacheWidth: decodeWidth,
-                semanticLabel: '${sport.label} sports photography',
-                filterQuality: FilterQuality.medium,
-                loadingBuilder: (_, child, progress) =>
-                    progress == null ? child : _placeholder(loading: true),
-                errorBuilder: (_, _, _) => _placeholder(loading: false),
-              ),
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  identity.actionPhoto,
+                  fit: BoxFit.cover,
+                  alignment: alignment,
+                  cacheWidth: actionDecodeWidth,
+                  semanticLabel: label,
+                  errorBuilder: (_, _, _) => Image.asset(
+                    identity.fallbackPhoto,
+                    fit: BoxFit.cover,
+                    alignment: alignment,
+                    cacheWidth: decodeWidth,
+                    semanticLabel: label,
+                    errorBuilder: (_, _, _) => Image.network(
+                      SportPhotography.forSport(sport),
+                      fit: BoxFit.cover,
+                      alignment: alignment,
+                      cacheWidth: decodeWidth,
+                      semanticLabel: label,
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : _placeholder(loading: true),
+                      errorBuilder: (_, _, _) => _placeholder(loading: false),
+                    ),
+                  ),
+                ),
+                SportMotionGraphic(tone: identity.tone),
+              ],
             );
           },
         ),
@@ -197,7 +215,7 @@ class EditorialBanner extends StatelessWidget {
   final Color accent;
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
     child: SizedBox(
       height:
           height +
@@ -208,16 +226,7 @@ class EditorialBanner extends StatelessWidget {
           SportPhoto(sport: sport, height: height, radius: 0),
           const DecoratedBox(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x0A061426),
-                  Color(0x8809182D),
-                  Color(0xF509182D),
-                ],
-                stops: [0, .4, 1],
-              ),
+              gradient: SportikaGradients.editorialCard,
             ),
           ),
           Positioned(
@@ -227,7 +236,7 @@ class EditorialBanner extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: SportikaColors.deepest.withValues(alpha: .85),
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(SportikaRadius.chip),
                 border: Border.all(color: accent.withValues(alpha: .5)),
               ),
               child: Text(
@@ -236,7 +245,7 @@ class EditorialBanner extends StatelessWidget {
                   fontSize: 9,
                   color: accent,
                   letterSpacing: 1.8,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: SportikaFontWeight.extraBold,
                 ),
               ),
             ),
@@ -256,14 +265,11 @@ class EditorialBanner extends StatelessWidget {
                     title,
                     maxLines: 2,
                     softWrap: false,
-                    style: const TextStyle(
-                      fontFamily: 'Barlow Condensed',
-                      fontSize: 40,
+                    style: SportikaType.display(
+                      40,
+                      italic: true,
                       height: .95,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w900,
                       letterSpacing: -.4,
-                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -275,7 +281,7 @@ class EditorialBanner extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: Color(0xFFD4DEEC),
+                    color: SportikaColors.textBody,
                   ),
                 ),
                 if (action != null) ...[
@@ -290,7 +296,7 @@ class EditorialBanner extends StatelessWidget {
                         vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(SportikaRadius.sm),
                       ),
                     ),
                     child: Row(
@@ -300,7 +306,7 @@ class EditorialBanner extends StatelessWidget {
                           child: Text(
                             action!,
                             style: const TextStyle(
-                              fontWeight: FontWeight.w700,
+                              fontWeight: SportikaFontWeight.bold,
                               fontSize: 12,
                             ),
                           ),
@@ -349,12 +355,12 @@ class BrandMetricStrip extends StatelessWidget {
                 Text(
                   metrics[i].value,
                   style: TextStyle(
-                    fontFamily: 'Barlow Condensed',
+                    fontFamily: SportikaType.displayFamily,
                     fontSize: compact ? 26 : 32,
                     height: 1,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: SportikaFontWeight.extraBold,
                     letterSpacing: .3,
-                    color: i == 1 ? accent : Colors.white,
+                    color: i == 1 ? accent : SportikaColors.text,
                   ),
                 ),
                 const SizedBox(height: 5),

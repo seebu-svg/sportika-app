@@ -10,12 +10,10 @@ import 'package:sportika/shared/navigation/notification_links.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// The in-app inbox.
+/// Sportika Activity Center.
 ///
-/// One screen for every family of message: invitations, schedule changes,
-/// results, disputes, squad activity and account notices. It reads only from
-/// [NotificationsController], so the same screen draws the device inbox and
-/// the server inbox without knowing which one it is talking to.
+/// Displays the existing notification feed with a premium sports-oriented
+/// presentation. All notification data and actions remain controller-driven.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -26,12 +24,14 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final ScrollController _scroll = ScrollController();
 
+  bool _loadingMore = false;
+
   @override
   void initState() {
     super.initState();
+
     _scroll.addListener(_onScroll);
-    // The live channel is shared with the header bell, so it stays open for
-    // the whole session. This only makes sure it is already running.
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<NotificationsController>().start();
@@ -45,12 +45,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.dispose();
   }
 
-  /// Pulls the next page in when the member reaches the end of the list.
   void _onScroll() {
-    if (!_scroll.hasClients) return;
+    if (!_scroll.hasClients || _loadingMore) return;
+
     final position = _scroll.position;
-    if (position.pixels >= position.maxScrollExtent - 240) {
-      context.read<NotificationsController>().loadMore();
+    final state = context.read<NotificationsController>();
+
+    if (!state.hasMore || state.loading) return;
+
+    if (position.extentAfter < 280) {
+      _loadMore(state);
+    }
+  }
+
+  Future<void> _loadMore(NotificationsController state) async {
+    if (_loadingMore || state.loading || !state.hasMore) return;
+
+    _loadingMore = true;
+
+    try {
+      await state.loadMore();
+    } finally {
+      _loadingMore = false;
     }
   }
 
@@ -62,196 +78,294 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       appBar: sportikaAppBar(
         'Notifications',
         subtitle: state.unreadCount > 0
-            ? '${state.unreadCount} unread'
+            ? '${state.unreadCount} unread updates'
             : 'You are up to date',
         actions: [
           IconButton(
-            tooltip: 'Notification settings',
+            tooltip: 'Notification preferences',
             onPressed: () =>
                 pushRoute(context, AppRoute.notificationPreferences),
-            icon: const Icon(Icons.tune, size: 20),
+            icon: const Icon(
+              Icons.tune_rounded,
+              color: SportikaColors.textBody,
+            ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
         ],
       ),
-      body: _body(context, state),
+      body: _buildBody(context, state),
     );
   }
 
-  Widget _body(BuildContext context, NotificationsController state) {
+  Widget _buildBody(BuildContext context, NotificationsController state) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    final inset = width > 760 ? (width - 720) / 2 : 16.0;
+
     if (state.loading && state.myNotifications.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: LoadingSkeleton(
+      return Padding(
+        padding: EdgeInsets.fromLTRB(inset, 20, inset, 0),
+        child: const LoadingSkeleton(
           rows: 4,
-          rowHeight: 82,
+          rowHeight: 90,
           label: 'Loading notifications',
         ),
       );
     }
 
-    final error = state.error;
-    if (error != null && state.myNotifications.isEmpty) {
+    if (state.error != null && state.myNotifications.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        padding: EdgeInsets.fromLTRB(inset, 20, inset, 0),
         child: ErrorState(
           title: 'Notifications did not load',
-          message: error,
+          message: state.error,
           onRetry: state.refresh,
         ),
       );
     }
 
     final groups = state.groupedNotifications;
-    final page = MediaQuery.sizeOf(context).width > 760
-        ? (MediaQuery.sizeOf(context).width - 720) / 2
-        : 16.0;
+
     return RefreshIndicator(
       onRefresh: state.refresh,
       color: SportikaColors.mint,
+      backgroundColor: SportikaColors.surface,
       child: CustomScrollView(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // =====================================
+          // ACTIVITY HEADER
+          // =====================================
+
           SliverPadding(
-            padding: EdgeInsets.symmetric(horizontal: page - 16),
+            padding: EdgeInsets.fromLTRB(inset, 16, inset, 0),
+            sliver: SliverToBoxAdapter(
+              child: _ActivityHeader(unread: state.unreadCount),
+            ),
+          ),
+
+          // =====================================
+          // FILTERS
+          // =====================================
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(inset, 18, inset, 12),
             sliver: SliverToBoxAdapter(child: _filters(state)),
           ),
+
+          // =====================================
+          // ERROR BANNER
+          // =====================================
           if (state.error != null)
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: page),
+              padding: EdgeInsets.fromLTRB(inset, 0, inset, 14),
               sliver: SliverToBoxAdapter(
                 child: _RetryNotice(onRetry: state.refresh),
               ),
             ),
+
+          // =====================================
+          // EMPTY STATE
+          // =====================================
           if (state.visibleNotifications.isEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 48,
-                  horizontal: 24,
-                ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(inset, 36, inset, 36),
+              sliver: SliverToBoxAdapter(
                 child: EmptyState(
-                  title: state.unreadOnly
-                      ? 'You are all caught up'
-                      : 'Nothing yet',
+                  title: state.unreadOnly ? 'All caught up' : 'No activity yet',
                   body: state.unreadOnly
-                      ? 'Switch to All to revisit your match and team updates.'
-                      : 'Match invitations, team updates and results will arrive here.',
+                      ? 'You have no unread notifications. Switch to All to revisit previous updates.'
+                      : 'Match invitations, tournament activity, scoring assignments and results will appear here.',
                   icon: state.unreadOnly
-                      ? Icons.done_all
-                      : Icons.notifications_none,
+                      ? Icons.done_all_rounded
+                      : Icons.notifications_none_rounded,
                 ),
               ),
             ),
+
+          // =====================================
+          // GROUPED NOTIFICATIONS
+          // =====================================
           for (final group in NotificationGroup.values)
-            if (groups[group]!.isNotEmpty) ...[
+            if ((groups[group]?.isNotEmpty ?? false)) ...[
               SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: page - 16),
-                sliver: SliverToBoxAdapter(child: _groupHeader(group)),
-              ),
-              SliverList.separated(
-                itemCount: groups[group]!.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, i) => Padding(
-                  padding: EdgeInsets.symmetric(horizontal: page),
-                  child: _NotificationTile(notification: groups[group]![i]),
+                padding: EdgeInsets.fromLTRB(inset, 12, inset, 12),
+                sliver: SliverToBoxAdapter(
+                  child: _GroupHeader(
+                    label: group.label,
+                    count: groups[group]!.length,
+                  ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: inset),
+                sliver: SliverList.separated(
+                  itemCount: groups[group]!.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final item = groups[group]![index];
+
+                    return _NotificationTile(
+                      key: ValueKey(item.id),
+                      notification: item,
+                    );
+                  },
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
             ],
+
           SliverToBoxAdapter(child: _footer(state)),
         ],
       ),
     );
   }
 
-  /// The two filters, with the unread count on the one that filters.
   Widget _filters(NotificationsController state) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          _FilterChip(
-            label: 'All',
-            selected: !state.unreadOnly,
-            onTap: () => state.setUnreadOnly(false),
-          ),
-          _FilterChip(
-            label: state.unreadCount > 0
-                ? 'Unread · ${state.unreadCount}'
-                : 'Unread',
-            selected: state.unreadOnly,
-            onTap: () => state.setUnreadOnly(true),
-          ),
-          if (state.unreadCount > 0)
-            TextButton(
-              onPressed: state.markAllNotificationsRead,
-              child: const Text(
-                'Mark all read',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+    return Row(
+      children: [
+        _ActivityFilter(
+          label: 'All',
+          selected: !state.unreadOnly,
+          onTap: () => state.setUnreadOnly(false),
+        ),
+
+        const SizedBox(width: 8),
+
+        _ActivityFilter(
+          label: state.unreadCount > 0
+              ? 'Unread ${state.unreadCount}'
+              : 'Unread',
+          selected: state.unreadOnly,
+          onTap: () => state.setUnreadOnly(true),
+        ),
+
+        const Spacer(),
+
+        if (state.unreadCount > 0)
+          TextButton(
+            onPressed: state.markAllNotificationsRead,
+            child: Text(
+              'Mark all read',
+              style: SportikaType.caption.copyWith(
+                color: SportikaColors.mint,
+                fontWeight: SportikaFontWeight.bold,
               ),
             ),
+          ),
+      ],
+    );
+  }
+
+  Widget _footer(NotificationsController state) {
+    if (state.loading && state.hasMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: SportikaColors.mint,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (state.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: TextButton.icon(
+            onPressed: () => _loadMore(state),
+            icon: const Icon(Icons.expand_more_rounded),
+            label: const Text('Load older activity'),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox(height: 36);
+  }
+}
+
+// ============================================================
+// ACTIVITY HEADER
+// ============================================================
+
+class _ActivityHeader extends StatelessWidget {
+  const _ActivityHeader({required this.unread});
+
+  final int unread;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: SportikaColors.blueBright.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(SportikaRadius.md),
+            ),
+            child: const Icon(
+              Icons.notifications_active_outlined,
+              color: SportikaColors.blueBright,
+              size: 27,
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'YOUR SPORTIKA ACTIVITY',
+                  style: SportikaType.micro.copyWith(
+                    color: SportikaColors.mint,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+
+                const SizedBox(height: 5),
+
+                Text(
+                  unread > 0 ? 'Stay in the game' : 'You are all caught up',
+                  style: SportikaType.bodyStrong.copyWith(fontSize: 17),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  unread > 0
+                      ? '$unread ${unread == 1 ? 'update needs' : 'updates need'} your attention.'
+                      : 'Your latest match and team activity lives here.',
+                  style: SportikaType.caption,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _groupHeader(NotificationGroup group) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-      child: Text(
-        group.label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.1,
-          color: SportikaColors.textDim,
-        ),
-      ),
-    );
-  }
-
-  /// The end of the list: a spinner while another page loads, or the hint
-  /// that there is nothing older.
-  Widget _footer(NotificationsController state) {
-    if (state.loading && state.hasMore) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 18, 16, 26),
-        child: Center(
-          child: SizedBox(
-            height: 20,
-            width: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: SportikaColors.blueBright,
-            ),
-          ),
-        ),
-      );
-    }
-    if (state.hasMore) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: TextButton.icon(
-            onPressed: state.loadMore,
-            icon: const Icon(Icons.expand_more_rounded),
-            label: const Text('Load older notifications'),
-          ),
-        ),
-      );
-    }
-    return const SizedBox(height: 28);
-  }
 }
 
-/// One filter button.
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+// ============================================================
+// FILTER
+// ============================================================
+
+class _ActivityFilter extends StatelessWidget {
+  const _ActivityFilter({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -264,8 +378,8 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      selected: selected,
       button: true,
+      selected: selected,
       child: Material(
         color: selected ? SportikaColors.blueSubtle : SportikaColors.surfaceAlt,
         borderRadius: BorderRadius.circular(SportikaRadius.pill),
@@ -273,7 +387,7 @@ class _FilterChip extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(SportikaRadius.pill),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(SportikaRadius.pill),
               border: Border.all(
@@ -284,9 +398,8 @@ class _FilterChip extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+              style: SportikaType.caption.copyWith(
+                fontWeight: SportikaFontWeight.bold,
                 color: selected
                     ? SportikaColors.text
                     : SportikaColors.textMuted,
@@ -299,9 +412,45 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-/// One message in the inbox.
+// ============================================================
+// GROUP HEADER
+// ============================================================
+
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.label, required this.count});
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label.toUpperCase(),
+            style: SportikaType.label.copyWith(
+              color: SportikaColors.textMuted,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
+        Text(
+          '$count',
+          style: SportikaType.micro.copyWith(color: SportikaColors.textDim),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// NOTIFICATION TILE
+// ============================================================
+
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({
+    super.key,
     required this.notification,
     this.compact = false,
     this.navigationContext,
@@ -315,132 +464,167 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final state = context.read<NotificationsController>();
+    final controller = context.read<NotificationsController>();
     final tone = _tone(notification.kind);
+    final unread = !notification.read;
 
-    return SurfaceCard(
-      onTap: () {
-        final target = navigationContext ?? context;
-        beforeOpen?.call();
-        _open(target, state);
-      },
-      borderColor: notification.read
-          ? SportikaColors.border
-          : tone.withValues(alpha: 0.4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 34,
-            width: 34,
-            decoration: BoxDecoration(
-              color: tone.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(10),
+    return Semantics(
+      container: true,
+      label: unread
+          ? 'Unread notification: ${notification.title}'
+          : notification.title,
+      child: SurfaceCard(
+        onTap: () {
+          final target = navigationContext ?? context;
+
+          controller.markNotificationRead(notification.id);
+
+          beforeOpen?.call();
+
+          _navigate(target);
+        },
+        borderColor: unread
+            ? tone.withValues(alpha: 0.45)
+            : SportikaColors.borderSubtle,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 14,
+          vertical: compact ? 11 : 14,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // CATEGORY ICON
+            Container(
+              width: compact ? 36 : 42,
+              height: compact ? 36 : 42,
+              decoration: BoxDecoration(
+                color: tone.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(SportikaRadius.sm),
+              ),
+              child: Icon(
+                _icon(notification.kind),
+                size: compact ? 18 : 20,
+                color: tone,
+              ),
             ),
-            child: Icon(_icon(notification.kind), size: 17, color: tone),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        notification.title,
-                        maxLines: compact ? 2 : 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          height: 1.3,
-                          fontWeight: notification.read
-                              ? FontWeight.w600
-                              : FontWeight.w800,
-                          color: SportikaColors.text,
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          maxLines: compact ? 2 : 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: SportikaType.bodyStrong.copyWith(
+                            fontSize: compact ? 12.5 : 13.5,
+                            height: 1.3,
+                            fontWeight: unread
+                                ? SportikaFontWeight.extraBold
+                                : SportikaFontWeight.semibold,
+                            color: unread
+                                ? SportikaColors.text
+                                : SportikaColors.textBody,
+                          ),
                         ),
                       ),
-                    ),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: notification.read
-                          ? const SizedBox.shrink()
-                          : Container(
-                              key: const ValueKey('unread'),
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: tone,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  notification.body,
-                  maxLines: compact ? 1 : 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.4,
-                    color: SportikaColors.textMuted,
+
+                      if (unread) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 7,
+                          height: 7,
+                          margin: const EdgeInsets.only(top: 5),
+                          decoration: const BoxDecoration(
+                            color: SportikaColors.mint,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  '${_category(notification.kind)} · ${timeAgo(notification.at)}',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: SportikaColors.textDim,
+
+                  const SizedBox(height: 5),
+
+                  Text(
+                    notification.body,
+                    maxLines: compact ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.caption.copyWith(
+                      height: 1.45,
+                      color: SportikaColors.textMuted,
+                    ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _category(notification.kind),
+                          style: SportikaType.micro.copyWith(
+                            color: tone,
+                            fontWeight: SportikaFontWeight.bold,
+                          ),
+                        ),
+                      ),
+
+                      Text(
+                        timeAgo(notification.at),
+                        style: SportikaType.micro.copyWith(
+                          color: SportikaColors.textDim,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Marks the message read and opens where it points.
-  ///
-  /// A message about something that no longer exists, or that belongs to
-  /// somebody else, says so instead of opening a screen the member may not
-  /// see.
-  Future<void> _open(
-    BuildContext context,
-    NotificationsController state,
-  ) async {
-    state.markNotificationRead(notification.id);
-    final result = await openNotification(context, notification);
-    if (result != NotificationOpenResult.unavailable) return;
+  Future<void> _navigate(BuildContext context) async {
     if (!context.mounted) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
-        content: Text('That is no longer available.'),
-        duration: Duration(seconds: 3),
-      ),
-    );
+
+    final result = await openNotification(context, notification);
+
+    if (!context.mounted) return;
+
+    if (result == NotificationOpenResult.unavailable) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text('That notification is no longer available.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   String _category(NotificationKind kind) => switch (kind) {
     NotificationKind.entryDecision ||
-    NotificationKind.tournamentUpdate => 'Tournaments',
+    NotificationKind.tournamentUpdate => 'TOURNAMENT',
     NotificationKind.fixtureChange ||
     NotificationKind.matchInvite ||
     NotificationKind.matchUpdate ||
-    NotificationKind.matchReminder => 'Matches',
-    NotificationKind.scorerAssignment => 'Scorer assignment',
+    NotificationKind.matchReminder => 'MATCH',
+    NotificationKind.scorerAssignment => 'SCORING',
     NotificationKind.resultSubmitted ||
     NotificationKind.resultPublished ||
-    NotificationKind.resultCorrected ||
-    NotificationKind.dispute => 'Results',
-    NotificationKind.teamUpdate => 'Teams',
-    NotificationKind.accountUpdate ||
-    NotificationKind.platformUpdate => 'System',
+    NotificationKind.resultCorrected => 'RESULT',
+    NotificationKind.dispute => 'DISPUTE',
+    NotificationKind.teamUpdate => 'TEAM',
+    NotificationKind.accountUpdate => 'ACCOUNT',
+    NotificationKind.platformUpdate => 'SPORTIKA',
   };
 
   Color _tone(NotificationKind kind) => switch (kind) {
@@ -478,21 +662,25 @@ class _NotificationTile extends StatelessWidget {
   };
 }
 
-/// Bell with an unread count, used in every root tab header.
+// ============================================================
+// PREMIUM NOTIFICATION BELL
+// ============================================================
+
 class NotificationBell extends StatelessWidget {
   const NotificationBell({super.key});
 
   @override
   Widget build(BuildContext context) {
     final unread = context.watch<NotificationsController>().unreadCount;
+
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.only(right: 8),
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Material(
             color: SportikaColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(SportikaRadius.control),
             child: Tooltip(
               message: 'Notifications',
               child: Semantics(
@@ -502,24 +690,35 @@ class NotificationBell extends StatelessWidget {
                     : 'Notifications',
                 child: InkWell(
                   onTap: () => showNotificationPreview(context),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(SportikaRadius.control),
                   child: Container(
-                    height: 44,
                     width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: SportikaColors.border),
+                      borderRadius: BorderRadius.circular(
+                        SportikaRadius.control,
+                      ),
+                      border: Border.all(
+                        color: unread > 0
+                            ? SportikaColors.blueBright.withValues(alpha: 0.45)
+                            : SportikaColors.border,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.notifications_none,
-                      size: 19,
-                      color: SportikaColors.textBody,
+                    child: Icon(
+                      unread > 0
+                          ? Icons.notifications_active_outlined
+                          : Icons.notifications_none_rounded,
+                      size: 21,
+                      color: unread > 0
+                          ? SportikaColors.mint
+                          : SportikaColors.textBody,
                     ),
                   ),
                 ),
               ),
             ),
           ),
+
           if (unread > 0)
             Positioned(right: -3, top: -4, child: AppBadge(count: unread)),
         ],
@@ -528,32 +727,49 @@ class NotificationBell extends StatelessWidget {
   }
 }
 
+// ============================================================
+// RETRY NOTICE
+// ============================================================
+
 class _RetryNotice extends StatelessWidget {
   const _RetryNotice({required this.onRetry});
+
   final VoidCallback onRetry;
+
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      const Icon(
-        Icons.cloud_off_outlined,
-        size: 18,
-        color: SportikaColors.textMuted,
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Row(
+        children: [
+          const Icon(
+            Icons.cloud_off_outlined,
+            color: SportikaColors.gold,
+            size: 19,
+          ),
+
+          const SizedBox(width: 10),
+
+          const Expanded(
+            child: Text(
+              'Some updates could not load.',
+              style: SportikaType.caption,
+            ),
+          ),
+
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
       ),
-      const SizedBox(width: 8),
-      const Expanded(
-        child: Text(
-          'Updates couldn’t load. Try again.',
-          style: TextStyle(fontSize: 12, color: SportikaColors.textMuted),
-        ),
-      ),
-      TextButton(onPressed: onRetry, child: const Text('Retry')),
-    ],
-  );
+    );
+  }
 }
 
-/// The preview shares the session controller, including live unread updates.
+// ============================================================
+// NOTIFICATION PREVIEW
+// ============================================================
+
 Future<void> showNotificationPreview(BuildContext context) async {
-  final state = context.read<NotificationsController>();
+  final controller = context.read<NotificationsController>();
+
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -561,10 +777,12 @@ Future<void> showNotificationPreview(BuildContext context) async {
     backgroundColor: SportikaColors.page,
     constraints: const BoxConstraints(maxWidth: 560),
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
-    builder: (sheetContext) => ChangeNotifierProvider.value(
-      value: state,
+    builder: (_) => ChangeNotifierProvider.value(
+      value: controller,
       child: _NotificationPreview(navigationContext: context),
     ),
   );
@@ -572,7 +790,9 @@ Future<void> showNotificationPreview(BuildContext context) async {
 
 class _NotificationPreview extends StatefulWidget {
   const _NotificationPreview({required this.navigationContext});
+
   final BuildContext navigationContext;
+
   @override
   State<_NotificationPreview> createState() => _NotificationPreviewState();
 }
@@ -581,80 +801,74 @@ class _NotificationPreviewState extends State<_NotificationPreview> {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<NotificationsController>().start();
+      if (!mounted) return;
+
+      context.read<NotificationsController>().start();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = context.watch<NotificationsController>();
+
     final items = state.myNotifications.take(5).toList();
+
     return SafeArea(
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .78,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.78,
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Notifications',
-                      style: TextStyle(
-                        fontFamily: 'Barlow Condensed',
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close notifications',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                  ),
-                ],
-              ),
+              // HEADER
               Row(
                 children: [
                   Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: Align(
-                        key: ValueKey(state.unreadCount),
-                        alignment: Alignment.centerLeft,
-                        child: Text(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Activity', style: SportikaType.display(24)),
+
+                        const SizedBox(height: 3),
+
+                        Text(
                           state.unreadCount > 0
-                              ? '${state.unreadCount} unread'
+                              ? '${state.unreadCount} unread updates'
                               : 'You are up to date',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: SportikaColors.textMuted,
-                          ),
+                          style: SportikaType.caption,
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: state.unreadCount > 0
-                        ? state.markAllNotificationsRead
-                        : null,
-                    child: const Text(
-                      'Mark all read',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+
+              const SizedBox(height: 12),
+
+              // MARK ALL READ
+              if (state.unreadCount > 0)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: state.markAllNotificationsRead,
+                    icon: const Icon(Icons.done_all_rounded, size: 17),
+                    label: const Text('Mark all read'),
+                  ),
+                ),
+
+              // NOTIFICATION LIST
               Flexible(
                 child: RefreshIndicator(
                   onRefresh: state.refresh,
@@ -665,10 +879,11 @@ class _NotificationPreviewState extends State<_NotificationPreview> {
                     children: [
                       if (state.error != null)
                         _RetryNotice(onRetry: state.refresh),
+
                       if (state.loading && items.isEmpty)
                         const LoadingSkeleton(
                           rows: 4,
-                          rowHeight: 68,
+                          rowHeight: 74,
                           label: 'Loading notifications',
                         )
                       else if (items.isEmpty)
@@ -676,15 +891,16 @@ class _NotificationPreviewState extends State<_NotificationPreview> {
                           padding: EdgeInsets.symmetric(vertical: 28),
                           child: EmptyState(
                             title: 'Nothing yet',
-                            body: 'Your match, team and tournament updates will appear here.',
+                            body: 'Your match, team and tournament activity will appear here.',
                             icon: Icons.notifications_none_rounded,
                           ),
                         )
                       else
                         for (final item in items)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.only(bottom: 10),
                             child: _NotificationTile(
+                              key: ValueKey(item.id),
                               notification: item,
                               compact: true,
                               navigationContext: widget.navigationContext,
@@ -695,7 +911,10 @@ class _NotificationPreviewState extends State<_NotificationPreview> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+
+              const SizedBox(height: 12),
+
+              // VIEW ALL
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -705,15 +924,17 @@ class _NotificationPreviewState extends State<_NotificationPreview> {
                   ),
                   onPressed: () {
                     final target = widget.navigationContext;
+
                     state.setUnreadOnly(false);
+
                     Navigator.pop(context);
-                    pushRoute(target, AppRoute.notifications);
+
+                    if (target.mounted) {
+                      pushRoute(target, AppRoute.notifications);
+                    }
                   },
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                  label: const Text(
-                    'View all',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                  ),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('View all notifications'),
                 ),
               ),
             ],

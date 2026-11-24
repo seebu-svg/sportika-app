@@ -6,7 +6,6 @@ import 'package:sportika/core/data/repositories.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -92,7 +91,7 @@ class TournamentHistoryScreen extends StatelessWidget {
               action: GhostButton(
                 label: 'Browse tournaments',
                 icon: Icons.search,
-                onPressed: () => openHomeTab(context, 1),
+                onPressed: () => openHomeTab(context, HomeTabIndex.tournaments),
               ),
             ),
           for (final row in rows)

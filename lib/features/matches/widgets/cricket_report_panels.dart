@@ -4,6 +4,93 @@ import 'package:sportika/features/matches/widgets/cricket_report_projection.dart
 import 'package:sportika/features/matches/widgets/cricket_report_style.dart';
 import 'package:sportika/shared/theme/theme.dart';
 
+/// The innings in three figures and a footnote.
+///
+/// It answers the first question a reader has — how many, off how many, at what
+/// rate — before the per-player tables, and names the XI members who never came
+/// out to bat, which no delivery row can show.
+class CricketInningsSummaryPanel extends StatelessWidget {
+  const CricketInningsSummaryPanel({
+    super.key,
+    required this.report,
+    this.didNotBat = const [],
+  });
+
+  final CricketInningsReport report;
+  final List<String> didNotBat;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const CricketSectionHeading('Innings'),
+      const SizedBox(height: 10),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: _SummaryFigure('Total', report.scoreLabel)),
+          Expanded(child: _SummaryFigure('Overs', report.oversLabel)),
+          Expanded(child: _SummaryFigure('Run rate', report.runRate)),
+        ],
+      ),
+      if (didNotBat.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const Text(
+          'DID NOT BAT',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: CricketReportType.statLabel,
+        ),
+        const SizedBox(height: 3),
+        Text(
+          didNotBat.join(', '),
+          style: CricketReportType.meta.copyWith(
+            color: SportikaColors.textBody,
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+/// One headline figure with its uppercase label underneath.
+class _SummaryFigure extends StatelessWidget {
+  const _SummaryFigure(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    label: '$label $value',
+    child: ExcludeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: CricketReportType.statStrong,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: CricketReportType.statLabel,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Batting card with fixed numeric columns. The batter column takes the
 /// remaining width so a long name truncates instead of squeezing the figures.
 class CricketBattingPanel extends StatelessWidget {
@@ -178,7 +265,10 @@ class CricketBowlingPanel extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'BOWLER',
+                // The bowling table sits under the scoring pad on the same
+                // screen, and the pad's own control reads BOWLER: the figure
+                // column names the person instead of repeating the role.
+                'NAME',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: CricketReportType.statLabel,
@@ -446,8 +536,8 @@ class _PartnershipRow extends StatelessWidget {
                         ? SportikaColors.text
                         : SportikaColors.textMuted,
                     fontWeight: partnership.unbroken
-                        ? FontWeight.w700
-                        : FontWeight.w500,
+                        ? SportikaFontWeight.bold
+                        : SportikaFontWeight.medium,
                   ),
                 ),
               ),

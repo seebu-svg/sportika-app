@@ -19,10 +19,6 @@ import 'package:sportika/features/matches/screens/create_match_screen.dart';
 import 'package:sportika/features/matches/screens/match_detail_screen.dart';
 import 'package:sportika/features/matches/screens/matches_screen.dart';
 import 'package:sportika/features/matches/scoring/match_scoring_shell.dart';
-import 'package:sportika/features/monetization/screens/billing_history_screen.dart';
-import 'package:sportika/features/monetization/screens/pricing_screen.dart';
-import 'package:sportika/features/monetization/screens/subscription_screen.dart';
-import 'package:sportika/features/monetization/screens/tournament_upgrade_screen.dart';
 import 'package:sportika/features/personal_games/screens/new_personal_match_screen.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
@@ -80,14 +76,6 @@ abstract final class AppRoute {
   static const String organizerDashboard = '/tournament/organizer';
   static const String scorerWorkspace = '/match/scorer';
   static const String resultsReview = '/match/results';
-
-  /// Plans, one subscription surface, the purchase ledger, and the per-tournament
-  /// upgrade flow. All four live under `/me/billing` except the upgrade, which is
-  /// reached from a tournament and carries its id.
-  static const String pricing = '/me/billing';
-  static const String subscription = '/me/billing/pro';
-  static const String billingHistory = '/me/billing/history';
-  static const String tournamentUpgrade = '/tournament/upgrade';
 
   static const String personalGames = '/personal';
   static const String newPersonalMatch = '/personal/new';
@@ -221,16 +209,6 @@ class ResultsReviewArgs {
   final String? highlightId;
 }
 
-/// Arguments for [AppRoute.tournamentUpgrade]. The pass unlocks exactly one
-/// tournament, so the id is required rather than inferred from whatever page
-/// pushed the route.
-@immutable
-class TournamentUpgradeArgs {
-  const TournamentUpgradeArgs(this.tournamentId);
-
-  final String tournamentId;
-}
-
 /// Builds the screen for a route. Kept as a named map so an unknown name can
 /// fall back instead of crashing on a production build.
 Widget Function(Object? args) _builderFor(String name) {
@@ -358,16 +336,6 @@ Widget Function(Object? args) _builderFor(String name) {
         final card = args as ScorecardArgs;
         return ScorecardScreen(id: card.id, mode: card.mode);
       };
-    case AppRoute.pricing:
-      return (_) => const PricingScreen();
-    case AppRoute.subscription:
-      return (_) => const SubscriptionScreen();
-    case AppRoute.billingHistory:
-      return (_) => const BillingHistoryScreen();
-    case AppRoute.tournamentUpgrade:
-      return (args) => TournamentUpgradeScreen(
-        tournamentId: (args as TournamentUpgradeArgs).tournamentId,
-      );
     default:
       return (_) => const _UnknownRouteScreen();
   }

@@ -39,9 +39,7 @@ Future<LocalSportikaRepository> freshState({bool onboardingSeen = true}) async {
 /// defaults to the flag the app is built with; tests for the code screen pass
 /// `true` explicitly, because the shipped build has it off. [profileModule]
 /// replaces the device adapter, so a test can drive the Me module with a fake
-/// server that fails, stalls or returns a chosen record. [monetizationRepository]
-/// does the same for billing, which is how the pricing, upgrade and history
-/// screens are tested against a paid, pending or empty ledger without a database.
+/// server that fails, stalls or returns a chosen record.
 Future<LocalSportikaRepository> pumpApp(
   WidgetTester tester, {
   LocalSportikaRepository? state,
@@ -50,7 +48,6 @@ Future<LocalSportikaRepository> pumpApp(
   AuthenticationService? authenticationService,
   bool? emailVerificationEnabled,
   ProfileModuleRepository? profileModule,
-  MonetizationRepository? monetizationRepository,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -71,7 +68,6 @@ Future<LocalSportikaRepository> pumpApp(
         authenticationService: service,
         emailVerificationEnabled: emailVerificationEnabled,
         profileModuleRepository: profileModule,
-        monetizationRepository: monetizationRepository,
       ),
     ),
   );

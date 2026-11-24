@@ -160,7 +160,7 @@ class _TermsScreenState extends State<TermsScreen> {
                       sections[i].heading,
                       style: const TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: SportikaFontWeight.extraBold,
                         color: SportikaColors.text,
                       ),
                     ),
@@ -205,7 +205,7 @@ class _Tabs extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: SportikaColors.surfaceSunken,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SportikaRadius.control),
         border: Border.all(color: SportikaColors.borderSubtle),
       ),
       child: Row(
@@ -246,10 +246,14 @@ class _Tab extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: selected ? SportikaColors.surfaceAlt : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            color: selected
+                ? SportikaColors.surfaceAlt
+                : SportikaColors.transparent,
+            borderRadius: BorderRadius.circular(SportikaRadius.badge),
             border: Border.all(
-              color: selected ? SportikaColors.border : Colors.transparent,
+              color: selected
+                  ? SportikaColors.border
+                  : SportikaColors.transparent,
             ),
           ),
           alignment: Alignment.center,
@@ -257,7 +261,7 @@ class _Tab extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 9,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               letterSpacing: 1.3,
               color: selected ? SportikaColors.text : SportikaColors.textDim,
             ),

@@ -131,6 +131,71 @@ void main() {
     });
   });
 
+  // ── Per-side score display ──────────────────────────────────────────────
+
+  group('PadelEngine per-side score display', () {
+    final rules = engine.rulesForFormat('Best of 3 sets');
+
+    // A 6-0, B 6-7 through a tie-break, then A 6-0: no set pair is symmetric,
+    // so a missing side reversal breaks the assertion immediately.
+    List<ScoringEvent> threeSetMatch() => [
+      ...List.filled(24, pt(0)), // Set 1: A takes six games without reply.
+      for (var game = 0; game < 6; game++) ...[
+        ...List.filled(4, pt(0)), // Set 2 alternates game by game to 6-6,
+        ...List.filled(4, pt(1)),
+      ],
+      ...List.filled(7, pt(1)), // B serves out the tie-break 7-0 for 6-7.
+      ...List.filled(24, pt(0)), // Set 3: A takes it 6-0 and the match.
+    ];
+
+    test("a completed match reads from each side's own end", () {
+      final p = engine.evaluate(
+        sides: ['A', 'B'],
+        rules: rules,
+        events: threeSetMatch(),
+      );
+      expect(p.isComplete, isTrue);
+      expect(p.winnerIndex, 0);
+      expect(p.scoreDisplay, ['6-0, 6-7, 6-0', '0-6, 7-6, 0-6']);
+      // The scoreboard rows and the submitted score come off one fold, so they
+      // cannot drift apart the way the display helper once did.
+      expect(p.lines[0].sub, p.scoreDisplay[0]);
+      expect(p.lines[1].sub, p.scoreDisplay[1]);
+    });
+
+    test('the set still in play is mirrored for the trailing side', () {
+      final p = engine.evaluate(
+        sides: ['A', 'B'],
+        rules: rules,
+        events: [
+          ...List.filled(24, pt(0)), // Set 1 closed at 6-0.
+          ...List.filled(12, pt(0)), // A is 3-0 up in the live set.
+        ],
+      );
+      expect(p.isComplete, isFalse);
+      expect(p.scoreDisplay, ['6-0, 3-0', '0-6, 0-3']);
+    });
+
+    test('a decided super tie-break reads as one game from each end', () {
+      final deciderRules = engine.rulesForFormat('Best of 3 · super tie-break');
+      final p = engine.evaluate(
+        sides: ['A', 'B'],
+        rules: deciderRules,
+        events: [
+          ...List.filled(24, pt(0)), // Set 1: A 6-0.
+          ...List.filled(24, pt(1)), // Set 2: B 6-0, so the decider is a TB.
+          ...List.filled(10, pt(1)), // B takes the 10-point decider 1-0.
+        ],
+      );
+      expect(p.isComplete, isTrue);
+      expect(p.winnerIndex, 1);
+      // The super tie-break is stored as the deciding set, reversed per side.
+      expect(p.scoreDisplay, ['6-0, 0-6, 0-1', '0-6, 6-0, 1-0']);
+      expect(p.lines[0].sub, p.scoreDisplay[0]);
+      expect(p.lines[1].sub, p.scoreDisplay[1]);
+    });
+  });
+
   // ── Serving rotation ────────────────────────────────────────────────────
 
   group('Padel serving rotation', () {

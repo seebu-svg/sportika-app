@@ -6,7 +6,6 @@ import 'package:sportika/core/state/profile_photo_controller.dart';
 import 'package:sportika/features/profile_photo/widgets/photo_cropper.dart';
 import 'package:sportika/features/profile_photo/widgets/photo_source_sheet.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 
 /// What one trip through the picture flow ended up doing, in the player's terms.

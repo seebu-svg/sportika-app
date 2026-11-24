@@ -1,6 +1,33 @@
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 
+/// The situations a badminton game can be in, in the order they matter.
+///
+/// One helper decides these for every surface — the official workspace, the
+/// Match Center, the broadcast scoreboard — so "Deuce" and "Golden point" can
+/// never mean two different things in two places.
+enum BadmintonSituationKind {
+  deuce,
+  goldenPoint,
+  gamePoint,
+  matchPoint,
+  interval,
+}
+
+class BadmintonSituation {
+  const BadmintonSituation({
+    required this.label,
+    required this.kind,
+    this.side,
+  });
+
+  final String label;
+  final BadmintonSituationKind kind;
+
+  /// The side the call belongs to, when it belongs to one.
+  final int? side;
+}
+
 /// Badminton rally-point scoring for singles or doubles: every rally scores,
 /// games to 21 (win by 2, capped at 30), and the match winner (spec §3).
 class BadmintonEngine implements SportEngine {
@@ -54,8 +81,12 @@ class BadmintonEngine implements SportEngine {
 
     for (final e in events) {
       if (e.kind != kRally || done) continue;
-      final s = e.side ?? 0;
-      server = s;
+      // A rally without a side is not a point for anybody: awarding side 0
+      // would invent a score the scorer never entered. The server refuses such
+      // a write, so this only guards a legacy log.
+      final s = e.side;
+      if (s != 0 && s != 1) continue;
+      server = s!;
       if (s == 0) {
         points0++;
       } else {
@@ -109,16 +140,27 @@ class BadmintonEngine implements SportEngine {
       ),
     ];
 
+    final situation = completed
+        ? null
+        : situationFor(
+            points: [points0, points1],
+            gamesWon: gamesWon,
+            gamesToWin: gamesToWin,
+            toWin: toWin,
+            cap: cap,
+            sides: sides,
+          );
+    final serveCourt = serveCourtFor(server == 0 ? points0 : points1);
+
     final chips = <String>[];
     if (completed) {
       chips.add('Games: ${gamesWon[0]}-${gamesWon[1]}');
     } else if (events.isNotEmpty) {
       chips.add('Game ${gamesTotal + 1} · $points0-$points1');
-      final gp = _gamePointLabel(points0, points1, toWin, cap, sides);
-      if (gp != null) chips.add(gp);
+      if (situation != null) chips.add(situation.label);
     }
     if (!completed && events.isNotEmpty) {
-      chips.add('Service: ${sides[server]}');
+      chips.add('Serving: ${sides[server]} · $serveCourt court');
     }
 
     final detail = <String>[
@@ -173,6 +215,7 @@ class BadmintonEngine implements SportEngine {
       state: {
         'completedGames': completedGames,
         'server': server,
+        'serveCourt': serveCourt,
         'gamesWon': [gamesWon[0], gamesWon[1]],
         'points': [points0, points1],
         'game': gamesTotal + 1,
@@ -180,17 +223,60 @@ class BadmintonEngine implements SportEngine {
     );
   }
 
-  String? _gamePointLabel(
-    int a,
-    int b,
-    int target,
-    int cap,
-    List<String> sides,
-  ) {
-    if (a == cap - 1 && b == cap - 1) return 'Golden point · next rally wins';
-    if (a == b && a >= target - 1) return 'Deuce · win by 2';
-    if (a >= target - 1 && a > b) return 'Game point · ${sides[0]}';
-    if (b >= target - 1 && b > a) return 'Game point · ${sides[1]}';
+  /// Where the serving side stands: the right court on an even score, the left
+  /// on an odd one. Derived from the fold, so undo and resume restore it.
+  static String serveCourtFor(int servingPoints) =>
+      servingPoints.isEven ? 'right' : 'left';
+
+  /// Deuce, golden point, game point, match point or the mid-game interval.
+  ///
+  /// The single source of truth for these words; the SQL fold repeats the same
+  /// arithmetic so a client and the server never disagree about the call.
+  static BadmintonSituation? situationFor({
+    required List<int> points,
+    required List<int> gamesWon,
+    required int gamesToWin,
+    required int toWin,
+    required int cap,
+    required List<String> sides,
+  }) {
+    if (points.length < 2) return null;
+    final a = points[0], b = points[1];
+    if (a >= cap - 1 && b >= cap - 1) {
+      return const BadmintonSituation(
+        label: 'Golden point · next rally wins',
+        kind: BadmintonSituationKind.goldenPoint,
+      );
+    }
+    if (a == b && a >= toWin - 1) {
+      return const BadmintonSituation(
+        label: 'Deuce · win by 2',
+        kind: BadmintonSituationKind.deuce,
+      );
+    }
+    for (final side in const [0, 1]) {
+      final p = side == 0 ? a : b;
+      final q = side == 0 ? b : a;
+      if (p < toWin - 1 || p <= q) continue;
+      final matchPoint =
+          side < gamesWon.length && gamesWon[side] >= gamesToWin - 1;
+      return BadmintonSituation(
+        label: '${matchPoint ? 'Match point' : 'Game point'} · ${sides[side]}',
+        kind: matchPoint
+            ? BadmintonSituationKind.matchPoint
+            : BadmintonSituationKind.gamePoint,
+        side: side,
+      );
+    }
+    final intervalAt = (toWin / 2).ceil();
+    if ((a == intervalAt && b < intervalAt) ||
+        (b == intervalAt && a < intervalAt)) {
+      return BadmintonSituation(
+        label: '$intervalAt-point interval',
+        kind: BadmintonSituationKind.interval,
+        side: a == intervalAt ? 0 : 1,
+      );
+    }
     return null;
   }
 }

@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/profile_avatar.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -14,18 +14,16 @@ import 'package:sportika/shared/widgets/widgets.dart';
 /// heavy weights, with italics reserved for the emotional half of a headline.
 TextStyle authDisplay(
   double size, {
-  Color color = Colors.white,
+  Color color = SportikaColors.text,
   bool italic = false,
   double height = .92,
   double letterSpacing = -1,
-}) => TextStyle(
-  fontFamily: 'Barlow Condensed',
-  fontSize: size,
-  height: height,
-  fontWeight: FontWeight.w900,
-  fontStyle: italic ? FontStyle.italic : FontStyle.normal,
-  letterSpacing: letterSpacing,
+}) => SportikaType.display(
+  size,
   color: color,
+  italic: italic,
+  height: height,
+  letterSpacing: letterSpacing,
 );
 
 /// Full-bleed sports photograph with a graceful editorial fallback. Reuses the
@@ -85,20 +83,13 @@ class AuthPhoto extends StatelessWidget {
 
   Widget _fallback() => DecoratedBox(
     decoration: BoxDecoration(
-      gradient: RadialGradient(
-        center: const Alignment(-.5, -.4),
-        radius: 1.25,
-        colors: [
-          sportColor(sport).withValues(alpha: .34),
-          SportikaColors.deepest,
-        ],
-      ),
+      gradient: SportikaGradients.sportFallback(sportColor(sport)),
     ),
     child: Center(
       child: Icon(
         sportGlyph(sport),
         size: 148,
-        color: Colors.white.withValues(alpha: .055),
+        color: SportikaColors.onAccent.withValues(alpha: .055),
       ),
     ),
   );
@@ -174,7 +165,7 @@ class AuthPage extends StatelessWidget {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
+        statusBarColor: SportikaColors.transparent,
         systemNavigationBarColor: SportikaColors.background,
       ),
       child: Scaffold(
@@ -190,17 +181,7 @@ class AuthPage extends StatelessWidget {
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0x40061426),
-                          Color(0xCC061426),
-                          SportikaColors.background,
-                          SportikaColors.background,
-                        ],
-                        stops: [0, .3, .58, .82],
-                      ),
+                      gradient: SportikaGradients.authPhotoScrim,
                     ),
                   ),
                 ),
@@ -225,7 +206,7 @@ class AuthPage extends StatelessWidget {
                             'SPORTIKA',
                             style: TextStyle(
                               fontSize: 10.5,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: SportikaFontWeight.black,
                               letterSpacing: 2.6,
                               color: SportikaColors.text,
                             ),
@@ -240,7 +221,7 @@ class AuthPage extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 9,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: SportikaFontWeight.extraBold,
                                   letterSpacing: 1.7,
                                   color: SportikaColors.textDim,
                                 ),
@@ -324,15 +305,17 @@ class _RoundIcon extends StatelessWidget {
     return Tooltip(
       message: tooltip ?? '',
       child: Material(
-        color: SportikaColors.deepest.withValues(alpha: .72),
-        shape: const CircleBorder(side: BorderSide(color: Color(0x33FFFFFF))),
+        color: SportikaColors.glass,
+        shape: const CircleBorder(
+          side: BorderSide(color: SportikaColors.overlay),
+        ),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: SizedBox(
             height: 48,
             width: 48,
-            child: Icon(icon, size: 18, color: Colors.white),
+            child: Icon(icon, size: 18, color: SportikaColors.onAccent),
           ),
         ),
       ),
@@ -365,12 +348,7 @@ class AuthEyebrow extends StatelessWidget {
         Flexible(
           child: Text(
             text.toUpperCase(),
-            style: TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 2.3,
-              color: tone,
-            ),
+            style: SportikaType.micro.copyWith(color: tone, letterSpacing: 2.3),
           ),
         ),
       ],
@@ -387,7 +365,7 @@ class AuthHeadline extends StatelessWidget {
     this.accent,
     this.size = 46,
     this.accentTone = SportikaColors.mint,
-    this.color = Colors.white,
+    this.color = SportikaColors.text,
   });
 
   final String primary;
@@ -424,7 +402,7 @@ class AuthLead extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: maxWidth),
       child: Text(
         text,
-        style: const TextStyle(
+        style: SportikaType.body.copyWith(
           fontSize: 13,
           height: 1.55,
           color: SportikaColors.textMuted,
@@ -464,16 +442,16 @@ class AuthStepRail extends StatelessWidget {
                     height: 2.5,
                     decoration: BoxDecoration(
                       color: i <= current ? tone : SportikaColors.border,
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(SportikaRadius.xxs),
                     ),
                   ),
                   const SizedBox(height: 7),
                   Text(
                     '0${i + 1}',
                     style: TextStyle(
-                      fontFamily: 'Barlow Condensed',
+                      fontFamily: SportikaType.displayFamily,
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: SportikaFontWeight.extraBold,
                       color: i <= current ? tone : SportikaColors.textDim,
                     ),
                   ),
@@ -484,7 +462,7 @@ class AuthStepRail extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 8.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: SportikaFontWeight.extraBold,
                       letterSpacing: 1.1,
                       color: i <= current
                           ? SportikaColors.textBody
@@ -607,7 +585,7 @@ class _AuthFieldState extends State<AuthField> {
                 widget.filledStyle ? widget.label : widget.label.toUpperCase(),
                 style: TextStyle(
                   fontSize: widget.filledStyle ? 12 : 9,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: SportikaFontWeight.extraBold,
                   letterSpacing: widget.filledStyle ? 0 : 1.8,
                   color: hasError
                       ? SportikaColors.danger
@@ -644,7 +622,7 @@ class _AuthFieldState extends State<AuthField> {
           style: const TextStyle(
             fontSize: 15.5,
             height: 1.35,
-            fontWeight: FontWeight.w600,
+            fontWeight: SportikaFontWeight.semibold,
             color: SportikaColors.text,
           ),
           decoration: InputDecoration(
@@ -654,19 +632,25 @@ class _AuthFieldState extends State<AuthField> {
             fillColor: SportikaColors.surface,
             border: widget.filledStyle
                 ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(
+                      SportikaRadius.thumbnail,
+                    ),
                     borderSide: BorderSide(color: ruleColor),
                   )
                 : InputBorder.none,
             enabledBorder: widget.filledStyle
                 ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(
+                      SportikaRadius.thumbnail,
+                    ),
                     borderSide: const BorderSide(color: SportikaColors.border),
                   )
                 : InputBorder.none,
             focusedBorder: widget.filledStyle
                 ? OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(
+                      SportikaRadius.thumbnail,
+                    ),
                     borderSide: BorderSide(color: ruleColor, width: 1.4),
                   )
                 : InputBorder.none,
@@ -679,7 +663,7 @@ class _AuthFieldState extends State<AuthField> {
             floatingLabelBehavior: FloatingLabelBehavior.never,
             hintStyle: const TextStyle(
               fontSize: 15.5,
-              fontWeight: FontWeight.w500,
+              fontWeight: SportikaFontWeight.medium,
               color: SportikaColors.textDim,
             ),
             suffixIcon:
@@ -764,7 +748,7 @@ class AuthAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final loading = busy || context.watch<AuthFlowController>().busy;
     final enabled = onPressed != null && !loading;
-    final foreground = ghost ? Colors.white : Colors.white;
+    final foreground = SportikaColors.onAccent;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -775,27 +759,25 @@ class AuthAction extends StatelessWidget {
           width: double.infinity,
           child: Material(
             color: ghost
-                ? Colors.white.withValues(alpha: .04)
+                ? SportikaColors.onAccent.withValues(
+                    alpha: SportikaOpacity.whisper,
+                  )
                 : enabled
                 ? tone
                 : tone.withValues(alpha: .35),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(SportikaRadius.button),
             child: InkWell(
               onTap: enabled ? onPressed : null,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(SportikaRadius.button),
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(SportikaRadius.button),
                   border: ghost
                       ? Border.all(color: SportikaColors.borderStrong)
                       : null,
                   gradient: ghost || !enabled
                       ? null
-                      : LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [tone, Color.lerp(tone, Colors.white, .14)!],
-                        ),
+                      : SportikaGradients.accentFill(tone),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Row(
@@ -806,7 +788,7 @@ class AuthAction extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: SportikaType.bodyFamily,
                           fontSize: 13.5,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: SportikaFontWeight.extraBold,
                           letterSpacing: 1.1,
                           color: foreground.withValues(alpha: enabled ? 1 : .7),
                         ),
@@ -818,7 +800,7 @@ class AuthAction extends StatelessWidget {
                         width: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: SportikaColors.onAccent,
                         ),
                       )
                     else if (icon != null)
@@ -875,7 +857,7 @@ class AuthLink extends StatelessWidget {
               label,
               style: const TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: SportikaFontWeight.bold,
                 letterSpacing: .2,
               ),
             ),
@@ -903,7 +885,7 @@ class AuthDivider extends StatelessWidget {
             label,
             style: const TextStyle(
               fontSize: 8.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               letterSpacing: 1.8,
               color: SportikaColors.textDim,
             ),
@@ -978,15 +960,15 @@ class AuthSelectCard extends StatelessWidget {
         color: selected
             ? tone.withValues(alpha: .10)
             : SportikaColors.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(SportikaRadius.lg),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(SportikaRadius.lg),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             padding: padding,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(SportikaRadius.lg),
               border: Border.all(
                 color: selected ? tone : SportikaColors.border,
                 width: selected ? 1.4 : 1,
@@ -1023,10 +1005,10 @@ class AuthChoicePill extends StatelessWidget {
       color: selected
           ? tone.withValues(alpha: .16)
           : SportikaColors.surfaceSunken,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(SportikaRadius.pill),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(SportikaRadius.pill),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: EdgeInsets.symmetric(
@@ -1034,7 +1016,7 @@ class AuthChoicePill extends StatelessWidget {
             vertical: dense ? 6 : 9,
           ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(SportikaRadius.pill),
             border: Border.all(
               color: selected
                   ? tone.withValues(alpha: .7)
@@ -1045,7 +1027,7 @@ class AuthChoicePill extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: dense ? 10.5 : 11.5,
-              fontWeight: FontWeight.w700,
+              fontWeight: SportikaFontWeight.bold,
               color: selected ? tone : SportikaColors.textBody,
             ),
           ),
@@ -1119,7 +1101,9 @@ class _AuthOtpInputState extends State<AuthOtpInput> {
       filled: true,
       fillColor: SportikaColors.surfaceSunken,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
+      ),
     ),
     onChanged: (value) {
       widget.onChanged(value);
@@ -1128,7 +1112,8 @@ class _AuthOtpInputState extends State<AuthOtpInput> {
   );
 }
 
-/// Circular avatar preview; initials instead of a photo upload.
+/// Circular avatar preview; the branded default portrait until a photo is
+/// imported.
 class AuthAvatar extends StatelessWidget {
   const AuthAvatar({
     super.key,
@@ -1138,6 +1123,7 @@ class AuthAvatar extends StatelessWidget {
     this.showRing = true,
     this.photoPath,
     this.photoUrl,
+    this.figure,
   });
 
   final String initials;
@@ -1146,11 +1132,14 @@ class AuthAvatar extends StatelessWidget {
   final bool showRing;
 
   /// The imported picture, when the player has one. Anything the profile photo
-  /// store did not issue falls back to the gradient face.
+  /// store did not issue falls back to the branded default portrait.
   final String? photoPath;
 
   /// The uploaded copy, shown when this device has no local file.
   final String? photoUrl;
+
+  /// Which default portrait to draw while no picture is set.
+  final DefaultAvatarFigure? figure;
 
   @override
   Widget build(BuildContext context) {
@@ -1161,6 +1150,7 @@ class AuthAvatar extends StatelessWidget {
       photoUrl: photoUrl,
       size: size,
       showRing: showRing,
+      figure: figure,
     );
   }
 }
@@ -1185,7 +1175,7 @@ class AuthNotice extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .09),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SportikaRadius.control),
         border: Border.all(color: tone.withValues(alpha: .32)),
       ),
       child: Row(
@@ -1230,7 +1220,7 @@ class AuthSummaryRow extends StatelessWidget {
               label.toUpperCase(),
               style: const TextStyle(
                 fontSize: 8.5,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 1.4,
                 color: SportikaColors.textDim,
                 height: 1.6,
@@ -1243,7 +1233,7 @@ class AuthSummaryRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.35,
-                fontWeight: FontWeight.w600,
+                fontWeight: SportikaFontWeight.semibold,
                 color: tone ?? SportikaColors.textBody,
               ),
             ),
@@ -1273,7 +1263,7 @@ class AuthRule extends StatelessWidget {
             label!.toUpperCase(),
             style: const TextStyle(
               fontSize: 8.5,
-              fontWeight: FontWeight.w800,
+              fontWeight: SportikaFontWeight.extraBold,
               letterSpacing: 1.6,
               color: SportikaColors.textDim,
             ),

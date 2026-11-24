@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sportika/shared/models/profile_module.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 class MatchSheetIntro extends StatelessWidget {

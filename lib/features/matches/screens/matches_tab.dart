@@ -3,18 +3,22 @@ import 'package:provider/provider.dart';
 
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/state/match_controller.dart';
-import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/features/discover/screens/games_tab.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
+import 'package:sportika/features/matches/widgets/match_center_hero.dart';
+import 'package:sportika/features/matches/widgets/match_feed_content.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/widgets/cinematic_backdrop.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
-import 'package:sportika/shared/widgets/match_scoreboard.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// One match feed, with official one-off matches and tournament fixtures.
+/// Discovery and play for standalone official matches.
+///
+/// Tournament fixtures belong to the Tournaments tab: this feed only reads
+/// matches with no [SportMatch.tournamentId], so a fixture can never appear in
+/// two places with two different scores.
 class MatchesTab extends StatefulWidget {
   const MatchesTab({super.key, this.initialScope = 0});
   final int initialScope;
@@ -27,8 +31,10 @@ class _MatchesTabState extends State<MatchesTab> {
   late int _scope = widget.initialScope;
   Sport? _sport;
   bool _mine = false;
+  bool _joinable = false;
   bool _searchOpen = false;
   bool _loading = false;
+  bool _answeringInvite = false;
   String? _error;
   final _search = TextEditingController();
 
@@ -60,21 +66,31 @@ class _MatchesTabState extends State<MatchesTab> {
       _error = null;
     });
     try {
-      await Future.wait([
-        context.read<MatchController>().refresh(),
-        context.read<FixturesController>().refresh(),
-      ]);
-      if (mounted) {
-        setState(
-          () => _error =
-              context.read<MatchController>().lastError ??
-              context.read<FixturesController>().lastError,
-        );
-      }
+      final controller = context.read<MatchController>();
+      await controller.refresh();
+      if (mounted) setState(() => _error = controller.lastError);
     } catch (error) {
       if (mounted) setState(() => _error = '$error');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// The invitation card is the only place an invite reaches a member without
+  /// the notifications screen, so it answers through the same RPC the sheet
+  /// uses (`respond_match_invite`).
+  Future<void> _respondInvite(SportMatch match, bool accept) async {
+    final controller = context.read<MatchController>();
+    setState(() => _answeringInvite = true);
+    final ok = await controller.respondToInvite(match.id, accept: accept);
+    if (!mounted) return;
+    setState(() => _answeringInvite = false);
+    if (!ok && mounted) {
+      showSnack(
+        context,
+        controller.lastError ?? 'That did not work',
+        error: true,
+      );
     }
   }
 
@@ -90,11 +106,12 @@ class _MatchesTabState extends State<MatchesTab> {
   @override
   Widget build(BuildContext context) {
     final matches = context.watch<MatchController>();
-    final fixtures = context.watch<FixturesController>();
     final needle = _search.text.trim().toLowerCase();
     bool accepts(Sport sport, String text) =>
         (_sport == null || _sport == sport) &&
         (needle.isEmpty || text.toLowerCase().contains(needle));
+    final filtered =
+        _search.text.isNotEmpty || _sport != null || _mine || _joinable;
     final source = switch (_scope) {
       1 => matches.liveMatches,
       2 =>
@@ -108,410 +125,524 @@ class _MatchesTabState extends State<MatchesTab> {
     final visible = source
         .where(
           (m) =>
+              m.tournamentId == null &&
+              !m.isDemo &&
               (!_mine || mine.contains(m.id)) &&
+              (!_joinable || m.isOpenToJoin) &&
               accepts(
                 m.sport,
                 '${m.title} ${m.venue} ${m.sideNames.join(' ')} ${m.sport.label}',
               ),
         )
         .toList();
-    final fixtureSource = switch (_scope) {
-      1 => fixtures.liveFixtures,
-      2 => fixtures.scheduledFixtures,
-      3 => fixtures.completedFixtures,
-      _ => fixtures.publicFixtures,
-    };
-    final myFixtures = fixtures.myFixtures.map((f) => f.id).toSet();
-    final tournamentFixtures = fixtureSource.where((f) {
-      final tournament = fixtures.tournamentOf(f);
-      return (!_mine || myFixtures.contains(f.id)) &&
-          accepts(
-            tournament?.sport ?? Sport.cricket,
-            '${tournament?.name ?? ''} ${f.venue} ${fixtures.sideLabelsOf(f).join(' ')} ${tournament?.sport.label ?? ''}',
-          );
-    }).toList();
     final cards =
-        <({DateTime date, Widget card})>[
+        <MatchFeedItem>[
           for (final m in visible)
-            (
+            MatchFeedItem(
+              title: m.title,
+              sport: m.sport,
+              status: m.status,
               date: m.scheduledAt,
-              card: _FixtureCard(
-                title: m.title,
-                sport: m.sport,
-                status: m.status,
-                metadata: '${m.formatLabel} · ${dateShort(m.scheduledAt)}',
-                scoreboard: MatchScoreboard(
-                  compact: true,
-                  sport: m.sport,
-                  labels: [
-                    for (var i = 0; i < 2; i++)
-                      m.sideLabels.length > i
-                          ? m.sideLabels[i]
-                          : 'Side ${i + 1}',
-                  ],
-                  progress:
-                      m.status != FixtureStatus.cancelled &&
-                          (m.isLive || m.result != null)
-                      ? matches.progressOf(m)
-                      : null,
-                  result: m.status == FixtureStatus.cancelled ? null : m.result,
-                  finished: m.result != null,
-                ),
-                onTap: () => pushRoute(
-                  context,
-                  AppRoute.matchDetail,
-                  args: MatchArgs(m.id),
-                ),
-              ),
-            ),
-          for (final f in tournamentFixtures)
-            (
-              date: f.scheduledAt,
-              card: _FixtureCard(
-                title: [
-                  fixtures.tournamentOf(f)?.name ?? 'Tournament',
-                  if (f.stage.isNotEmpty) f.stage,
-                ].join(' · '),
-                sport: fixtures.tournamentOf(f)?.sport ?? Sport.cricket,
-                status: f.status,
-                metadata: [
-                  if (fixtures.tournamentOf(f)?.formatLabel.isNotEmpty == true)
-                    fixtures.tournamentOf(f)!.formatLabel,
-                  dateShort(f.scheduledAt),
-                ].join(' · '),
-                scoreboard: MatchScoreboard(
-                  compact: true,
-                  sport: fixtures.tournamentOf(f)?.sport ?? Sport.cricket,
-                  labels: fixtures.sideLabelsOf(f),
-                  progress:
-                      f.status != FixtureStatus.cancelled && f.events.isNotEmpty
-                      ? fixtures.progressOfFixture(f)
-                      : null,
-                  result: f.status == FixtureStatus.cancelled ? null : f.result,
-                  finished: f.result != null,
-                ),
-                onTap: () => pushRoute(
-                  context,
-                  AppRoute.fixtureDetail,
-                  args: FixtureDetailArgs(f.id),
-                ),
+              venue: m.venue,
+              format: m.formatLabel,
+              sides: m.sideLabels,
+              result: m.result,
+              paused: m.pausedAt != null,
+              openToJoin: m.isOpenToJoin,
+              loadProgress: m.events.any((event) => !event.voided)
+                  ? () => matches.progressOf(m)
+                  : null,
+              onTap: () => pushRoute(
+                context,
+                AppRoute.matchDetail,
+                args: MatchArgs(m.id),
               ),
             ),
         ]..sort(
           (a, b) =>
               _scope == 3 ? b.date.compareTo(a.date) : a.date.compareTo(b.date),
         );
+    final featured = _featuredMatch(cards);
+    final remaining = cards.where((item) => item != featured).toList();
+    final liveCount = cards
+        .where((item) => item.status == FixtureStatus.live)
+        .length;
+    final upcomingCount = cards
+        .where((item) => item.status == FixtureStatus.upcoming)
+        .length;
+    final scopeTone = switch (_scope) {
+      1 => SportikaColors.mint,
+      2 => SportikaColors.blueBright,
+      3 => SportikaColors.gold,
+      _ => SportikaColors.mint,
+    };
 
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: sportikaMaxContentWidth),
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  SportikaSpacing.lg,
-                  SportikaSpacing.md,
-                  SportikaSpacing.lg,
-                  SportikaSpacing.sm,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Matches', style: SportikaType.title),
-                                SizedBox(height: SportikaSpacing.xs),
-                                Text(
-                                  'Fixtures, live scores & results',
-                                  style: SportikaType.caption,
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: _searchOpen
-                                ? 'Close search'
-                                : 'Search matches',
-                            isSelected: _searchOpen,
-                            onPressed: () => setState(() {
-                              _searchOpen = !_searchOpen;
-                              if (!_searchOpen) _search.clear();
-                            }),
-                            icon: Icon(
-                              _searchOpen ? Icons.close : Icons.search,
-                            ),
-                          ),
-                          PopupMenuButton<String>(
-                            tooltip: 'More match options',
-                            onSelected: (value) {
-                              switch (value) {
-                                case 'mine':
-                                  setState(() => _mine = !_mine);
-                                case 'personal':
-                                  pushRoute(context, AppRoute.personalGames);
-                                case 'games':
-                                  _openGames();
-                                case 'scorer':
-                                  pushRoute(context, AppRoute.scorerWorkspace);
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              CheckedPopupMenuItem(
-                                value: 'mine',
-                                checked: _mine,
-                                child: const Text('My matches only'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'personal',
-                                child: Text('Personal games'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'games',
-                                child: Text('Pickup games'),
-                              ),
-                              const PopupMenuItem(
-                                value: 'scorer',
-                                child: Text('Scorer assignments'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: SportikaSpacing.sm),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(
-                          onPressed: () =>
-                              pushRoute(context, AppRoute.createMatch),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Create Match'),
-                        ),
-                      ),
-                      if (_searchOpen) ...[
-                        const SizedBox(height: SportikaSpacing.sm),
-                        TextField(
-                          controller: _search,
-                          autofocus: true,
-                          onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            hintText: 'Search matches, teams or venues',
-                            prefixIcon: Icon(Icons.search),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: SportikaSpacing.sm),
-                      FilterChipRow<int>(
-                        label: 'Match status',
-                        selected: _scope,
-                        onChanged: (v) => setState(() => _scope = v),
-                        choices: const [
-                          FilterChoice(0, 'All'),
-                          FilterChoice(1, 'Live'),
-                          FilterChoice(2, 'Upcoming'),
-                          FilterChoice(3, 'Results'),
-                        ],
-                      ),
-                      const SizedBox(height: SportikaSpacing.xs),
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: SportikaSpacing.sm,
-                        children: [
-                          Text(
-                            _mine
-                                ? 'My ${['matches', 'live matches', 'upcoming matches', 'results'][_scope]}'
-                                : [
-                                    'All matches',
-                                    'Live now',
-                                    'Upcoming matches',
-                                    'Results',
-                                  ][_scope],
-                            style: SportikaType.bodyStrong,
-                          ),
-                          PopupMenuButton<int>(
-                            tooltip: 'Filter by sport',
-                            onSelected: (v) => setState(
-                              () => _sport = v < 0 ? null : Sport.values[v],
-                            ),
-                            itemBuilder: (_) => [
-                              const PopupMenuItem<int>(
-                                value: -1,
-                                child: Text('All sports'),
-                              ),
-                              for (final sport in Sport.values)
-                                PopupMenuItem<int>(
-                                  value: sport.index,
-                                  child: Text(sport.label),
-                                ),
-                            ],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: SportikaSpacing.md,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _sport?.label ?? 'All sports',
-                                    style: SportikaType.action,
-                                  ),
-                                  const Icon(Icons.expand_more, size: 20),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${cards.length} ${cards.length == 1 ? 'match' : 'matches'}',
-                        style: SportikaType.caption,
-                      ),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.only(top: SportikaSpacing.sm),
-                          child: LinearProgressIndicator(),
-                        ),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            top: SportikaSpacing.sm,
-                          ),
-                          child: ErrorState(
-                            title: 'Matches could not refresh',
-                            message: _error!,
-                            onRetry: _refresh,
-                          ),
-                        ),
-                      if (matches.sync.isWarning)
-                        const Padding(
-                          padding: EdgeInsets.only(top: SportikaSpacing.sm),
-                          child: InlineBanner(
-                            text: 'Matches may be out of date. Pull down to refresh.',
-                            tone: SportikaColors.gold,
-                            icon: Icons.cloud_off,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              if (_loading && cards.isEmpty)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(SportikaSpacing.lg),
-                    child: LoadingSkeleton(
-                      rows: 3,
-                      label: 'Loading matches',
-                      rowHeight: 116,
-                    ),
-                  ),
-                )
-              else if (cards.isEmpty && _error == null)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: EmptyState(
-                    title: 'No matches here yet',
-                    body: 'Try another sport, change the status filter or clear your search.',
-                    icon: Icons.sports_score,
-                  ),
-                )
-              else
+        child: CinematicBackdrop(
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(
                     SportikaSpacing.lg,
-                    SportikaSpacing.xs,
+                    SportikaSpacing.md,
                     SportikaSpacing.lg,
-                    SportikaSpacing.xl,
+                    SportikaSpacing.sm,
                   ),
-                  sliver: SliverList.separated(
-                    itemCount: cards.length,
-                    separatorBuilder: (_, _) =>
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        MatchCenterHero(
+                          selectedSport: _sport,
+                          liveCount: liveCount,
+                          upcomingCount: upcomingCount,
+                          matchCount: cards.length,
+                        ),
+                        const SizedBox(height: SportikaSpacing.md),
+                        MatchSportSelector(
+                          selected: _sport,
+                          onChanged: (sport) => setState(() => _sport = sport),
+                        ),
+                        if (matches.myInvites.isNotEmpty) ...[
+                          const SizedBox(height: SportikaSpacing.md),
+                          _InvitesCard(
+                            invites: matches.myInvites,
+                            busy: _answeringInvite,
+                            onRespond: _respondInvite,
+                            onOpen: (id) => pushRoute(
+                              context,
+                              AppRoute.matchDetail,
+                              args: MatchArgs(id),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: SportikaSpacing.sm),
-                    itemBuilder: (_, i) => cards[i].card,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: FilledButton.icon(
+                                  onPressed: () =>
+                                      pushRoute(context, AppRoute.createMatch),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Create Match'),
+                                ),
+                              ),
+                            ),
+                            _ToolbarGroup(
+                              children: [
+                                IconButton(
+                                  tooltip: _searchOpen
+                                      ? 'Close search'
+                                      : 'Search matches',
+                                  isSelected: _searchOpen,
+                                  onPressed: () => setState(() {
+                                    _searchOpen = !_searchOpen;
+                                    if (!_searchOpen) _search.clear();
+                                  }),
+                                  icon: Icon(
+                                    _searchOpen ? Icons.close : Icons.search,
+                                  ),
+                                ),
+                                PopupMenuButton<String>(
+                                  tooltip: 'More match options',
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'mine':
+                                        setState(() => _mine = !_mine);
+                                      case 'joinable':
+                                        setState(() => _joinable = !_joinable);
+                                      case 'personal':
+                                        pushRoute(
+                                          context,
+                                          AppRoute.personalGames,
+                                        );
+                                      case 'games':
+                                        _openGames();
+                                      case 'scorer':
+                                        pushRoute(
+                                          context,
+                                          AppRoute.scorerWorkspace,
+                                        );
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    CheckedPopupMenuItem(
+                                      value: 'mine',
+                                      checked: _mine,
+                                      child: const Text('My matches only'),
+                                    ),
+                                    CheckedPopupMenuItem(
+                                      value: 'joinable',
+                                      checked: _joinable,
+                                      child: const Text('Open to join only'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'personal',
+                                      child: Text('Personal games'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'games',
+                                      child: Text('Pickup games'),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'scorer',
+                                      child: Text('Scorer assignments'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        if (_searchOpen) ...[
+                          const SizedBox(height: SportikaSpacing.sm),
+                          TextField(
+                            controller: _search,
+                            autofocus: true,
+                            onChanged: (_) => setState(() {}),
+                            decoration: const InputDecoration(
+                              hintText: 'Search matches, teams or venues',
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: SportikaSpacing.sm),
+                        FilterChipRow<int>(
+                          label: 'Match status',
+                          selected: _scope,
+                          onChanged: (v) => setState(() => _scope = v),
+                          tone: scopeTone,
+                          choices: const [
+                            FilterChoice(0, 'All'),
+                            FilterChoice(1, 'Live'),
+                            FilterChoice(2, 'Upcoming'),
+                            FilterChoice(3, 'Results'),
+                          ],
+                        ),
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.only(top: SportikaSpacing.sm),
+                            child: LinearProgressIndicator(),
+                          ),
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: SportikaSpacing.sm,
+                            ),
+                            child: ErrorState(
+                              title: 'Matches could not refresh',
+                              message: _error!,
+                              onRetry: _refresh,
+                            ),
+                          ),
+                        if (matches.sync.isWarning)
+                          const Padding(
+                            padding: EdgeInsets.only(top: SportikaSpacing.sm),
+                            child: InlineBanner(
+                              text: 'Matches may be out of date. Pull down to refresh.',
+                              tone: SportikaColors.gold,
+                              icon: Icons.cloud_off,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-            ],
+                if (_loading && cards.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(SportikaSpacing.lg),
+                      child: LoadingSkeleton(
+                        rows: 3,
+                        label: 'Loading matches',
+                        rowHeight: 116,
+                      ),
+                    ),
+                  )
+                else if (cards.isEmpty && _error == null)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EmptyState(
+                      title: filtered
+                          ? 'No matches for these filters'
+                          : [
+                              'No matches yet',
+                              'No live matches',
+                              'No upcoming matches',
+                              'No results yet',
+                            ][_scope],
+                      body: filtered
+                          ? 'Change your filters or clear your search.'
+                          : 'Create a match or open one from your invitations.',
+                      icon: Icons.sports_score,
+                    ),
+                  ),
+                if (featured != null)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      SportikaSpacing.lg,
+                      SportikaSpacing.md,
+                      SportikaSpacing.lg,
+                      SportikaSpacing.lg,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _FeedHeading(title: 'Featured match'),
+                          const SizedBox(height: SportikaSpacing.sm),
+                          MatchFeedCard(item: featured, featured: true),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (remaining.isNotEmpty) ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: SportikaSpacing.lg,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _FeedHeading(
+                        title: _mine
+                            ? [
+                                'My matches',
+                                'My live matches',
+                                'My upcoming matches',
+                                'My results',
+                              ][_scope]
+                            : [
+                                'All matches',
+                                'Live now',
+                                'Upcoming matches',
+                                'Results',
+                              ][_scope],
+                        count: remaining.length,
+                        tone: scopeTone,
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      SportikaSpacing.lg,
+                      SportikaSpacing.sm,
+                      SportikaSpacing.lg,
+                      SportikaSpacing.xl,
+                    ),
+                    sliver: SliverList.separated(
+                      itemCount: remaining.length,
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: SportikaSpacing.sm),
+                      itemBuilder: (_, i) => MatchFeedCard(item: remaining[i]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  MatchFeedItem? _featuredMatch(List<MatchFeedItem> items) {
+    for (final status in [FixtureStatus.live, FixtureStatus.upcoming]) {
+      for (final item in items) {
+        if (item.status == status) return item;
+      }
+    }
+    MatchFeedItem? latestResult;
+    for (final item in items) {
+      if (item.status != FixtureStatus.published &&
+          item.status != FixtureStatus.walkover) {
+        continue;
+      }
+      if (latestResult == null || item.date.isAfter(latestResult.date)) {
+        latestResult = item;
+      }
+    }
+    return latestResult;
+  }
 }
 
-class _FixtureCard extends StatelessWidget {
-  const _FixtureCard({
-    required this.title,
-    required this.sport,
-    required this.status,
-    required this.metadata,
-    required this.scoreboard,
-    required this.onTap,
+/// Pending invitations, newest first.
+///
+/// An invitation used to be reachable only through the notification list, and a
+/// member who dismissed that notification had no way back into the match. The
+/// card answers through `respond_match_invite`, the same RPC the match sheet
+/// uses, so the two surfaces cannot disagree.
+class _InvitesCard extends StatelessWidget {
+  const _InvitesCard({
+    required this.invites,
+    required this.busy,
+    required this.onRespond,
+    required this.onOpen,
   });
+
+  final List<SportMatch> invites;
+  final bool busy;
+  final Future<void> Function(SportMatch match, bool accept) onRespond;
+  final void Function(String matchId) onOpen;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+    padding: const EdgeInsets.all(SportikaSpacing.md),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.mark_email_unread_outlined, size: 18),
+            const SizedBox(width: SportikaSpacing.sm),
+            const Expanded(
+              child: Text('Your invitations', style: SportikaType.bodyStrong),
+            ),
+            Text('${invites.length}', style: SportikaType.caption),
+          ],
+        ),
+        const SizedBox(height: SportikaSpacing.sm),
+        for (final invite in invites)
+          Padding(
+            padding: const EdgeInsets.only(bottom: SportikaSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkWell(
+                  onTap: () => onOpen(invite.id),
+                  borderRadius: BorderRadius.circular(SportikaRadius.md),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: SportikaSpacing.xs,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          invite.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SportikaType.bodyStrong,
+                        ),
+                        Text(
+                          '${invite.sport.label} · '
+                          '${dateShort(invite.scheduledAt)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SportikaType.caption,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'Accept',
+                        icon: Icons.check_circle_outline,
+                        tone: SportikaColors.mint,
+                        onPressed: busy ? null : () => onRespond(invite, true),
+                      ),
+                    ),
+                    const SizedBox(width: SportikaSpacing.sm),
+                    Expanded(
+                      child: GhostButton(
+                        label: 'Decline',
+                        icon: Icons.close,
+                        tone: SportikaColors.danger,
+                        expand: true,
+                        onPressed: busy ? null : () => onRespond(invite, false),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// Section rule above a group of fixtures: a tone bar, the broadcast title and
+/// an optional count so the feed stays scannable.
+class _FeedHeading extends StatelessWidget {
+  const _FeedHeading({
+    required this.title,
+    this.count,
+    this.tone = SportikaColors.mint,
+  });
+
   final String title;
-  final Sport sport;
-  final FixtureStatus status;
-  final String metadata;
-  final Widget scoreboard;
-  final VoidCallback onTap;
+  final int? count;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 3,
+        height: 18,
+        decoration: BoxDecoration(
+          color: tone,
+          borderRadius: BorderRadius.circular(SportikaRadius.pill),
+        ),
+      ),
+      const SizedBox(width: SportikaSpacing.sm),
+      Expanded(
+        child: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: SportikaType.headline,
+        ),
+      ),
+      if (count != null)
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: SportikaSpacing.sm,
+            vertical: SportikaSpacing.xxs,
+          ),
+          decoration: BoxDecoration(
+            color: SportikaColors.surfaceSunken,
+            borderRadius: BorderRadius.circular(SportikaRadius.pill),
+            border: Border.all(color: SportikaColors.borderSubtle),
+          ),
+          child: Text(
+            '$count',
+            style: SportikaType.micro.copyWith(color: SportikaColors.textBody),
+          ),
+        ),
+    ],
+  );
+}
+
+/// Groups the search and overflow actions into one toolbar capsule.
+class _ToolbarGroup extends StatelessWidget {
+  const _ToolbarGroup({required this.children});
+
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) => Material(
-    color: SportikaColors.surface,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(SportikaRadius.md),
-      side: const BorderSide(color: SportikaColors.border),
+    color: SportikaColors.surfaceSunken.withValues(
+      alpha: SportikaOpacity.heavy,
     ),
+    borderRadius: BorderRadius.circular(SportikaRadius.md),
     clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(SportikaSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: SportikaSpacing.sm,
-              runSpacing: SportikaSpacing.xs,
-              children: [
-                Text(sport.label, style: SportikaType.caption),
-                Text(
-                  status.label,
-                  style: SportikaType.caption.copyWith(
-                    color: statusColor(status.key),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: SportikaSpacing.xs),
-            Text(title, style: SportikaType.bodyStrong),
-            const SizedBox(height: SportikaSpacing.md),
-            scoreboard,
-            const SizedBox(height: SportikaSpacing.sm),
-            Row(
-              children: [
-                Expanded(child: Text(metadata, style: SportikaType.caption)),
-                const SizedBox(width: SportikaSpacing.sm),
-                const Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  semanticLabel: 'Open match details',
-                  color: SportikaColors.textMuted,
-                ),
-              ],
-            ),
-          ],
-        ),
+    child: Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
+        border: Border.all(color: SportikaColors.borderSubtle),
       ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: children),
     ),
   );
 }

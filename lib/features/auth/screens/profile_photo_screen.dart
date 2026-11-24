@@ -8,6 +8,7 @@ import 'package:sportika/core/state/profile_photo_controller.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/shared/widgets/avatar_presets.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 import 'package:sportika/features/profile_photo/profile_photo_flow.dart';
 
@@ -70,6 +71,7 @@ class ProfilePhotoScreen extends StatelessWidget {
               ProfileAvatar(
                 initials: initialsOf(flow.fullName),
                 avatarId: flow.avatar,
+                figure: defaultAvatarFigureFor(flow.gender),
                 photoPath: photos.photoPath,
                 photoUrl: photos.photoUrl,
                 size: 120,
@@ -88,7 +90,7 @@ class ProfilePhotoScreen extends StatelessWidget {
                 flow.handle.isEmpty ? '@yourhandle' : '@${flow.handle}',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: SportikaFontWeight.semibold,
                   color: option.colors.first,
                 ),
               ),
@@ -105,7 +107,7 @@ class ProfilePhotoScreen extends StatelessWidget {
               'CHOOSE A COLOUR',
               style: TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 1.6,
                 color: SportikaColors.textDim,
               ),
@@ -114,7 +116,7 @@ class ProfilePhotoScreen extends StatelessWidget {
               option.label.toUpperCase(),
               style: TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 1.4,
                 color: option.colors.first,
               ),
@@ -192,7 +194,7 @@ class _AvatarSwatch extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(
               color: selected
-                  ? Colors.white.withValues(alpha: .85)
+                  ? SportikaColors.onAccent.withValues(alpha: .85)
                   : SportikaColors.border,
               width: selected ? 1.6 : 1,
             ),

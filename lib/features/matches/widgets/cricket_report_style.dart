@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 /// Text roles for the cricket scorecard. Sizes mirror [SportikaType] and every
 /// colour resolves to a [SportikaColors] token, so the sheet inherits the app
@@ -36,7 +35,7 @@ class CricketReportType {
     fontFamily: SportikaType.displayFamily,
     fontSize: 16.5,
     height: 1.15,
-    fontWeight: FontWeight.w700,
+    fontWeight: SportikaFontWeight.bold,
     color: SportikaColors.text,
   );
 
@@ -44,7 +43,7 @@ class CricketReportType {
     fontFamily: SportikaType.displayFamily,
     fontSize: 18,
     height: 1.15,
-    fontWeight: FontWeight.w800,
+    fontWeight: SportikaFontWeight.extraBold,
     color: SportikaColors.text,
   );
 
@@ -52,7 +51,7 @@ class CricketReportType {
     fontFamily: SportikaType.bodyFamily,
     fontSize: 9.5,
     height: 1.2,
-    fontWeight: FontWeight.w800,
+    fontWeight: SportikaFontWeight.extraBold,
     letterSpacing: 0.9,
     color: SportikaColors.textDim,
   );
@@ -61,7 +60,7 @@ class CricketReportType {
     fontFamily: SportikaType.bodyFamily,
     fontSize: 10.5,
     height: 1.1,
-    fontWeight: FontWeight.w800,
+    fontWeight: SportikaFontWeight.extraBold,
     color: SportikaColors.text,
   );
 }
@@ -315,7 +314,7 @@ class CricketRunBadge extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: fill,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(SportikaRadius.tag),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),

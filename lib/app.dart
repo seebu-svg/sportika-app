@@ -40,7 +40,6 @@ class SportikaApp extends StatelessWidget {
     this.gameRepository,
     this.teamRepository,
     this.notificationRepository,
-    this.monetizationRepository,
     this.identityStore,
     this.emailVerificationEnabled,
   });
@@ -77,10 +76,6 @@ class SportikaApp extends StatelessWidget {
   /// device document, which is what demo builds and every test use.
   final NotificationRepository? notificationRepository;
 
-  /// Billing when it reads and writes PostgreSQL. Null keeps it on the device
-  /// adapter in a demo build, and on the fail-closed adapter everywhere else:
-  /// no build ever fabricates a paid purchase.
-  final MonetizationRepository? monetizationRepository;
   final IdentityDocumentStore? identityStore;
 
   /// Overrides the compile-time email-verification flag. Only tests pass it,
@@ -99,7 +94,6 @@ class SportikaApp extends StatelessWidget {
       gameRepository: gameRepository,
       teamRepository: teamRepository,
       notificationRepository: notificationRepository,
-      monetizationRepository: monetizationRepository,
       child: ChangeNotifierProvider<AuthFlowController>(
         create: (context) => AuthFlowController(
           context.read<SessionController>(),
@@ -112,6 +106,8 @@ class SportikaApp extends StatelessWidget {
           title: 'Sportika',
           debugShowCheckedModeBanner: false,
           theme: buildSportikaTheme(),
+          darkTheme: buildSportikaTheme(),
+          themeMode: ThemeMode.dark,
           onGenerateRoute: onGenerateRoute,
           home: const RootGate(),
         ),

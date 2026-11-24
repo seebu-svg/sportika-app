@@ -19,7 +19,6 @@ import 'package:sportika/core/data/supabase_game_repository.dart';
 import 'package:sportika/core/data/supabase_match_repository.dart';
 import 'package:sportika/core/data/supabase_team_repository.dart';
 import 'package:sportika/core/data/supabase_tournament_repository.dart';
-import 'package:sportika/core/data/supabase_monetization_repository.dart';
 import 'package:sportika/core/data/supabase_notification_repository.dart';
 import 'package:sportika/core/data/supabase_profile_module_repository.dart';
 import 'package:sportika/features/auth/services/authentication_service.dart';
@@ -66,7 +65,6 @@ Future<void> main() async {
           gameRepository: backend.games,
           teamRepository: backend.teams,
           notificationRepository: backend.notifications,
-          monetizationRepository: backend.monetization,
           identityStore: backend.identityStore,
         ),
       ),
@@ -88,7 +86,6 @@ typedef _Backend = ({
   GameRepository? games,
   TeamRepository? teams,
   NotificationRepository? notifications,
-  MonetizationRepository? monetization,
   IdentityDocumentStore? identityStore,
 });
 
@@ -113,7 +110,6 @@ Future<_Backend> _openAuthentication(
         games: null,
         teams: null,
         notifications: null,
-        monetization: null,
         identityStore: null,
       );
 
@@ -182,10 +178,6 @@ Future<_Backend> _openAuthentication(
           // The inbox is server-owned too: the member only ever sees their own
           // rows, and the live channel carries new ones without polling.
           notifications: SupabaseNotificationRepository(client: client),
-          // Billing is the one aggregate a member must never be able to fake:
-          // every write is an RPC and the operator functions have no member
-          // grant.
-          monetization: SupabaseMonetizationRepository(client: client),
         );
       } catch (error, stack) {
         // A bad URL or key must not blank the app. The sign-in screen explains
@@ -201,7 +193,6 @@ Future<_Backend> _openAuthentication(
           games: null,
           teams: null,
           notifications: null,
-          monetization: null,
           identityStore: null,
         );
       }
@@ -217,7 +208,6 @@ Future<_Backend> _openAuthentication(
         games: null,
         teams: null,
         notifications: null,
-        monetization: null,
         identityStore: null,
       );
   }

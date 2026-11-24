@@ -183,6 +183,23 @@ class SportMatch {
       )
       .toList();
 
+  /// The per-side cap the server derives from [capacity]: a capacity is a total,
+  /// so a team sport splits it in half (five a side at 10, a bench at 14),
+  /// singles is one a side and doubles two. Mirrors `join_match` in 0022.
+  int get sideCapacity => switch (discipline) {
+    MatchDiscipline.team => capacity ~/ 2 < 1 ? 1 : capacity ~/ 2,
+    MatchDiscipline.singles => 1,
+    MatchDiscipline.doubles => 2,
+  };
+
+  bool isSideFull(int side) => participantsOnSide(side).length >= sideCapacity;
+
+  /// A public match still open for kick-off: exactly what `join_match` accepts.
+  bool get isOpenToJoin =>
+      visibility == MatchVisibility.public &&
+      status == FixtureStatus.upcoming &&
+      startedAt == null;
+
   /// The newest active entry, which is the only one undo may withdraw.
   MatchEvent? get lastActiveEvent {
     MatchEvent? last;
@@ -323,8 +340,19 @@ extension MatchDisciplineX on MatchDiscipline {
     MatchDiscipline.doubles => 'Doubles',
     MatchDiscipline.team => 'Team',
   };
-  static MatchDiscipline fromKey(String key) => MatchDiscipline.values
-      .firstWhere((d) => d.name == key, orElse: () => MatchDiscipline.team);
+
+  /// Reads a discipline from a stored key. A tournament entry type is not a
+  /// discipline — a `pair` entry is played as doubles and an `individual` one
+  /// as singles — so those two keys are mapped before the field fallback, and a
+  /// tournament-created match no longer reads back as [team].
+  static MatchDiscipline fromKey(String key) {
+    if (key == 'individual') return MatchDiscipline.singles;
+    if (key == 'pair') return MatchDiscipline.doubles;
+    return MatchDiscipline.values.firstWhere(
+      (d) => d.name == key,
+      orElse: () => MatchDiscipline.team,
+    );
+  }
 
   /// The discipline a sport allows. Racket sports offer singles and doubles,
   /// the team sports only team.

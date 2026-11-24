@@ -51,5 +51,12 @@ app.*.map.json
 .tmp/
 .refactor_backup/
 
+# Scratch artifacts that must never enter the tracked tree: IDE knowledge
+# cache, stray Android build output (the real build dir is the ignored /build/),
+# and test-run failure lists dropped at the repo root.
+.qoder/
+android/build/
+*.log.fails
+
 # Supabase CLI session state (auth tokens); the backend tree itself is tracked.
 supabase/.temp/

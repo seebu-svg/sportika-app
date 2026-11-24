@@ -319,6 +319,9 @@ void main() {
     expect(submitted.status, FixtureStatus.submitted);
     expect(submitted.result, isNotNull);
     expect(submitted.result!.winnerIndex, 0);
+    // The frozen record keeps each side's own reading of the same set, so the
+    // published tile cannot show 6-0 to the pair that lost it 0-6.
+    expect(submitted.result!.sideScores, ['6-0', '0-6']);
     expect(find.text('scoreboard closed'), findsOneWidget);
     await drainSnack(tester);
   });
@@ -336,7 +339,7 @@ void main() {
     final second = match.sideNames.last;
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 500));
-      await tapPad(tester, pad('Rally', second));
+      await tapPad(tester, pad('+1 RALLY', second));
     }
 
     final progress = store.progressOf(store.matchById(match.id)!);

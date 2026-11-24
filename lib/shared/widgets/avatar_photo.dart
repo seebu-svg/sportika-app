@@ -83,6 +83,14 @@ class AvatarNetworkPhoto extends StatelessWidget {
   }
 }
 
+/// Whether [photoPath] / [photoUrl] would actually paint a picture.
+///
+/// Callers use this to decide between a framed picture and the branded default
+/// avatar instead of building an image widget that can only fall back.
+bool hasAvatarPhoto({String? photoPath, String? photoUrl}) =>
+    looksLikeManagedPhotoPath(photoPath) ||
+    (photoUrl?.trim().isNotEmpty ?? false);
+
 /// The picture at [photoPath] when the profile photo store really issued it,
 /// otherwise [photoUrl] when the server has one, otherwise [fallback].
 ///

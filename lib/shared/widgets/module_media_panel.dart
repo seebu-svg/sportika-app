@@ -7,7 +7,6 @@ import 'package:sportika/core/data/module_media_store.dart';
 import 'package:sportika/core/data/image_picker_photo_picker.dart';
 import 'package:sportika/core/data/profile_photo.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 const String _matchBucket = 'match-media';
 
@@ -263,11 +262,7 @@ class _ArtworkPlaceholder extends StatelessWidget {
     return String.fromCharCode(trimmed.runes.first).toUpperCase();
   }
 
-  static const LinearGradient _surface = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [SportikaColors.surfaceAlt, SportikaColors.surfaceSunken],
-  );
+  static const LinearGradient _surface = SportikaGradients.mediaSurface;
 
   @override
   Widget build(BuildContext context) {

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 /// One selectable option in a [FilterChipRow].
 @immutable
@@ -128,7 +127,9 @@ class _Chip extends StatelessWidget {
                     choice.label,
                     style: SportikaType.action.copyWith(
                       color: active ? tone : SportikaColors.textBody,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w700,
+                      fontWeight: active
+                          ? SportikaFontWeight.extraBold
+                          : SportikaFontWeight.bold,
                     ),
                   ),
                   if (choice.badge != null && choice.badge! > 0) ...[
@@ -149,7 +150,7 @@ class _Chip extends StatelessWidget {
 }
 
 /// Sport filter built on [FilterChipRow]; the single place that maps
-/// `Sport?` onto chips so Home, Live and Discover stay in sync.
+/// `Sport?` onto chips so Home, Matches and Tournaments stay in sync.
 class SportFilterRow extends StatelessWidget {
   const SportFilterRow({
     super.key,

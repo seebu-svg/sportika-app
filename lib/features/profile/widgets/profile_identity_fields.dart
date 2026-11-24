@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/features/auth/widgets/auth_widgets.dart';
 import 'package:sportika/shared/models/profile_setup.dart';
 

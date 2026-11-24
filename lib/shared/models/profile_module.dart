@@ -56,6 +56,57 @@ class ProfileSportPreference {
   };
 }
 
+/// A laterality choice for a physical attribute. The three values mirror the
+/// `dominant_hand` / `dominant_foot` check constraint in `profiles_private`.
+enum ProfileSide { left, right, ambidextrous }
+
+extension ProfileSideX on ProfileSide {
+  String get label => switch (this) {
+    ProfileSide.left => 'Left',
+    ProfileSide.right => 'Right',
+    ProfileSide.ambidextrous => 'Either',
+  };
+
+  /// Wire value stored in PostgreSQL.
+  String get key => name;
+
+  static ProfileSide? fromKey(String? key) {
+    if (key == null || key.isEmpty) return null;
+    return ProfileSide.values.where((s) => s.name == key).firstOrNull;
+  }
+}
+
+/// The optional physical attributes and preferred jersey number a member keeps
+/// on their own athlete profile. Every field is nullable: an untouched profile
+/// stays untouched, and a save never invents a value the member did not give.
+@immutable
+class ProfileAthleteDetails {
+  const ProfileAthleteDetails({
+    this.heightCm,
+    this.weightKg,
+    this.dominantHand,
+    this.dominantFoot,
+    this.preferredJersey,
+  });
+
+  final int? heightCm;
+  final double? weightKg;
+  final ProfileSide? dominantHand;
+  final ProfileSide? dominantFoot;
+  final int? preferredJersey;
+
+  /// A profile that has not filled any athlete field yet. The screen uses this
+  /// to decide whether to show the empty prompt instead of fabricated numbers.
+  bool get isEmpty =>
+      heightCm == null &&
+      weightKg == null &&
+      dominantHand == null &&
+      dominantFoot == null &&
+      preferredJersey == null;
+
+  static const ProfileAthleteDetails empty = ProfileAthleteDetails();
+}
+
 /// The optional CNIC / B-Form submission. It is never a verification claim.
 @immutable
 class ProfileIdentityRecord {
@@ -88,11 +139,17 @@ class ProfileModuleSnapshot {
     required this.personal,
     required this.sports,
     this.identity,
+    this.athlete,
   });
 
   final ProfilePersonalInformation personal;
   final List<ProfileSportPreference> sports;
   final ProfileIdentityRecord? identity;
+
+  /// The athlete attributes section. Null means this build could not read them
+  /// (for example a backend that predates the columns); the screen then keeps
+  /// the section as an honest placeholder rather than showing an editable form.
+  final ProfileAthleteDetails? athlete;
 
   /// No level anywhere is what the skipped preferences step looks like after a
   /// round trip.

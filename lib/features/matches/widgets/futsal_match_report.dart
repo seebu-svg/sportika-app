@@ -3,7 +3,6 @@ import 'package:sportika/features/matches/widgets/match_report_widgets.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Only event-backed statistics. Untracked metrics are deliberately omitted.

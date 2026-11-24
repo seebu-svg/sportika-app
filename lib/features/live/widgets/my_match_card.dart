@@ -3,16 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:sportika/features/live/widgets/my_matches.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// One compact fixture card of the My Matches list.
+/// Premium, compact scoreboard card for an official match or fixture.
 ///
-/// Shared by both sources so a tournament appearance and an official match read
-/// the same way: sport and exact status on top, the two sides and their scores
-/// in the middle, and one meta line carrying the date, venue and the member's
-/// role. No nested cards, no gradient surfaces.
+/// Keeps exact controller-driven statuses, real scores, and roles.
+/// No fabricated team logos, scores, or results.
 class MyMatchCard extends StatelessWidget {
   const MyMatchCard({super.key, required this.record, this.onTap});
 
@@ -21,65 +18,90 @@ class MyMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final invited = record.role == MyMatchRole.invited;
+    final theme = context.sportika;
+
+    final invited = record.isInvited && !record.isParticipant;
     final statusLabel = _statusLabel(invited);
+
     final accent = invited
         ? SportikaColors.gold
         : statusColor(record.status.key);
-    final winner = record.winnerIndex;
+
+    final hasScore = record.hasScore;
+    final hasPublishedWinner =
+        record.publishedResult &&
+        (record.winnerIndex == 0 || record.winnerIndex == 1);
 
     Color sideTone(int side) {
-      if (winner == null || (winner != 0 && winner != 1)) {
-        return SportikaColors.text;
-      }
-      return winner == side ? SportikaColors.text : SportikaColors.textMuted;
+      if (!hasPublishedWinner) return theme.textBody;
+
+      return record.winnerIndex == side ? SportikaColors.text : theme.textMuted;
     }
 
-    /// A live score is the only coloured readout in the card; once a result is
-    /// published the split between winner and loser carries the meaning.
-    Color scoreTone(int side) =>
-        record.isLive ? SportikaColors.mint : sideTone(side);
+    Color scoreTone(int side) {
+      if (record.isLive) return theme.live;
+      return sideTone(side);
+    }
 
     final meta = [
       dateShort(record.scheduledAt),
+      timeLabel(record.scheduledAt),
       if (record.venue.trim().isNotEmpty) record.venue.trim(),
     ].join(' · ');
 
-    final scoreLine = record.scoreA == null && record.scoreB == null
-        ? ''
-        : ', ${record.scoreA ?? '—'} to ${record.scoreB ?? '—'}';
+    final roles = record.effectiveRoles;
+    final extraRoles = roles.length > 1 ? roles.length - 1 : 0;
+
+    final scoreSummary = hasScore
+        ? ', ${record.scoreA} to ${record.scoreB}'
+        : '';
+
+    final semanticLabel =
+        '${record.sport.label}: '
+        '${record.sideA} versus ${record.sideB}, '
+        '$statusLabel, '
+        '${roles.map((role) => role.label).join(', ')}, '
+        '${dayLabel(record.scheduledAt)} at '
+        '${timeLabel(record.scheduledAt)}'
+        '$scoreSummary';
 
     return Semantics(
-      button: true,
       container: true,
-      label:
-          '${record.sport.label}: ${record.sideA} versus ${record.sideB}, '
-          '${statusLabel.toLowerCase()}, ${record.role.label.toLowerCase()}, '
-          '${dayLabel(record.scheduledAt)} at '
-          '${timeLabel(record.scheduledAt)}$scoreLine',
+      button: onTap != null,
+      label: semanticLabel,
       child: ExcludeSemantics(
         child: SurfaceCard(
           onTap: onTap,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.all(SportikaSpacing.md),
           borderColor: record.isLive
-              ? SportikaColors.mint.withValues(alpha: 0.42)
-              : SportikaColors.border,
+              ? theme.live.withValues(alpha: SportikaOpacity.medium)
+              : theme.borderSubtle,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ========================================
+              // COMPETITION / STATUS HEADER
+              // ========================================
+
               Row(
                 children: [
                   SportTag(record.sport, compact: true),
+
                   const SizedBox(width: SportikaSpacing.sm),
+
                   Expanded(
                     child: Text(
-                      record.context,
+                      record.context.isEmpty
+                          ? 'Official match'
+                          : record.context,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: SportikaType.micro,
                     ),
                   ),
+
                   const SizedBox(width: SportikaSpacing.xs),
+
                   StatusPill(
                     statusLabel,
                     color: accent,
@@ -89,25 +111,91 @@ class MyMatchCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: SportikaSpacing.sm),
-              _SideRow(
-                label: record.sideA,
-                score: record.scoreA,
-                labelTone: sideTone(0),
-                scoreTone: scoreTone(0),
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              // ========================================
+              // SCOREBOARD
+              // ========================================
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _ScoreboardSide(
+                          name: record.sideA,
+                          score: hasScore ? record.scoreA : null,
+                          nameColor: sideTone(0),
+                          scoreColor: scoreTone(0),
+                          isWinner:
+                              hasPublishedWinner && record.winnerIndex == 0,
+                        ),
+
+                        const SizedBox(height: SportikaSpacing.md),
+
+                        _ScoreboardSide(
+                          name: record.sideB,
+                          score: hasScore ? record.scoreB : null,
+                          nameColor: sideTone(1),
+                          scoreColor: scoreTone(1),
+                          isWinner:
+                              hasPublishedWinner && record.winnerIndex == 1,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (!hasScore)
+                    Padding(
+                      padding: const EdgeInsets.only(left: SportikaSpacing.md),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.surfaceSunken,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(SportikaRadius.control),
+                          ),
+                          border: Border.all(color: theme.borderSubtle),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SportikaSpacing.sm,
+                            vertical: SportikaSpacing.xs,
+                          ),
+                          child: Text(
+                            'VS',
+                            style: SportikaType.bodyStrong.copyWith(
+                              color: theme.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: SportikaSpacing.xs),
-              _SideRow(
-                label: record.sideB,
-                score: record.scoreB,
-                labelTone: sideTone(1),
-                scoreTone: scoreTone(1),
+
+              const SizedBox(height: SportikaSpacing.md),
+
+              Divider(
+                height: SportikaBorder.hairline,
+                color: theme.borderSubtle,
               ),
+
               const SizedBox(height: SportikaSpacing.sm),
-              const Divider(height: 1, color: SportikaColors.borderSubtle),
-              const SizedBox(height: SportikaSpacing.xs + 2),
+
+              // ========================================
+              // MATCH METADATA / USER ROLE
+              // ========================================
               Row(
                 children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: SportikaIconSize.sm,
+                    color: theme.textMuted,
+                  ),
+
+                  const SizedBox(width: SportikaSpacing.xs),
+
                   Expanded(
                     child: Text(
                       meta,
@@ -116,17 +204,22 @@ class MyMatchCard extends StatelessWidget {
                       style: SportikaType.caption,
                     ),
                   ),
-                  const SizedBox(width: SportikaSpacing.xs),
-                  Text(
-                    record.role.label,
-                    style: SportikaType.micro.copyWith(color: _roleTone),
+
+                  const SizedBox(width: SportikaSpacing.sm),
+
+                  _MatchRoleBadge(
+                    role: record.primaryRole,
+                    extraRoles: extraRoles,
                   ),
-                  const SizedBox(width: 2),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: SportikaColors.textDim,
-                  ),
+
+                  if (onTap != null) ...[
+                    const SizedBox(width: SportikaSpacing.xs),
+                    Icon(
+                      Icons.arrow_outward_rounded,
+                      size: SportikaIconSize.md,
+                      color: theme.textMuted,
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -136,51 +229,98 @@ class MyMatchCard extends StatelessWidget {
     );
   }
 
-  Color get _roleTone => switch (record.role) {
-    MyMatchRole.organizing => SportikaColors.blueBright,
-    MyMatchRole.scoring => SportikaColors.gold,
-    MyMatchRole.invited => SportikaColors.gold,
-    MyMatchRole.playing => SportikaColors.textDim,
-  };
-
-  /// The exact state, in the shortest wording a dense card can carry: the
-  /// awaiting-review state keeps its meaning without wrapping the header.
   String _statusLabel(bool invited) {
     if (invited) return 'Invited';
-    if (record.status == FixtureStatus.submitted) return 'In review';
+
+    if (record.status == FixtureStatus.submitted) {
+      return 'In review';
+    }
+
     return record.status.label;
   }
 }
 
-class _SideRow extends StatelessWidget {
-  const _SideRow({
-    required this.label,
-    required this.labelTone,
-    required this.scoreTone,
-    this.score,
+// ============================================================
+// SCOREBOARD SIDE
+// ============================================================
+
+class _ScoreboardSide extends StatelessWidget {
+  const _ScoreboardSide({
+    required this.name,
+    required this.score,
+    required this.nameColor,
+    required this.scoreColor,
+    required this.isWinner,
   });
 
-  final String label;
+  final String name;
   final String? score;
-  final Color labelTone;
-  final Color scoreTone;
+  final Color nameColor;
+  final Color scoreColor;
+  final bool isWinner;
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.sportika;
+
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: SportikaType.bodyStrong.copyWith(color: labelTone),
+        // Generic sport-team identity.
+        // Do not invent logos or use unrelated profile photos.
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.surfaceSunken,
+            borderRadius: const BorderRadius.all(
+              Radius.circular(SportikaRadius.control),
+            ),
+            border: Border.all(
+              color: isWinner
+                  ? theme.live.withValues(alpha: SportikaOpacity.medium)
+                  : theme.borderSubtle,
+            ),
+          ),
+          child: SizedBox.square(
+            dimension: SportikaSpacing.xxl,
+            child: Icon(
+              Icons.shield_outlined,
+              size: SportikaIconSize.md,
+              color: isWinner ? theme.live : theme.textMuted,
+            ),
           ),
         ),
+
+        const SizedBox(width: SportikaSpacing.sm),
+
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SportikaType.bodyStrong.copyWith(
+                    color: nameColor,
+                    fontWeight: isWinner ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              if (isWinner) ...[
+                const SizedBox(width: SportikaSpacing.xs),
+                Icon(
+                  Icons.emoji_events_outlined,
+                  size: SportikaIconSize.sm,
+                  color: theme.live,
+                ),
+              ],
+            ],
+          ),
+        ),
+
         if (score != null) ...[
           const SizedBox(width: SportikaSpacing.sm),
-          // A cricket score carries the over count, so the readout is allowed
-          // to scale down instead of truncating digits.
+
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 156),
             child: FittedBox(
@@ -190,7 +330,10 @@ class _SideRow extends StatelessWidget {
                 score!,
                 maxLines: 1,
                 softWrap: false,
-                style: SportikaType.scoreSmall.copyWith(color: scoreTone),
+                style: SportikaType.scoreSmall.copyWith(
+                  color: scoreColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
           ),
@@ -200,7 +343,61 @@ class _SideRow extends StatelessWidget {
   }
 }
 
-/// Compact status filter row used above the list.
+// ============================================================
+// MATCH ROLE BADGE
+// ============================================================
+
+class _MatchRoleBadge extends StatelessWidget {
+  const _MatchRoleBadge({required this.role, required this.extraRoles});
+
+  final MyMatchRole role;
+  final int extraRoles;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.sportika;
+
+    final tone = switch (role) {
+      MyMatchRole.playing => theme.live,
+      MyMatchRole.organizing => SportikaColors.blueBright,
+      MyMatchRole.scoring => SportikaColors.gold,
+      MyMatchRole.invited => SportikaColors.gold,
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          switch (role) {
+            MyMatchRole.playing => Icons.sports_rounded,
+            MyMatchRole.organizing => Icons.admin_panel_settings_outlined,
+            MyMatchRole.scoring => Icons.edit_note_rounded,
+            MyMatchRole.invited => Icons.mail_outline_rounded,
+          },
+          size: SportikaIconSize.sm,
+          color: tone,
+        ),
+
+        const SizedBox(width: SportikaSpacing.xs),
+
+        Text(role.label, style: SportikaType.micro.copyWith(color: tone)),
+
+        if (extraRoles > 0) ...[
+          const SizedBox(width: SportikaSpacing.xs),
+          Text(
+            '+$extraRoles',
+            style: SportikaType.micro.copyWith(color: theme.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ============================================================
+// MATCH PHASE FILTERS
+// ============================================================
+
 class MyMatchPhaseChips extends StatelessWidget {
   const MyMatchPhaseChips({
     super.key,
@@ -211,8 +408,9 @@ class MyMatchPhaseChips extends StatelessWidget {
 
   final MyMatchPhase selected;
 
-  /// Row count per phase; only the four filterable ones are read.
+  /// Real match count for each phase.
   final Map<MyMatchPhase, int> counts;
+
   final ValueChanged<MyMatchPhase> onChanged;
 
   @override
@@ -225,7 +423,7 @@ class MyMatchPhaseChips extends StatelessWidget {
         for (final phase in MyMatchPhase.values)
           FilterChoice(
             phase,
-            _phaseLabel(phase),
+            phase.label,
             badge: counts[phase] ?? 0,
             icon: _phaseIcon(phase),
           ),
@@ -233,17 +431,12 @@ class MyMatchPhaseChips extends StatelessWidget {
     );
   }
 
-  static String _phaseLabel(MyMatchPhase phase) => switch (phase) {
-    MyMatchPhase.all => 'All',
-    MyMatchPhase.upcoming => 'Upcoming',
-    MyMatchPhase.live => 'Live',
-    MyMatchPhase.completed => 'Completed',
-  };
-
-  static IconData? _phaseIcon(MyMatchPhase phase) => switch (phase) {
-    MyMatchPhase.all => null,
-    MyMatchPhase.upcoming => Icons.schedule_rounded,
-    MyMatchPhase.live => Icons.sensors_rounded,
-    MyMatchPhase.completed => Icons.flag_outlined,
-  };
+  static IconData? _phaseIcon(MyMatchPhase phase) {
+    return switch (phase) {
+      MyMatchPhase.all => null,
+      MyMatchPhase.upcoming => Icons.schedule_rounded,
+      MyMatchPhase.live => Icons.sensors_rounded,
+      MyMatchPhase.completed => Icons.history_rounded,
+    };
+  }
 }

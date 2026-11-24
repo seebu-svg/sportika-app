@@ -5,7 +5,6 @@ import 'package:sportika/core/state/match_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -30,7 +29,9 @@ Future<void> showMatchDisputeSheet(
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) =>
         SingleChildScrollView(child: _MatchDisputeSheet(matchId: match.id)),

@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 /// Installs the process-wide crash guards.
 ///
@@ -59,10 +58,10 @@ class SportikaErrorScreen extends StatelessWidget {
                   color: SportikaColors.gold,
                 ),
                 const SizedBox(height: 14),
-                Text(
+                const Text(
                   'That screen hit a snag',
                   textAlign: TextAlign.center,
-                  style: SportikaType.headline.copyWith(color: Colors.white),
+                  style: SportikaType.headline,
                 ),
                 const SizedBox(height: 8),
                 Text(

@@ -4,7 +4,6 @@ import 'package:sportika/features/matches/widgets/match_result_card.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -37,6 +36,9 @@ Future<bool> confirmSubmitResult(
             labels: sides,
             scores: scores,
             winnerIndex: progress.isComplete ? progress.winnerIndex : -1,
+            // The dialog measures this content's intrinsic height, so the review
+            // panel declares its narrow layout instead of measuring for one.
+            stacked: true,
           ),
           if (progress.resultLabel.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -96,7 +98,9 @@ Future<CorrectedResult?> showCorrectResultSheet(
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) =>
         SingleChildScrollView(child: _CorrectResultSheet(match: match)),
@@ -311,7 +315,9 @@ Future<WalkoverChoice?> showWalkoverSheet(
     backgroundColor: SportikaColors.surfaceElevated,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(SportikaRadius.xl),
+      ),
     ),
     builder: (_) => SingleChildScrollView(child: _WalkoverSheet(match: match)),
   );
@@ -476,4 +482,112 @@ Future<String?> showPauseMatchDialog(BuildContext context) async {
   );
   controller.dispose();
   return reason;
+}
+
+/// What the scorer asked for when they retired a badminton match.
+class MatchRetireRequest {
+  const MatchRetireRequest({required this.winnerIndex, required this.reason});
+
+  final int winnerIndex;
+  final String reason;
+}
+
+/// Retires a badminton match that will not reach the winning game.
+///
+/// The partial score is shown, not typed: it comes from the rally log, and the
+/// server writes the same thing. The reason is required because a retirement is
+/// the only way to decide an unfinished match, and the winner is the side that
+/// takes the result. Returns null when the scorer backs out.
+Future<MatchRetireRequest?> showMatchRetireSheet(
+  BuildContext context, {
+  required SportMatch match,
+  required MatchProgress progress,
+}) async {
+  final controller = TextEditingController();
+  final scores = progress.scoreDisplay;
+  final partial = scores[0] == '-' ? 'no game completed' : scores.join(' / ');
+  var winner = progress.scoreValues[0] >= progress.scoreValues[1] ? 0 : 1;
+
+  final request = await showDialog<MatchRetireRequest>(
+    context: context,
+    builder: (dialog) => StatefulBuilder(
+      builder: (dialog, setLocal) {
+        final reason = controller.text.trim();
+        return AlertDialog(
+          title: const Text('Retire this match?'),
+          scrollable: true,
+          icon: const Icon(Icons.flag_outlined, color: SportikaColors.danger),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('RETIREMENT', style: SportikaType.label),
+              const SizedBox(height: 8),
+              Text(
+                'Recorded so far: $partial. The games and the winner of a '
+                'retirement are read from the rally log, so this is the score '
+                'the result will carry.',
+                style: SportikaType.caption,
+              ),
+              const SizedBox(height: SportikaSpacing.sm),
+              const Text('WHO TAKES THE RESULT', style: SportikaType.label),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var side = 0; side < 2; side++)
+                    ChoiceChip(
+                      label: Text(
+                        match.sideNames.length > side
+                            ? match.sideNames[side]
+                            : 'Side ${side + 1}',
+                      ),
+                      selected: winner == side,
+                      onSelected: (_) => setLocal(() => winner = side),
+                    ),
+                ],
+              ),
+              const SizedBox(height: SportikaSpacing.sm),
+              TextField(
+                controller: controller,
+                maxLength: 200,
+                onChanged: (_) => setLocal(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Reason (3 to 200 characters)',
+                  hintText: 'Injury, walk-off, no players left',
+                  isDense: true,
+                ),
+              ),
+              const Text(
+                'The organizer and the scorer are told, and the reason is kept '
+                'in the match history.',
+                style: SportikaType.caption,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('Keep scoring'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: SportikaColors.danger,
+              ),
+              onPressed: reason.length < 3
+                  ? null
+                  : () => Navigator.pop(
+                      dialog,
+                      MatchRetireRequest(winnerIndex: winner, reason: reason),
+                    ),
+              child: const Text('Retire & award'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+  controller.dispose();
+  return request;
 }

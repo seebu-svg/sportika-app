@@ -9,16 +9,12 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/models.dart';
 
-/// Where a My Matches row was read from.
-///
-/// Both sources are official: [officialMatch] is the match module's own
-/// aggregate (`public.matches`), [tournamentFixture] is a fixture the member
-/// appeared in. A live build projects the second from the first, which is why
-/// the list below de-duplicates them.
+/// Authoritative source of a My Matches row.
 enum MyMatchSource { officialMatch, tournamentFixture }
 
-/// Why the member is on a match. Never inferred: a match is the organizer's,
-/// the appointed scorer's, a joined player's, or a pending invitation.
+/// A user's relationship to a match.
+///
+/// One universal Sportika account can hold multiple roles simultaneously.
 enum MyMatchRole { playing, organizing, scoring, invited }
 
 extension MyMatchRoleX on MyMatchRole {
@@ -30,15 +26,25 @@ extension MyMatchRoleX on MyMatchRole {
   };
 }
 
-/// The four states the filter row exposes.
+/// The existing enum is preserved for current filter callers.
 ///
-/// [completed] collects everything that is no longer upcoming or live, so an
-/// awaiting-review or cancelled match stays reachable; each row keeps drawing
-/// its own exact status pill, so no match is ever relabelled as finished when
-/// its result was not published.
+/// `completed` represents History, including published, cancelled,
+/// submitted, and other non-live/non-upcoming statuses.
 enum MyMatchPhase { all, upcoming, live, completed }
 
-/// One row of the unified list, independent of the model it came from.
+extension MyMatchPhaseX on MyMatchPhase {
+  String get label => switch (this) {
+    MyMatchPhase.all => 'All',
+    MyMatchPhase.upcoming => 'Upcoming',
+    MyMatchPhase.live => 'Live',
+    MyMatchPhase.completed => 'History',
+  };
+}
+
+/// A single official match or tournament fixture.
+///
+/// All fields originate from existing controllers. No match or score
+/// is estimated or generated.
 @immutable
 class MyMatchRecord {
   const MyMatchRecord({
@@ -51,6 +57,7 @@ class MyMatchRecord {
     required this.status,
     required this.scheduledAt,
     required this.role,
+    this.roles = const <MyMatchRole>{},
     this.scoreA,
     this.scoreB,
     this.venue = '',
@@ -58,36 +65,66 @@ class MyMatchRecord {
     this.winnerIndex,
     this.matchId,
     this.fixtureId,
+    this.tournamentId,
   });
 
-  /// Stable identity for a list row and for de-duplication.
+  /// Stable row identity.
   final String key;
+
   final MyMatchSource source;
   final Sport sport;
 
-  /// Tournament name and stage, or the match's own title.
   final String context;
   final String sideA;
   final String sideB;
 
-  /// Formatted score per side: the published result first, the live fold when
-  /// the match is still running, and null when there is nothing to show.
   final String? scoreA;
   final String? scoreB;
 
   final FixtureStatus status;
   final DateTime scheduledAt;
   final String venue;
+
+  /// Primary role retained for existing UI callers.
   final MyMatchRole role;
 
-  /// The member's side (0/1) when they were an accepted player, else null.
+  /// All applicable roles.
+  ///
+  /// Older direct constructors may omit this field. In that case,
+  /// [effectiveRoles] still includes [role].
+  final Set<MyMatchRole> roles;
+
+  /// The user's confirmed playing side.
+  ///
+  /// Administrative roles never establish participation.
   final int? mySide;
 
-  /// Published winner (0/1), -1 for a draw, null when nothing is published.
+  /// 0 or 1 = winning side.
+  /// -1 = explicit draw.
+  /// null = no published winner.
   final int? winnerIndex;
 
   final String? matchId;
   final String? fixtureId;
+  final String? tournamentId;
+
+  Set<MyMatchRole> get effectiveRoles =>
+      Set<MyMatchRole>.unmodifiable({...roles, role});
+
+  MyMatchRole get primaryRole => role;
+
+  bool get isParticipant =>
+      effectiveRoles.contains(MyMatchRole.playing) &&
+      (mySide == 0 || mySide == 1);
+
+  bool get isOrganizer => effectiveRoles.contains(MyMatchRole.organizing);
+
+  bool get isScorer => effectiveRoles.contains(MyMatchRole.scoring);
+
+  bool get isInvited => effectiveRoles.contains(MyMatchRole.invited);
+
+  bool get isTournamentMatch =>
+      tournamentId != null || source == MyMatchSource.tournamentFixture;
 
   MyMatchPhase get phase => switch (status) {
     FixtureStatus.upcoming => MyMatchPhase.upcoming,
@@ -97,35 +134,54 @@ class MyMatchRecord {
 
   bool get isLive => status == FixtureStatus.live;
 
-  /// Only a published (or walked-over) result proves anything about the
-  /// member's record; a submitted, cancelled or unplayed match never does.
-  bool get publishedResult =>
-      winnerIndex != null &&
-      (status == FixtureStatus.published || status == FixtureStatus.walkover);
+  bool get hasScore =>
+      scoreA != null &&
+      scoreB != null &&
+      scoreA!.trim().isNotEmpty &&
+      scoreB!.trim().isNotEmpty;
+
+  /// Only final, authoritative results are eligible for sporting records.
+  bool get isResultPublished =>
+      (status == FixtureStatus.published || status == FixtureStatus.walkover) &&
+      (winnerIndex == -1 || winnerIndex == 0 || winnerIndex == 1);
+
+  /// Backward-compatible alias.
+  bool get publishedResult => isResultPublished;
 
   SportingOutcome get outcome {
-    if (!publishedResult || mySide == null) return SportingOutcome.unrecorded;
-    final winner = winnerIndex!;
-    if (winner != 0 && winner != 1) return SportingOutcome.draw;
-    return winner == mySide ? SportingOutcome.win : SportingOutcome.loss;
+    if (!isResultPublished || !isParticipant) {
+      return SportingOutcome.unrecorded;
+    }
+
+    return switch (winnerIndex) {
+      -1 => SportingOutcome.draw,
+      0 ||
+      1 => winnerIndex == mySide ? SportingOutcome.win : SportingOutcome.loss,
+      _ => SportingOutcome.unrecorded,
+    };
   }
 
-  bool matchesQuery(String needle) =>
-      sideA.toLowerCase().contains(needle) ||
-      sideB.toLowerCase().contains(needle) ||
-      context.toLowerCase().contains(needle) ||
-      venue.toLowerCase().contains(needle) ||
-      sport.label.toLowerCase().contains(needle) ||
-      role.label.toLowerCase().contains(needle);
+  /// A normalized representation of searchable record information.
+  String get searchText => [
+    sideA,
+    sideB,
+    context,
+    venue,
+    sport.label,
+    for (final matchRole in effectiveRoles) matchRole.label,
+  ].join(' ').toLowerCase();
+
+  bool matchesQuery(String needle) {
+    final normalized = needle.trim().toLowerCase();
+
+    return normalized.isEmpty || searchText.contains(normalized);
+  }
 }
 
-/// Every official match the member is on, from both controllers, without
-/// repeats.
+/// Build a unified, de-duplicated list of the user's official matches.
 ///
-/// The match module is authoritative: in a live build a tournament fixture is
-/// projected from the same match row, so a fixture is dropped when a match
-/// already represents it (same id, or the same tournament/fixture pair). A row
-/// exists only because a controller returned it; nothing is estimated.
+/// Official match records take precedence over their projected fixtures.
+/// Fixture identity is scoped to its tournament whenever possible.
 List<MyMatchRecord> myMatchesFor({
   required String? accountId,
   required MatchController matches,
@@ -133,71 +189,95 @@ List<MyMatchRecord> myMatchesFor({
   required TournamentsController tournaments,
 }) {
   final records = <MyMatchRecord>[];
-  if (accountId == null) return records;
 
-  final representedIds = <String>{};
+  if (accountId == null || accountId.trim().isEmpty) {
+    return records;
+  }
+
   final representedLinks = <String>{};
 
+  // ============================================================
+  // OFFICIAL MATCHES
+  // ============================================================
+
   for (final match in matches.matches) {
-    final role = _roleOfMatch(match, accountId);
-    if (role == null) continue;
+    final roles = _rolesOfMatch(match, accountId);
+
+    if (roles.isEmpty) continue;
+
     final fixtureId = match.fixtureId;
     final tournamentId = match.tournamentId;
-    if (fixtureId != null) {
-      representedIds.add(fixtureId);
-      if (tournamentId != null) {
-        representedLinks.add('$tournamentId/$fixtureId');
-      }
+
+    if (fixtureId != null && tournamentId != null) {
+      representedLinks.add(_fixtureLink(tournamentId, fixtureId));
     }
+
     records.add(
       _fromMatch(
         match,
         accountId: accountId,
-        role: role,
-        progress: match.events.isEmpty ? null : matches.progressOf(match),
+        roles: roles,
+        progress: match.isLive && match.events.isNotEmpty
+            ? matches.progressOf(match)
+            : null,
         tournaments: tournaments,
       ),
     );
   }
 
+  // ============================================================
+  // TOURNAMENT FIXTURES
+  // ============================================================
+
   final myEntryIds = _myEntryIds(tournaments, accountId);
+
   for (final fixture in fixtures.appearancesOf(accountId)) {
-    // A live build projects a fixture from the match row above; when that row
-    // is already in the list this fixture is the same match. When it is not -
-    // a drawn fixture has no match participants, only entrants - the fixture
-    // is the member's row, so it must survive this de-duplication.
-    if (representedIds.contains(fixture.id) ||
-        representedLinks.contains('${fixture.tournamentId}/${fixture.id}')) {
+    final link = _fixtureLink(fixture.tournamentId, fixture.id);
+
+    if (representedLinks.contains(link)) {
       continue;
     }
+
     final tournament = fixtures.tournamentOf(fixture);
-    final role = _roleOfFixture(
+
+    // Do not invent a sport when tournament metadata is missing.
+    // The fixture cannot be accurately represented without it.
+    if (tournament == null) {
+      continue;
+    }
+
+    final mySide = _sideOf(fixture, myEntryIds);
+
+    final roles = _rolesOfFixture(
       fixture,
       accountId: accountId,
-      myEntryIds: myEntryIds,
-      organizerId: tournament?.organizerId,
+      mySide: mySide,
+      organizerId: tournament.organizerId,
     );
-    if (role == null) continue;
+
+    if (roles.isEmpty) continue;
+
     records.add(
       _fromFixture(
         fixture,
         tournament: tournament,
-        role: role,
-        mySide: _sideOf(fixture, myEntryIds),
-        progress: fixture.events.isEmpty
-            ? null
-            : fixtures.progressOfFixture(fixture),
+        roles: roles,
+        mySide: mySide,
+        progress:
+            fixture.status == FixtureStatus.live && fixture.events.isNotEmpty
+            ? fixtures.progressOfFixture(fixture)
+            : null,
         labels: fixtures.sideLabelsOf(fixture),
       ),
     );
   }
 
   records.sort(_compare);
+
   return records;
 }
 
-/// Rows matching one filter combination. Search and filters only ever narrow
-/// the rows the controllers returned.
+/// Apply UI filters without changing the authoritative record set.
 List<MyMatchRecord> filterMyMatches(
   Iterable<MyMatchRecord> records, {
   MyMatchPhase phase = MyMatchPhase.all,
@@ -205,36 +285,62 @@ List<MyMatchRecord> filterMyMatches(
   String query = '',
 }) {
   final needle = query.trim().toLowerCase();
+
   return [
     for (final record in records)
       if ((phase == MyMatchPhase.all || record.phase == phase) &&
           (sport == null || record.sport == sport) &&
-          (needle.isEmpty || record.matchesQuery(needle)))
+          (needle.isEmpty || record.searchText.contains(needle)))
         record,
   ];
 }
 
-/// The member's official record over the rows that carry a published result.
+/// Calculate the user's official sporting record.
 ///
-/// Same rule as the Me passport: a draw is played but undecided, and a match
-/// without a published result is left out rather than counted as a defeat.
+/// Only accepted participation with an authoritative result counts.
+/// Administrative responsibilities and pending invitations do not count.
 SportingRecord recordOf(Iterable<MyMatchRecord> records) {
-  var played = 0, wins = 0, losses = 0, draws = 0;
+  var played = 0;
+  var wins = 0;
+  var losses = 0;
+  var draws = 0;
+
+  // Guard against accidental duplicate rows in caller-supplied data.
+  final counted = <String>{};
+
   for (final record in records) {
-    switch (record.outcome) {
+    final identity = record.tournamentId != null && record.fixtureId != null
+        ? _fixtureLink(record.tournamentId!, record.fixtureId!)
+        : record.key;
+
+    if (counted.contains(identity)) continue;
+
+    final outcome = record.outcome;
+
+    if (outcome == SportingOutcome.unrecorded) {
+      continue;
+    }
+
+    counted.add(identity);
+
+    switch (outcome) {
       case SportingOutcome.win:
         played++;
         wins++;
+
       case SportingOutcome.loss:
         played++;
         losses++;
+
       case SportingOutcome.draw:
         played++;
         draws++;
+
       case SportingOutcome.unrecorded:
         break;
     }
   }
+
   return SportingRecord(
     played: played,
     wins: wins,
@@ -243,33 +349,52 @@ SportingRecord recordOf(Iterable<MyMatchRecord> records) {
   );
 }
 
-// ── Sources ────────────────────────────────────────────────────────────────
+// ============================================================
+// SOURCE MAPPING
+// ============================================================
 
 MyMatchRecord _fromMatch(
   SportMatch match, {
   required String accountId,
-  required MyMatchRole role,
+  required Set<MyMatchRole> roles,
   required MatchProgress? progress,
   required TournamentsController tournaments,
 }) {
   final tournamentId = match.tournamentId;
+
   final tournament = tournamentId == null
       ? null
       : tournaments.tournamentById(tournamentId);
-  final stage = (match.rules['stage'] as String?)?.trim() ?? '';
+
+  final rawStage = match.rules['stage'];
+
+  final stage = rawStage is String ? rawStage.trim() : '';
+
+  final title = tournament != null && tournament.name.trim().isNotEmpty
+      ? tournament.name.trim()
+      : match.title.trim();
+
   final context = [
-    if (tournament != null && tournament.name.trim().isNotEmpty)
-      tournament.name.trim()
-    else
-      match.title.trim(),
+    if (title.isNotEmpty) title,
     if (stage.isNotEmpty) stage,
-  ].where((part) => part.isNotEmpty).join(' · ');
+  ].join(' · ');
 
   final participant = match.participantOf(accountId);
+
+  final mySide =
+      participant != null &&
+          participant.status == MatchParticipantStatus.accepted &&
+          (participant.side == 0 || participant.side == 1)
+      ? participant.side
+      : null;
+
   final scores = _scores(
     match.result?.sideScores,
     progress,
     live: match.isLive,
+    published:
+        match.status == FixtureStatus.published ||
+        match.status == FixtureStatus.walkover,
   );
 
   return MyMatchRecord(
@@ -277,145 +402,257 @@ MyMatchRecord _fromMatch(
     source: MyMatchSource.officialMatch,
     sport: match.sport,
     context: context,
-    sideA: match.sideNames.isNotEmpty && match.sideNames[0].trim().isNotEmpty
-        ? match.sideNames[0].trim()
-        : 'Side A',
-    sideB: match.sideNames.length > 1 && match.sideNames[1].trim().isNotEmpty
-        ? match.sideNames[1].trim()
-        : 'Side B',
+    sideA: _sideLabel(match.sideNames, 0),
+    sideB: _sideLabel(match.sideNames, 1),
     scoreA: scores?[0],
     scoreB: scores?[1],
     status: match.status,
     scheduledAt: match.scheduledAt,
     venue: match.venue,
-    role: role,
-    mySide:
-        participant != null &&
-            participant.status == MatchParticipantStatus.accepted
-        ? participant.side
-        : null,
+    role: _primaryRole(roles),
+    roles: Set<MyMatchRole>.unmodifiable(roles),
+    mySide: mySide,
     winnerIndex: match.result?.winnerIndex,
     matchId: match.id,
+    fixtureId: match.fixtureId,
+    tournamentId: tournamentId,
   );
 }
 
 MyMatchRecord _fromFixture(
   Fixture fixture, {
-  required Tournament? tournament,
-  required MyMatchRole role,
+  required Tournament tournament,
+  required Set<MyMatchRole> roles,
   required int? mySide,
   required MatchProgress? progress,
   required List<String> labels,
 }) {
   final stage = fixture.stage.trim();
+
   final context = [
-    if (tournament != null && tournament.name.trim().isNotEmpty)
-      tournament.name.trim(),
+    if (tournament.name.trim().isNotEmpty) tournament.name.trim(),
     if (stage.isNotEmpty) stage,
-  ].where((part) => part.isNotEmpty).join(' · ');
+  ].join(' · ');
 
   final scores = _scores(
     fixture.result?.sideScores,
     progress,
     live: fixture.status == FixtureStatus.live,
+    published:
+        fixture.status == FixtureStatus.published ||
+        fixture.status == FixtureStatus.walkover,
   );
 
   return MyMatchRecord(
-    key: 'fixture:${fixture.id}',
+    key: 'fixture:${fixture.tournamentId}/${fixture.id}',
     source: MyMatchSource.tournamentFixture,
-    sport: tournament?.sport ?? Sport.cricket,
+    sport: tournament.sport,
     context: context,
-    sideA: labels.isNotEmpty && labels[0].trim().isNotEmpty
-        ? labels[0].trim()
-        : 'Side A',
-    sideB: labels.length > 1 && labels[1].trim().isNotEmpty
-        ? labels[1].trim()
-        : 'Side B',
+    sideA: _sideLabel(labels, 0),
+    sideB: _sideLabel(labels, 1),
     scoreA: scores?[0],
     scoreB: scores?[1],
     status: fixture.status,
     scheduledAt: fixture.scheduledAt,
     venue: fixture.venue,
-    role: role,
+    role: _primaryRole(roles),
+    roles: Set<MyMatchRole>.unmodifiable(roles),
     mySide: mySide,
     winnerIndex: fixture.result?.winnerIndex,
     fixtureId: fixture.id,
+    tournamentId: fixture.tournamentId,
   );
 }
 
-// ── Role and side resolution ───────────────────────────────────────────────
+// ============================================================
+// ROLE RESOLUTION
+// ============================================================
 
-MyMatchRole? _roleOfMatch(SportMatch match, String accountId) {
-  if (match.organizerId == accountId) return MyMatchRole.organizing;
-  if (match.scorerId == accountId) return MyMatchRole.scoring;
+Set<MyMatchRole> _rolesOfMatch(SportMatch match, String accountId) {
+  final roles = <MyMatchRole>{};
+
   final participant = match.participantOf(accountId);
-  return switch (participant?.status) {
-    MatchParticipantStatus.accepted => MyMatchRole.playing,
-    MatchParticipantStatus.invited => MyMatchRole.invited,
-    _ => null,
-  };
+
+  if (participant?.status == MatchParticipantStatus.accepted) {
+    roles.add(MyMatchRole.playing);
+  }
+
+  if (match.organizerId == accountId) {
+    roles.add(MyMatchRole.organizing);
+  }
+
+  if (match.scorerId == accountId) {
+    roles.add(MyMatchRole.scoring);
+  }
+
+  if (participant?.status == MatchParticipantStatus.invited) {
+    roles.add(MyMatchRole.invited);
+  }
+
+  return roles;
 }
 
-MyMatchRole? _roleOfFixture(
+Set<MyMatchRole> _rolesOfFixture(
   Fixture fixture, {
   required String accountId,
-  required Set<String> myEntryIds,
+  required int? mySide,
   required String? organizerId,
 }) {
-  if (organizerId == accountId) return MyMatchRole.organizing;
-  if (fixture.scorerAccountIds.contains(accountId)) return MyMatchRole.scoring;
-  if (_sideOf(fixture, myEntryIds) != null) return MyMatchRole.playing;
-  return null;
+  final roles = <MyMatchRole>{};
+
+  if (mySide != null) {
+    roles.add(MyMatchRole.playing);
+  }
+
+  if (organizerId == accountId) {
+    roles.add(MyMatchRole.organizing);
+  }
+
+  if (fixture.scorerAccountIds.contains(accountId)) {
+    roles.add(MyMatchRole.scoring);
+  }
+
+  return roles;
+}
+
+/// Prefer the playing role for athlete-facing presentation.
+///
+/// The full set remains available for organizer/scorer controls.
+MyMatchRole _primaryRole(Set<MyMatchRole> roles) {
+  if (roles.contains(MyMatchRole.playing)) {
+    return MyMatchRole.playing;
+  }
+
+  if (roles.contains(MyMatchRole.organizing)) {
+    return MyMatchRole.organizing;
+  }
+
+  if (roles.contains(MyMatchRole.scoring)) {
+    return MyMatchRole.scoring;
+  }
+
+  return MyMatchRole.invited;
 }
 
 int? _sideOf(Fixture fixture, Set<String> myEntryIds) {
-  if (myEntryIds.contains(fixture.home.entryId)) return 0;
-  if (myEntryIds.contains(fixture.away.entryId)) return 1;
+  if (myEntryIds.contains(fixture.home.entryId)) {
+    return 0;
+  }
+
+  if (myEntryIds.contains(fixture.away.entryId)) {
+    return 1;
+  }
+
   return null;
 }
 
-/// Entries that still stand for the member. A withdrawn entry is not theirs to
-/// play any more, so the fixture it points at is not an appearance.
-Set<String> _myEntryIds(TournamentsController tournaments, String accountId) =>
-    {
-      for (final entry in tournaments.entriesById.values)
-        if (entry.memberAccountIds.contains(accountId) &&
-            entry.status != EntryStatus.withdrawn)
-          entry.id,
-    };
+/// Non-withdrawn tournament entries containing the current account.
+Set<String> _myEntryIds(TournamentsController tournaments, String accountId) {
+  return {
+    for (final entry in tournaments.entriesById.values)
+      if (entry.memberAccountIds.contains(accountId) &&
+          entry.status != EntryStatus.withdrawn)
+        entry.id,
+  };
+}
 
-// ── Ordering and scores ────────────────────────────────────────────────────
+// ============================================================
+// SORTING
+// ============================================================
 
-/// Live first, then the next match up, then the newest results.
+/// Live first, upcoming next, then history newest first.
 int _compare(MyMatchRecord a, MyMatchRecord b) {
-  final rank = _phaseRank(a.phase).compareTo(_phaseRank(b.phase));
-  if (rank != 0) return rank;
-  return a.phase == MyMatchPhase.completed
+  final phaseComparison = _phaseRank(a.phase).compareTo(_phaseRank(b.phase));
+
+  if (phaseComparison != 0) {
+    return phaseComparison;
+  }
+
+  final dateComparison = a.phase == MyMatchPhase.completed
       ? b.scheduledAt.compareTo(a.scheduledAt)
       : a.scheduledAt.compareTo(b.scheduledAt);
+
+  if (dateComparison != 0) {
+    return dateComparison;
+  }
+
+  // Stable ordering when timestamps are identical.
+  return a.key.compareTo(b.key);
 }
 
-int _phaseRank(MyMatchPhase phase) => switch (phase) {
-  MyMatchPhase.live => 0,
-  MyMatchPhase.upcoming => 1,
-  MyMatchPhase.completed => 2,
-  MyMatchPhase.all => 3,
-};
+int _phaseRank(MyMatchPhase phase) {
+  return switch (phase) {
+    MyMatchPhase.live => 0,
+    MyMatchPhase.upcoming => 1,
+    MyMatchPhase.completed => 2,
+    MyMatchPhase.all => 3,
+  };
+}
 
+// ============================================================
+// SCORE RESOLUTION
+// ============================================================
+
+/// Resolve exactly two displayable scores.
+///
+/// Live matches prefer the event fold.
+/// Published matches prefer the official result.
+/// Other statuses do not display provisional results.
 List<String>? _scores(
-  List<String>? published,
+  List<String>? stored,
   MatchProgress? progress, {
   required bool live,
+  required bool published,
 }) {
-  if (published != null && published.length >= 2 && !_blank(published)) {
-    return published;
+  if (live) {
+    final liveScores = _validScores(progress?.scoreDisplay);
+
+    if (liveScores != null) {
+      return liveScores;
+    }
+
+    // A live match may have no scoring events yet.
+    return null;
   }
-  // A running match has no stored result yet: the folded event log is the only
-  // score there is, and it is the same string the scoring workspace paints.
-  if (!live || progress == null) return null;
-  final display = progress.scoreDisplay;
-  if (display.length < 2 || _blank(display)) return null;
-  return display;
+
+  if (published) {
+    return _validScores(stored);
+  }
+
+  return null;
 }
 
-bool _blank(List<String> values) => values.every((v) => v.trim().isEmpty);
+List<String>? _validScores(List<String>? values) {
+  if (values == null || values.length < 2) {
+    return null;
+  }
+
+  final first = values[0].trim();
+  final second = values[1].trim();
+
+  if (first.isEmpty || second.isEmpty) {
+    return null;
+  }
+
+  return [first, second];
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+String _fixtureLink(String tournamentId, String fixtureId) {
+  return '$tournamentId/$fixtureId';
+}
+
+String _sideLabel(List<String> labels, int index) {
+  if (index < labels.length) {
+    final value = labels[index].trim();
+
+    if (value.isNotEmpty) {
+      return value;
+    }
+  }
+
+  return index == 0 ? 'Side A' : 'Side B';
+}

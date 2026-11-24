@@ -124,6 +124,21 @@ class MatchController extends FeatureController<MatchRepository> {
   Future<bool> removeParticipant(String matchId, String profileId) =>
       _guardVoid(() => repo.removeParticipant(matchId, profileId));
 
+  /// Joins a public match on the given side without an invitation.
+  Future<bool> joinMatch(String matchId, {int side = 0}) =>
+      _guardVoid(() => repo.joinMatch(matchId, side: side));
+
+  Future<bool> leaveMatch(String matchId) =>
+      _guardVoid(() => repo.leaveMatch(matchId));
+
+  /// Invites a whole squad; returns how many invitations were written, or null
+  /// when it was refused (see [lastError]).
+  Future<int?> addSquadToMatch(
+    String matchId,
+    String squadId, {
+    int side = 0,
+  }) => _guard(() => repo.addSquadToMatch(matchId, squadId, side: side));
+
   Future<bool> assignScorer(String matchId, String scorerId) =>
       _guardVoid(() => repo.assignMatchScorer(matchId, scorerId));
 
@@ -215,6 +230,16 @@ class MatchController extends FeatureController<MatchRepository> {
       winnerIndex: winnerIndex,
       reason: reason,
     ),
+  );
+
+  /// Retires a live badminton match with a reason and a winner. The partial
+  /// score is derived from the rally log, so nothing here can invent one.
+  Future<bool> retireMatch(
+    String matchId, {
+    required int winnerIndex,
+    required String reason,
+  }) => _guardVoid(
+    () => repo.retireMatch(matchId, winnerIndex: winnerIndex, reason: reason),
   );
 
   /// Every dispute raised on a match, newest first. Free of any entitlement

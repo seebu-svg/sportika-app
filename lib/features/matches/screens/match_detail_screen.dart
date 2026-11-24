@@ -1,9 +1,7 @@
 import 'package:sportika/features/matches/widgets/cricket_match_report.dart';
 import 'package:sportika/shared/widgets/module_media_panel.dart';
 import 'package:flutter/material.dart';
-import 'package:sportika/features/matches/widgets/futsal_lineups.dart';
 import 'package:sportika/features/matches/widgets/match_roster_card.dart';
-import 'package:sportika/features/matches/widgets/futsal_match_report.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/app/routes.dart';
@@ -19,12 +17,16 @@ import 'package:sportika/features/matches/widgets/racket_match_report.dart';
 import 'package:sportika/features/matches/widgets/match_management_widgets.dart';
 import 'package:sportika/features/matches/widgets/match_scorer_sheet.dart';
 import 'package:sportika/features/matches/widgets/match_detail_hero.dart';
+import 'package:sportika/features/matches/widgets/padel_match_center.dart';
+import 'package:sportika/features/matches/screens/futsal_match_center_view.dart';
+import 'package:sportika/features/matches/screens/cricket_match_center_view.dart';
+import 'package:sportika/features/matches/screens/badminton_match_center_view.dart';
+import 'package:sportika/features/matches/widgets/padel_match_sections.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -65,6 +67,22 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     super.dispose();
   }
 
+  List<Widget> matchActions(SportMatch match, String? accountId) => [
+    if (match.isLive && match.canScore(accountId))
+      IconButton(
+        tooltip: 'Open scoring workspace',
+        onPressed: _busy ? null : () => _openScoring(match),
+        icon: const Icon(Icons.sports_score),
+      ),
+    Builder(
+      builder: (scaffoldContext) => IconButton(
+        tooltip: 'Match management',
+        onPressed: () => Scaffold.of(scaffoldContext).openEndDrawer(),
+        icon: const Icon(Icons.more_horiz),
+      ),
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<MatchController>();
@@ -89,268 +107,338 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     final progress = controller.progressOf(match);
 
     final organizer = match.isOrganizer(me?.id);
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: sportikaAppBar(
-          'Match Center',
-          actions: [
-            if (match.isLive && match.canScore(me?.id))
-              IconButton(
-                tooltip: 'Open scoring workspace',
-                onPressed: _busy ? null : () => _openScoring(match),
-                icon: const Icon(Icons.sports_score),
-              ),
-            Builder(
-              builder: (scaffoldContext) => IconButton(
-                tooltip: 'Match management',
-                onPressed: () => Scaffold.of(scaffoldContext).openEndDrawer(),
-                icon: const Icon(Icons.more_horiz),
-              ),
+    final padel = match.sport == Sport.padel;
+    final futsal = match.sport == Sport.futsal;
+    final cricket = match.sport == Sport.cricket;
+    final badminton = match.sport == Sport.badminton;
+    final banners = _statusBanners(controller);
+    return Scaffold(
+      appBar: padel
+          ? padelMatchAppBar(
+              match: match,
+              progress: progress,
+              actions: matchActions(match, me?.id),
+            )
+          : sportikaAppBar(
+              'Match Center',
+              actions: matchActions(match, me?.id),
             ),
-          ],
-        ),
-        endDrawer: Drawer(
-          backgroundColor: SportikaColors.background,
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(SportikaSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Match management',
-                          style: SportikaType.title,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close management',
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
-                  if (organizer && match.status == FixtureStatus.upcoming)
-                    TextButton.icon(
-                      onPressed: _busy ? null : () => _edit(match),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit match'),
-                    ),
-                  MatchLifecycleBar(
-                    compact: true,
-                    match: match,
-                    accountId: me?.id,
-                    busy: _busy,
-                    onStart: () => _start(match),
-                    onScore: () => _openScoring(match),
-                    onPause: () => _pause(match),
-                    onResume: () => _resume(match),
-                    onSubmit: () => _submit(match, progress),
-                    onPublish: () => _publish(match),
-                    onCorrect: () => _correct(match),
-                    onWalkover: () => _walkover(match),
-                    onDispute: () =>
-                        showMatchDisputeSheet(context, match: match),
-                    onCancel: () => _cancel(match),
-                    onInvite: () =>
-                        showMatchParticipantsSheet(context, match: match),
-                    onAssignScorer: () =>
-                        showMatchScorerSheet(context, match: match),
-                    onRespond: (accept) => _respond(match, accept),
-                  ),
-                  if (match.corrections.isNotEmpty)
-                    MatchCorrectionHistory(match: match),
-                  if (match.disputes.isNotEmpty)
-                    _DisputeSummary(
-                      match: match,
-                      onOpen: () =>
-                          showMatchDisputeSheet(context, match: match),
-                    ),
-                  if (organizer)
-                    ModuleMediaPanel(
-                      bucket: 'match-media',
-                      entity: match.id,
-                      canEdit: true,
-                      label: match.title,
-                      showEmptyArtwork: false,
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: sportikaMaxContentWidth,
-              ),
-              child: NestedScrollView(
-                headerSliverBuilder: (context, innerScrolled) => [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      children: [
-                        MatchDetailHero(match: match, progress: progress),
-                        if (controller.sync.isWarning)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: SportikaSpacing.lg,
-                            ),
-                            child: InlineBanner(
-                              text: controller.sync == MatchSyncState.offline
-                                  ? 'Offline. Entries will sync when the connection returns.'
-                                  : 'The last change did not reach the server.',
-                              tone: SportikaColors.gold,
-                              icon: Icons.cloud_off,
-                            ),
-                          ),
-                        if (controller.lastError != null)
-                          Padding(
-                            padding: const EdgeInsets.all(SportikaSpacing.md),
-                            child: InlineBanner(
-                              text: controller.lastError!,
-                              tone: SportikaColors.danger,
-                              onDismiss: controller.clearError,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SliverAppBar(
-                    primary: false,
-                    pinned: true,
-                    automaticallyImplyLeading: false,
-                    toolbarHeight: 0,
-                    backgroundColor: SportikaColors.background,
-                    bottom: TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      labelStyle: SportikaType.action,
-                      indicatorColor: SportikaColors.mint,
-                      labelColor: SportikaColors.text,
-                      unselectedLabelColor: SportikaColors.textMuted,
-                      tabs: [
-                        Tab(text: 'Summary'),
-                        Tab(text: 'Scorecard'),
-                        Tab(text: 'Players'),
-                        Tab(text: 'Timeline'),
-                      ],
-                    ),
-                  ),
-                ],
-                body: TabBarView(
+      endDrawer: Drawer(
+        backgroundColor: SportikaColors.background,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(SportikaSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    _section('summary', controller.refresh, [
-                      const Text(
-                        'Match details',
-                        style: SportikaType.bodyStrong,
+                    const Expanded(
+                      child: Text(
+                        'Match management',
+                        style: SportikaType.title,
                       ),
-                      const SizedBox(height: SportikaSpacing.md),
-                      _DetailFact(
-                        label: 'Scheduled',
-                        value: dateShort(match.scheduledAt),
-                      ),
-                      if (match.venue.isNotEmpty)
-                        _DetailFact(label: 'Venue', value: match.venue),
-                      _DetailFact(label: 'Format', value: match.formatLabel),
-                      _DetailFact(
-                        label: 'Discipline',
-                        value: match.discipline.label,
-                      ),
-                      if (match.isPaused &&
-                          match.pauseReason?.isNotEmpty == true)
-                        _DetailFact(
-                          label: 'Pause reason',
-                          value: match.pauseReason!,
-                        ),
-                      if (match.result?.detail.isNotEmpty == true)
-                        _DetailFact(
-                          label: 'Result detail',
-                          value: match.result!.detail,
-                        ),
-                      if (match.isTournamentMatch)
-                        _TournamentLinkCard(match: match),
-                      const SizedBox(height: SportikaSpacing.md),
-                      const Text(
-                        'Official scorer',
-                        style: SportikaType.bodyStrong,
-                      ),
-                      const SizedBox(height: SportikaSpacing.sm),
-                      _ScorerRow(match: match, canManage: false, onTap: () {}),
-                      ModuleMediaPanel(
-                        bucket: 'match-media',
-                        entity: match.id,
-                        canEdit: false,
-                        label: match.title,
-                        showEmptyArtwork: false,
-                      ),
-                    ]),
-                    _section('scorecard', controller.refresh, [
-                      Text(
-                        '${match.sport.label} scorecard',
-                        style: SportikaType.bodyStrong,
-                      ),
-                      const SizedBox(height: SportikaSpacing.md),
-                      if (match.sport == Sport.cricket)
-                        CricketMatchReport(match: match, progress: progress),
-                      if (match.sport == Sport.padel ||
-                          match.sport == Sport.badminton) ...[
-                        if (match.isLive &&
-                            !progress.isComplete &&
-                            match.corrections.isEmpty) ...[
-                          for (final contextLine in progress.contextChips)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: SportikaSpacing.xs,
-                              ),
-                              child: Text(
-                                contextLine,
-                                style: SportikaType.body,
-                              ),
-                            ),
-                          const SizedBox(height: SportikaSpacing.sm),
-                        ],
-                        RacketMatchReport(match: match, progress: progress),
-                      ],
-                      if (match.sport == Sport.futsal)
-                        FutsalMatchReport(match: match, progress: progress),
-                    ]),
-                    _section('players', controller.refresh, [
-                      MatchRosterCard(
-                        match: match,
-                        accountId: me?.id,
-                        onInviteSide: _busy
-                            ? null
-                            : (side) => showMatchParticipantsSheet(
-                                context,
-                                match: match,
-                                initialSide: side,
-                              ),
-                      ),
-                      if (match.sport == Sport.futsal) ...[
-                        const SizedBox(height: SportikaSpacing.md),
-                        FutsalLineups(match: match),
-                      ],
-                    ]),
-                    _section('timeline', controller.refresh, [
-                      MatchEventTimeline(
-                        match: match,
-                        showFilters: true,
-                        paginated: true,
-                        limit: match.events.length,
-                      ),
-                    ]),
+                    ),
+                    IconButton(
+                      tooltip: 'Close management',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
                   ],
                 ),
-              ),
+                if (organizer && match.status == FixtureStatus.upcoming)
+                  TextButton.icon(
+                    onPressed: _busy ? null : () => _edit(match),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit match'),
+                  ),
+                MatchLifecycleBar(
+                  compact: true,
+                  match: match,
+                  accountId: me?.id,
+                  busy: _busy,
+                  onStart: () => cricket ? _startCricket(match) : _start(match),
+                  onScore: () => _openScoring(match),
+                  onPause: () => _pause(match),
+                  onResume: () => _resume(match),
+                  onSubmit: () => _submit(match, progress),
+                  onPublish: () => _publish(match),
+                  onCorrect: () => _correct(match),
+                  onWalkover: () => _walkover(match),
+                  onRetire: badminton ? () => _retire(match) : null,
+                  onDispute: () => showMatchDisputeSheet(context, match: match),
+                  onCancel: () => _cancel(match),
+                  onInvite: () =>
+                      showMatchParticipantsSheet(context, match: match),
+                  onAssignScorer: () =>
+                      showMatchScorerSheet(context, match: match),
+                  onRespond: (accept) => _respond(match, accept),
+                  onJoinSide: (side) => _join(match, side),
+                  onLeave: () => _leave(match),
+                ),
+                if (match.corrections.isNotEmpty)
+                  MatchCorrectionHistory(match: match),
+                if (match.disputes.isNotEmpty)
+                  _DisputeSummary(
+                    match: match,
+                    onOpen: () => showMatchDisputeSheet(context, match: match),
+                  ),
+                if (organizer)
+                  ModuleMediaPanel(
+                    bucket: 'match-media',
+                    entity: match.id,
+                    canEdit: true,
+                    label: match.title,
+                    showEmptyArtwork: false,
+                  ),
+              ],
             ),
           ),
         ),
       ),
+      body: padel
+          ? PadelMatchCenterView(
+              match: match,
+              progress: progress,
+              accountId: me?.id,
+              actions: PadelMatchActions(
+                onInviteSide: _busy
+                    ? null
+                    : (side) => showMatchParticipantsSheet(
+                        context,
+                        match: match,
+                        initialSide: side,
+                      ),
+                onRefresh: controller.refresh,
+                canManageMedia: organizer,
+                canManageRoster: organizer,
+              ),
+              banners: banners,
+            )
+          : futsal
+          ? FutsalMatchCenterView(
+              match: match,
+              progress: progress,
+              accountId: me?.id,
+              actions: FutsalMatchActions(
+                onScore: _busy || !match.canScore(me?.id)
+                    ? null
+                    : () => _openScoring(match),
+                onRecord: match.canScore(me?.id)
+                    ? (kind, side, data) => _record(match, kind, side, data)
+                    : null,
+                onRefresh: controller.refresh,
+                canManageMedia: organizer,
+              ),
+              banners: banners,
+            )
+          : badminton
+          ? BadmintonMatchCenterView(
+              match: match,
+              progress: progress,
+              accountId: me?.id,
+              actions: BadmintonMatchActions(
+                onStart: _busy || !organizer
+                    ? null
+                    : () =>
+                          context.read<MatchController>().startMatch(match.id),
+                onScore: _busy || !match.canScore(me?.id)
+                    ? null
+                    : () => _openScoring(match),
+                onRecord: match.canScore(me?.id)
+                    ? (kind, side, data) => _record(match, kind, side, data)
+                    : null,
+                onRetire: _busy || !match.canScore(me?.id)
+                    ? null
+                    : () => _retire(match),
+                onInviteSide: organizer
+                    ? (side) => showMatchParticipantsSheet(
+                        context,
+                        match: match,
+                        initialSide: side,
+                      )
+                    : null,
+                onRefresh: controller.refresh,
+                canManageMedia: organizer,
+              ),
+              banners: banners,
+            )
+          : cricket
+          ? CricketMatchCenterView(
+              match: match,
+              progress: progress,
+              accountId: me?.id,
+              actions: CricketMatchActions(
+                onStart: _busy || !organizer
+                    ? null
+                    : () => _startCricket(match),
+                onScore: _busy || !match.canScore(me?.id)
+                    ? null
+                    : () => _openScoring(match),
+                onRecord: match.canScore(me?.id)
+                    ? (kind, side, data) => _record(match, kind, side, data)
+                    : null,
+                onRefresh: controller.refresh,
+                canManageMedia: organizer,
+              ),
+              banners: banners,
+            )
+          : DefaultTabController(
+              length: 4,
+              child: SafeArea(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: sportikaMaxContentWidth,
+                    ),
+                    child: NestedScrollView(
+                      headerSliverBuilder: (context, innerScrolled) => [
+                        SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              MatchDetailHero(match: match, progress: progress),
+                              ...banners,
+                            ],
+                          ),
+                        ),
+                        const SliverAppBar(
+                          primary: false,
+                          pinned: true,
+                          automaticallyImplyLeading: false,
+                          toolbarHeight: 0,
+                          backgroundColor: SportikaColors.background,
+                          bottom: TabBar(
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.start,
+                            labelStyle: SportikaType.action,
+                            indicatorColor: SportikaColors.mint,
+                            labelColor: SportikaColors.text,
+                            unselectedLabelColor: SportikaColors.textMuted,
+                            tabs: [
+                              Tab(text: 'Summary'),
+                              Tab(text: 'Scorecard'),
+                              Tab(text: 'Players'),
+                              Tab(text: 'Timeline'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      body: TabBarView(
+                        children: [
+                          _section('summary', controller.refresh, [
+                            const Text(
+                              'Match details',
+                              style: SportikaType.bodyStrong,
+                            ),
+                            const SizedBox(height: SportikaSpacing.md),
+                            _DetailFact(
+                              label: 'Scheduled',
+                              value: dateShort(match.scheduledAt),
+                            ),
+                            if (match.venue.isNotEmpty)
+                              _DetailFact(label: 'Venue', value: match.venue),
+                            _DetailFact(
+                              label: 'Format',
+                              value: match.formatLabel,
+                            ),
+                            _DetailFact(
+                              label: 'Discipline',
+                              value: match.discipline.label,
+                            ),
+                            if (match.isPaused &&
+                                match.pauseReason?.isNotEmpty == true)
+                              _DetailFact(
+                                label: 'Pause reason',
+                                value: match.pauseReason!,
+                              ),
+                            if (match.result?.detail.isNotEmpty == true)
+                              _DetailFact(
+                                label: 'Result detail',
+                                value: match.result!.detail,
+                              ),
+                            if (match.isTournamentMatch)
+                              _TournamentLinkCard(match: match),
+                            const SizedBox(height: SportikaSpacing.md),
+                            const Text(
+                              'Official scorer',
+                              style: SportikaType.bodyStrong,
+                            ),
+                            const SizedBox(height: SportikaSpacing.sm),
+                            _ScorerRow(
+                              match: match,
+                              canManage: false,
+                              onTap: () {},
+                            ),
+                            ModuleMediaPanel(
+                              bucket: 'match-media',
+                              entity: match.id,
+                              canEdit: false,
+                              label: match.title,
+                              showEmptyArtwork: false,
+                            ),
+                          ]),
+                          _section('scorecard', controller.refresh, [
+                            Text(
+                              '${match.sport.label} scorecard',
+                              style: SportikaType.bodyStrong,
+                            ),
+                            const SizedBox(height: SportikaSpacing.md),
+                            if (match.sport == Sport.cricket)
+                              CricketMatchReport(
+                                match: match,
+                                progress: progress,
+                              ),
+                            if (match.sport == Sport.badminton) ...[
+                              if (match.isLive &&
+                                  !progress.isComplete &&
+                                  match.corrections.isEmpty) ...[
+                                for (final contextLine in progress.contextChips)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: SportikaSpacing.xs,
+                                    ),
+                                    child: Text(
+                                      contextLine,
+                                      style: SportikaType.body,
+                                    ),
+                                  ),
+                                const SizedBox(height: SportikaSpacing.sm),
+                              ],
+                              RacketMatchReport(
+                                match: match,
+                                progress: progress,
+                              ),
+                            ],
+                          ]),
+                          _section('players', controller.refresh, [
+                            MatchRosterCard(
+                              match: match,
+                              accountId: me?.id,
+                              onInviteSide: _busy
+                                  ? null
+                                  : (side) => showMatchParticipantsSheet(
+                                      context,
+                                      match: match,
+                                      initialSide: side,
+                                    ),
+                            ),
+                          ]),
+                          _section('timeline', controller.refresh, [
+                            MatchEventTimeline(
+                              match: match,
+                              showFilters: true,
+                              paginated: true,
+                              limit: match.events.length,
+                            ),
+                          ]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
@@ -367,6 +455,32 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
       children: children,
     ),
   );
+
+  /// The sync and error warnings, defined once so the Padel Match Center and
+  /// the other sports' detail hero cannot show different health states for the
+  /// same controller.
+  List<Widget> _statusBanners(MatchController controller) => [
+    if (controller.sync.isWarning)
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SportikaSpacing.lg),
+        child: InlineBanner(
+          text: controller.sync == MatchSyncState.offline
+              ? 'Offline. Entries will sync when the connection returns.'
+              : 'The last change did not reach the server.',
+          tone: SportikaColors.gold,
+          icon: Icons.cloud_off,
+        ),
+      ),
+    if (controller.lastError != null)
+      Padding(
+        padding: const EdgeInsets.all(SportikaSpacing.md),
+        child: InlineBanner(
+          text: controller.lastError!,
+          tone: SportikaColors.danger,
+          onDismiss: controller.clearError,
+        ),
+      ),
+  ];
 
   Future<void> _run(Future<bool> Function() action) async {
     final controller = context.read<MatchController>();
@@ -393,6 +507,13 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     }
   }
 
+  /// Cricket starts into its Match Center, not the pad: the toss and the XIs
+  /// have to be recorded before a ball can be logged, and the center is where
+  /// that happens.
+  Future<void> _startCricket(SportMatch match) async {
+    await _run(() => context.read<MatchController>().startMatch(match.id));
+  }
+
   void _openScoring(SportMatch match) {
     pushRoute(context, AppRoute.matchScoring, args: MatchArgs(match.id));
   }
@@ -414,7 +535,51 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     await _run(() => context.read<MatchController>().resumeMatch(match.id));
   }
 
+  /// Writes one scoring entry from the Match Center.
+  ///
+  /// The only entry the center itself records is the `lineup` event: everything
+  /// that moves the score goes through the scoring workspace, so the server
+  /// sees the same actor and the same confirmations as before.
+  Future<void> _record(
+    SportMatch match,
+    String kind,
+    int? side,
+    Map<String, dynamic> data,
+  ) async {
+    final controller = context.read<MatchController>();
+    final event = await controller.recordEvent(
+      match.id,
+      kind: kind,
+      side: side,
+      data: data,
+    );
+    if (!mounted) return;
+    if (event == null) {
+      showSnack(
+        context,
+        controller.lastError ?? 'That entry was not recorded',
+        error: true,
+      );
+    }
+  }
+
   Future<void> _submit(SportMatch match, MatchProgress progress) async {
+    // `submit_match_result` derives a futsal or badminton result from the
+    // recorded log and refuses a match that has not finished, so the sheet is
+    // never opened for one: a confirmation dialog that cannot succeed is worse
+    // than none.
+    if ((match.sport == Sport.futsal ||
+            match.sport == Sport.cricket ||
+            match.sport == Sport.badminton) &&
+        !progress.isComplete) {
+      showSnack(context, switch (match.sport) {
+        Sport.cricket => 'End the match first: close both innings.',
+        Sport.badminton =>
+          'Finish the match first: reach the winning game, or retire it.',
+        _ => 'End the match first: the clock has to reach full time.',
+      }, error: true);
+      return;
+    }
     final confirmed = await confirmSubmitResult(
       context,
       match: match,
@@ -467,6 +632,24 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     );
   }
 
+  /// Retires a badminton match that will not reach the winning game. The
+  /// partial score is read from the rally log by the server.
+  Future<void> _retire(SportMatch match) async {
+    final request = await showMatchRetireSheet(
+      context,
+      match: match,
+      progress: context.read<MatchController>().progressOf(match),
+    );
+    if (request == null || !mounted) return;
+    await _run(
+      () => context.read<MatchController>().retireMatch(
+        match.id,
+        winnerIndex: request.winnerIndex,
+        reason: request.reason,
+      ),
+    );
+  }
+
   Future<void> _cancel(SportMatch match) async {
     final reason = await showCancelMatchDialog(context);
     if (reason == null || !mounted) return;
@@ -487,13 +670,36 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     );
   }
 
+  /// `join_match`: takes a free place on a public side without an invitation.
+  Future<void> _join(SportMatch match, int side) async {
+    await _run(
+      () => context.read<MatchController>().joinMatch(match.id, side: side),
+    );
+    if (!mounted) return;
+    final joined = context.read<MatchController>().matchById(match.id);
+    final me = context.read<SessionController>().currentAccount?.id;
+    if (joined != null &&
+        joined.participantOf(me)?.status == MatchParticipantStatus.accepted) {
+      showSnack(
+        context,
+        'You are on ${side < joined.sideNames.length ? joined.sideNames[side] : 'side ${side + 1}'}',
+      );
+    }
+  }
+
+  Future<void> _leave(SportMatch match) async {
+    await _run(() => context.read<MatchController>().leaveMatch(match.id));
+  }
+
   Future<void> _edit(SportMatch match) async {
     final draft = await showModalBottomSheet<_EditDraft>(
       context: context,
       backgroundColor: SportikaColors.surfaceElevated,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SportikaRadius.xl),
+        ),
       ),
       builder: (_) =>
           SingleChildScrollView(child: _EditMatchSheet(match: match)),

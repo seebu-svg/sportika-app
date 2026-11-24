@@ -117,7 +117,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               waiting ? 'RESEND IN ${flow.otpSecondsLeft}s' : 'DIDN\'T GET IT?',
               style: const TextStyle(
                 fontSize: 9,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: 1.3,
                 color: SportikaColors.textDim,
               ),

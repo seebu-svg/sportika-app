@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -155,11 +154,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x99061426), Color(0x00061426)],
-                        ),
+                        gradient: SportikaGradients.onboardingTopFade,
                       ),
                     ),
                   ),
@@ -171,17 +166,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: IgnorePointer(
                     child: Container(
                       height: 260,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            SportikaColors.deepest.withValues(alpha: 0),
-                            SportikaColors.deepest.withValues(alpha: .86),
-                            SportikaColors.deepest,
-                          ],
-                          stops: const [0, .45, 1],
-                        ),
+                      decoration: const BoxDecoration(
+                        gradient: SportikaGradients.onboardingBottomFade,
                       ),
                     ),
                   ),
@@ -199,7 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               'SPORTIKA',
                               style: TextStyle(
                                 fontSize: 10.5,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: SportikaFontWeight.black,
                                 letterSpacing: 2.6,
                               ),
                             ),
@@ -219,7 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 'SKIP',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: SportikaFontWeight.extraBold,
                                   letterSpacing: 1.8,
                                 ),
                               ),
@@ -253,7 +239,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                         onTap: flow.busy
                                             ? null
                                             : () => _goTo(i, reduceMotion),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(
+                                          SportikaRadius.tag,
+                                        ),
                                         child: SizedBox(
                                           width: 44,
                                           height: 48,
@@ -273,7 +261,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                                     : SportikaColors
                                                           .borderStrong,
                                                 borderRadius:
-                                                    BorderRadius.circular(2),
+                                                    BorderRadius.circular(
+                                                      SportikaRadius.xxs,
+                                                    ),
                                               ),
                                             ),
                                           ),
@@ -354,17 +344,7 @@ class _SlideView extends StatelessWidget {
         ),
         const DecoratedBox(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x40061426),
-                Color(0x66061426),
-                Color(0xE6061426),
-                SportikaColors.deepest,
-              ],
-              stops: [0, .35, .62, .9],
-            ),
+            gradient: SportikaGradients.onboardingSlideScrim,
           ),
         ),
         SafeArea(

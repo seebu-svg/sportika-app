@@ -1,290 +1,290 @@
 import 'package:flutter/material.dart';
 
+import 'package:sportika/features/profile/widgets/sporting_record.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/widgets/default_avatar.dart';
 import 'package:sportika/shared/widgets/profile_avatar.dart';
+import 'package:sportika/shared/widgets/surfaces.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// The signature Sports Passport card: one premium navy surface carrying the
-/// member's photographic identity, handle, city and Sportika membership.
+/// Athlete Passport hero: the strongest surface on the Me screen.
 ///
-/// Nothing here is invented — no rank, no tier, no serial number. The only
-/// claims on the card are the member's own profile record.
+/// A signature navy surface with the Sportika mark, a single small
+/// ATHLETE PASSPORT label, the member's photo and name as the focal point,
+/// their published record, and one labelled edit action. The oversized
+/// wrapping wordmark is deliberately gone so the identity reads first.
+///
+/// Presentation only. Account data, official statistics, and navigation
+/// remain owned by their existing models and callbacks.
 class SportsPassportCard extends StatelessWidget {
   const SportsPassportCard({
     super.key,
     required this.account,
     required this.onEditProfile,
+    this.record,
   });
 
   final Account account;
   final VoidCallback onEditProfile;
+  final SportingRecord? record;
 
   @override
   Widget build(BuildContext context) {
-    final name = account.displayName.trim().isEmpty
-        ? '@${account.username}'
-        : account.displayName.trim();
-    // A profile that has not set a name yet already shows the handle as the
-    // headline, so the small line underneath is skipped rather than repeated.
-    final handle = account.displayName.trim().isEmpty
-        ? null
-        : '@${account.username}';
-    final city = account.city.trim();
+    final record = this.record;
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: SportikaColors.borderStrong.withValues(alpha: .65),
-        ),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF16304E), Color(0xFF0C1F36), Color(0xFF09182D)],
-          stops: [0, .58, 1],
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 26,
-            offset: Offset(0, 14),
-          ),
-          BoxShadow(color: Color(0x1436506D), blurRadius: 2, spreadRadius: 1),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
-        child: Stack(
-          children: [
-            const Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(painter: _PassportGuardPainter()),
-              ),
-            ),
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                child: SizedBox(
-                  height: 1.4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0x00FFFFFF),
-                          Color(0x33FFFFFF),
-                          Color(0x00FFFFFF),
-                        ],
-                      ),
+    return SportikaSurface(
+      style: SportikaSurfaceStyle.signature,
+      tone: SportikaColors.mint,
+      radius: SportikaRadius.passport,
+      padding: const EdgeInsets.all(SportikaSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _PassportMasthead(),
+
+          const SizedBox(height: SportikaSpacing.lg),
+          _PassportIdentity(account: account),
+
+          if (record != null) ...[
+            const SizedBox(height: SportikaSpacing.lg),
+            const _PassportDivider(),
+            const SizedBox(height: SportikaSpacing.md),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'OFFICIAL RECORD',
+                    style: SportikaType.label.copyWith(
+                      color: SportikaColors.textMuted,
+                      letterSpacing: 1.2,
                     ),
                   ),
                 ),
-              ),
+                const Icon(
+                  Icons.insights_outlined,
+                  size: SportikaIconSize.sm,
+                  color: SportikaColors.mint,
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'SPORTIKA · ATHLETE PASSPORT',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: SportikaType.micro.copyWith(
-                            color: SportikaColors.mint,
-                            letterSpacing: 1.3,
-                          ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: onEditProfile,
-                        style: TextButton.styleFrom(
-                          foregroundColor: SportikaColors.textBody,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: const Size(0, 40),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        icon: const Icon(Icons.edit_outlined, size: 15),
-                        label: const Text(
-                          'Edit profile',
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const IgnorePointer(
-                    child: SizedBox(
-                      height: 1,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0x00F6B84B),
-                              Color(0x40F6B84B),
-                              Color(0x00F6B84B),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      ProfileAvatar(
-                        initials: account.initials,
-                        avatarId: account.avatar,
-                        photoPath: account.photoPath,
-                        photoUrl: account.photoUrl,
-                        size: 84,
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: SportikaType.displayFamily,
-                                fontSize: 26,
-                                height: 1.02,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -.2,
-                                color: SportikaColors.text,
-                              ),
-                            ),
-                            if (handle != null) ...[
-                              const SizedBox(height: 5),
-                              Text(
-                                handle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: SportikaType.caption.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: SportikaColors.textBody,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.place_outlined,
-                                  size: 12,
-                                  color: SportikaColors.textDim,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    city.isEmpty ? 'City not set' : city,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: SportikaType.caption,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-                    decoration: BoxDecoration(
-                      color: SportikaColors.deepest.withValues(alpha: .5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: SportikaColors.borderSubtle),
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('MEMBERSHIP', style: SportikaType.micro),
-                        SizedBox(height: 6),
-                        StatusPill(
-                          'Sportika member',
-                          color: SportikaColors.blueBright,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+
+            const SizedBox(height: SportikaSpacing.md),
+
+            // Keep the existing official record implementation.
+            // No statistics are fabricated or recalculated here.
+            SportingRecordStrip(record: record),
+
+            if (record.draws > 0) ...[
+              const SizedBox(height: SportikaSpacing.sm),
+              Text(
+                record.draws == 1
+                    ? '1 match drawn · a draw counts as neither a win nor a '
+                          'loss'
+                    : '${record.draws} matches drawn · a draw counts as '
+                          'neither a win nor a loss',
+                style: SportikaType.caption.copyWith(
+                  color: SportikaColors.textMuted,
+                ),
               ),
-            ),
+            ],
+
+            if (record.isEmpty) ...[
+              const SizedBox(height: SportikaSpacing.sm),
+              Text(
+                'Your first official result sets your win rate.',
+                style: SportikaType.caption.copyWith(
+                  color: SportikaColors.textMuted,
+                ),
+              ),
+            ],
           ],
-        ),
+
+          const SizedBox(height: SportikaSpacing.lg),
+          const _PassportDivider(),
+          const SizedBox(height: SportikaSpacing.md),
+
+          GhostButton(
+            label: 'Edit profile',
+            icon: Icons.edit_outlined,
+            expand: true,
+            onPressed: onEditProfile,
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Very quiet concentric rings in the passport's upper right: enough to read as
-/// a printed security detail, never bright enough to compete with the name.
-class _PassportGuardPainter extends CustomPainter {
-  const _PassportGuardPainter();
+/// Compact brand identity: the mark and one small passport label.
+class _PassportMasthead extends StatelessWidget {
+  const _PassportMasthead();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final ring = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = SportikaColors.mint.withValues(alpha: .1);
-    final centre = Offset(size.width * .93, size.height * .06);
-    for (final radius in const [34.0, 58.0, 82.0]) {
-      canvas.drawCircle(centre, radius, ring);
-    }
-
-    final sweep = Paint()
-      ..strokeWidth = 1
-      ..color = SportikaColors.blueBright.withValues(alpha: .08);
-    canvas.drawLine(
-      Offset(size.width * .62, size.height),
-      Offset(size.width, size.height * .38),
-      sweep,
-    );
-
-    // A faint embossed wordmark, low enough to read as printed security
-    // engraving rather than competing with the member's name.
-    final wordmark = TextPainter(
-      text: const TextSpan(
-        text: 'SPORTIKA',
-        style: TextStyle(
-          fontFamily: 'Barlow Condensed',
-          fontSize: 62,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 6,
-          color: Color(0x0FFFFFFF),
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const ExcludeSemantics(child: BrandMark(size: SportikaSpacing.xl)),
+        const SizedBox(width: SportikaSpacing.sm),
+        Expanded(
+          child: Text(
+            'ATHLETE PASSPORT',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: SportikaType.label.copyWith(
+              color: SportikaColors.textBody,
+              letterSpacing: 1.6,
+            ),
+          ),
         ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    canvas.save();
-    canvas.translate(size.width * .5, size.height * .66);
-    canvas.rotate(-.16);
-    wordmark.paint(canvas, Offset(-wordmark.width / 2, 0));
-    canvas.restore();
+      ],
+    );
   }
+}
+
+/// Athlete portrait, display name, username, and location.
+///
+/// The existing ProfileAvatar is retained so all image sources and
+/// fallback behavior continue to work.
+class _PassportIdentity extends StatelessWidget {
+  const _PassportIdentity({required this.account});
+
+  final Account account;
 
   @override
-  bool shouldRepaint(_PassportGuardPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    final displayName = account.displayName.trim();
+    final username = account.username.trim();
+    final city = account.city.trim();
+
+    final handle = username.isEmpty ? '' : '@$username';
+
+    final primaryName = displayName.isNotEmpty
+        ? displayName
+        : handle.isNotEmpty
+        ? handle
+        : 'Sportika member';
+
+    const portraitSize = SportikaSpacing.xxxl * 2;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textScale =
+            MediaQuery.textScalerOf(context).scale(SportikaSpacing.lg) /
+            SportikaSpacing.lg;
+
+        final stacked =
+            constraints.maxWidth <
+            (portraitSize +
+                SportikaSpacing.md +
+                SportikaSpacing.xxxl * 3 * textScale);
+
+        final portrait = Container(
+          width: portraitSize,
+          height: portraitSize,
+          padding: const EdgeInsets.all(SportikaBorder.rule),
+          decoration: BoxDecoration(
+            color: SportikaColors.surfaceSunken,
+            borderRadius: BorderRadius.circular(SportikaRadius.control),
+            border: Border.all(
+              color: SportikaColors.mint.withValues(alpha: .34),
+              width: SportikaBorder.hairline,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: ProfileAvatar(
+            initials: account.initials,
+            avatarId: account.avatar,
+            figure: defaultAvatarFigureFor(account.gender),
+            photoPath: account.photoPath,
+            photoUrl: account.photoUrl,
+            size: portraitSize - SportikaBorder.rule * 2,
+          ),
+        );
+
+        final identity = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              primaryName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: SportikaType.hero,
+            ),
+
+            if (displayName.isNotEmpty && handle.isNotEmpty) ...[
+              const SizedBox(height: SportikaSpacing.xxs),
+              Text(
+                handle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: SportikaType.caption.copyWith(
+                  color: SportikaColors.textBody,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: SportikaSpacing.sm),
+
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.place_outlined,
+                  size: SportikaIconSize.sm,
+                  color: SportikaColors.textMuted,
+                ),
+                const SizedBox(width: SportikaSpacing.xs),
+                Flexible(
+                  child: Text(
+                    city.isEmpty ? 'City not set' : city,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: SportikaType.caption,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              portrait,
+              const SizedBox(height: SportikaSpacing.md),
+              identity,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            portrait,
+            const SizedBox(width: SportikaSpacing.md),
+            Expanded(child: identity),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Fine, understated separation between passport sections.
+class _PassportDivider extends StatelessWidget {
+  const _PassportDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: SportikaBorder.rule,
+      thickness: SportikaBorder.hairline,
+      color: SportikaColors.borderSubtle,
+    );
+  }
 }

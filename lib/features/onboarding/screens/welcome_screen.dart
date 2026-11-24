@@ -108,7 +108,7 @@ class _Metric extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 7.5,
-            fontWeight: FontWeight.w800,
+            fontWeight: SportikaFontWeight.extraBold,
             letterSpacing: 1.3,
             color: SportikaColors.textDim,
           ),

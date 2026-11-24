@@ -73,9 +73,11 @@ class PadelEngine implements SportEngine {
     final completed = st.done;
     final winner = completed ? st.winner : -1;
 
-    String scoreTextFor(int side) => _scoreText(st, side, r);
-
-    // Per-side set summary, including the set still in play.
+    // The one per-side set summary, including the set still in play: the score
+    // lines and scoreDisplay must read from the same fold, and side B always
+    // sees every pair reversed so each side reads its own games first. The
+    // server builds the same two orders in
+    // `supabase/migrations/0013_padel_scoring.sql`.
     String setsText(int s) {
       final parts = <String>[];
       for (final set in st.completedSets) {
@@ -181,7 +183,7 @@ class PadelEngine implements SportEngine {
                 : 'Sets to win reached (${r.setsToWin})'
           : '',
       scoreValues: [st.setsWon[0], st.setsWon[1]],
-      scoreDisplay: [scoreTextFor(0), scoreTextFor(1)],
+      scoreDisplay: [setsText(0), setsText(1)],
       actions: completed
           ? []
           : [
@@ -391,18 +393,6 @@ class PadelEngine implements SportEngine {
       _PointOutcome.game => 'game · $wonBy',
       _PointOutcome.point => _gameScoreText(st, sides, r),
     };
-  }
-
-  String _scoreText(_PadelState st, int side, _PadelRules r) {
-    final parts = <String>[];
-    for (final set in st.completedSets) {
-      parts.add('${set[0]}-${set[1]}');
-    }
-    if (!st.done && st.hasLiveSet) {
-      final cur = st.deciderTiebreak ? st.tb : st.games;
-      parts.add('${cur[0]}-${cur[1]}');
-    }
-    return parts.isEmpty ? '-' : parts.join(', ');
   }
 }
 

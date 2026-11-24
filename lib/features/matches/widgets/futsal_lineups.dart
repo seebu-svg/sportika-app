@@ -7,7 +7,6 @@ import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/features/matches/scoring/futsal_roster.dart';
 import 'package:sportika/features/matches/scoring/match_scoring_validator.dart';
 import 'package:sportika/shared/models/match.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/theme/theme.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
@@ -177,8 +176,14 @@ class FutsalLineupSection extends StatelessWidget {
                   style: SportikaType.label,
                 ),
               ),
-              if (onEdit != null)
-                _EditLineup(teamName: teamName, onPressed: onEdit!),
+              if (onEdit != null) ...[
+                const SizedBox(width: SportikaSpacing.xs),
+                // Loose fit: the heading keeps its share and the action shrinks
+                // into whatever is left instead of overflowing the card.
+                Flexible(
+                  child: _EditLineup(teamName: teamName, onPressed: onEdit!),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: SportikaSpacing.sm),
@@ -305,7 +310,9 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// The one action on the card. Kept overflow-safe at large text scales.
+/// The one action on the card. The label lives inside a [FittedBox], so at a
+/// 320 dp width and a 2.0 text scale it scales down instead of overflowing the
+/// card: the button has to survive the tightest layout the roster allows.
 class _EditLineup extends StatelessWidget {
   const _EditLineup({required this.teamName, required this.onPressed});
 
@@ -319,28 +326,32 @@ class _EditLineup extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: SportikaColors.blue,
-        minimumSize: const Size(48, 44),
-        padding: const EdgeInsets.symmetric(horizontal: SportikaSpacing.sm),
+        // No 64 dp floor: the row above gives the action what it can spare and
+        // the FittedBox keeps the glyphs readable below the default minimum.
+        minimumSize: const Size(0, 44),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: SportikaSpacing.xs),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(SportikaRadius.sm),
         ),
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.edit_outlined, size: 15),
-          SizedBox(width: 6),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Edit Lineup',
-                maxLines: 1,
-                style: SportikaType.action,
-              ),
+      child: const FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit_outlined, size: 15),
+            SizedBox(width: 6),
+            Text(
+              'Edit Lineup',
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: SportikaType.action,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -610,7 +621,7 @@ class _Substitutes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Theme(
-    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+    data: Theme.of(context).copyWith(dividerColor: SportikaColors.transparent),
     child: Material(
       color: SportikaColors.lightSurface,
       child: ExpansionTile(
@@ -970,7 +981,7 @@ class _FutsalLineupSelectionSheetState
           child: AnimatedContainer(
             duration: SportikaMotion.fast,
             curve: SportikaMotion.standard,
-            color: Colors.transparent,
+            color: SportikaColors.transparent,
             child: InkWell(
               onTap: !enabled ? null : () => _toggle(player.profileId),
               child: Padding(
@@ -1006,7 +1017,7 @@ class _SelectTick extends StatelessWidget {
     height: 24,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      color: selected ? SportikaColors.blue : Colors.transparent,
+      color: selected ? SportikaColors.blue : SportikaColors.transparent,
       border: Border.all(
         color: selected ? SportikaColors.blue : SportikaColors.lightBorder,
         width: 1.5,

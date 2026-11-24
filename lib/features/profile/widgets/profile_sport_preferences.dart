@@ -34,9 +34,9 @@ class ProfileSportPreferences extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
       decoration: BoxDecoration(
         color: refined
-            ? Colors.transparent
+            ? SportikaColors.transparent
             : SportikaColors.surface.withValues(alpha: .72),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
         border: refined ? null : Border.all(color: SportikaColors.border),
       ),
       child: Column(
@@ -49,7 +49,7 @@ class ProfileSportPreferences extends StatelessWidget {
                 width: 30,
                 decoration: BoxDecoration(
                   color: tone.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: BorderRadius.circular(SportikaRadius.badge),
                   border: Border.all(color: tone.withValues(alpha: .35)),
                 ),
                 child: Icon(sportGlyph(sport), size: 16, color: tone),
@@ -78,7 +78,7 @@ class ProfileSportPreferences extends StatelessWidget {
                 refined ? level.label : level.label.toUpperCase(),
                 style: TextStyle(
                   fontSize: refined ? 11 : 8.5,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: SportikaFontWeight.extraBold,
                   letterSpacing: refined ? 0 : 1.1,
                   color: tone,
                 ),

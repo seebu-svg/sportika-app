@@ -1,40 +1,33 @@
-import 'package:sportika/features/matches/widgets/cricket_match_report.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
-import 'package:sportika/features/matches/widgets/match_vs_card.dart';
 import 'package:provider/provider.dart';
 
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/state/match_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
+import 'package:sportika/features/live/widgets/live_clock.dart';
 import 'package:sportika/features/matches/scoring/badminton_scoring_workspace.dart';
 import 'package:sportika/features/matches/scoring/cricket_scoring_workspace.dart';
 import 'package:sportika/features/matches/scoring/futsal_scoring_workspace.dart';
 import 'package:sportika/features/matches/scoring/match_scoring_validator.dart';
 import 'package:sportika/features/matches/scoring/padel_scoring_workspace.dart';
+import 'package:sportika/features/matches/widgets/cricket_match_report.dart';
 import 'package:sportika/features/matches/widgets/match_event_timeline.dart';
-import 'package:sportika/features/matches/widgets/match_scoring_dock.dart';
 import 'package:sportika/features/matches/widgets/match_result_card.dart';
 import 'package:sportika/features/matches/widgets/match_result_dialogs.dart';
-import 'package:sportika/features/live/widgets/live_clock.dart';
+import 'package:sportika/features/matches/widgets/match_scoring_dock.dart';
+import 'package:sportika/features/matches/widgets/match_vs_card.dart';
+import 'package:sportika/features/matches/widgets/padel_match_result.dart';
 import 'package:sportika/features/personal_games/scoring/cricket/cricket.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/features/personal_games/scoring/futsal/futsal.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/layout.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
-/// The official scoring workspace for one match.
-///
-/// It owns everything the four sports have in common — the score readout, the
-/// sync banner, undo, the end-of-innings/end-of-match buttons and submitting
-/// the result — and dispatches the body to exactly one sport workspace. Each
-/// workspace writes single events through the same log, and every number it
-/// paints comes from that sport's engine, never from a shared generic scorer.
+/// Official scoring shell. Sport engines remain the only source of score data.
 class MatchScoringScreen extends StatefulWidget {
   const MatchScoringScreen({
     super.key,
@@ -43,9 +36,6 @@ class MatchScoringScreen extends StatefulWidget {
   });
 
   final String matchId;
-
-  /// The clock seam: a widget test builds the screen with `ticking: false` so
-  /// the futsal timer cannot outlive the test or make `pumpAndSettle` spin.
   final bool ticking;
 
   @override
@@ -56,7 +46,10 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
   MatchController? _controller;
   bool _busy = false;
   bool _recording = false;
-  Duration? _lastRallyTap;
+  bool _historyExpanded = false;
+  DateTime? _lastBadmintonTap;
+
+  bool get _locked => _busy || _recording;
 
   @override
   void initState() {
@@ -70,9 +63,55 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant MatchScoringScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.matchId == widget.matchId) return;
+    _controller?.unwatchMatch(oldWidget.matchId);
+    _historyExpanded = false;
+    _lastBadmintonTap = null;
+    if (_controller != null) {
+      _controller!.watchMatch(widget.matchId);
+      _controller!.clearError();
+    }
+  }
+
+  @override
   void dispose() {
     _controller?.unwatchMatch(widget.matchId);
     super.dispose();
+  }
+
+  SportMatch? _latestMatch(MatchController controller, String id) =>
+      controller.matchById(id);
+
+  bool _canMutate(SportMatch? match, {bool requireLive = true}) {
+    if (match == null) return false;
+    final accountId = context.read<SessionController>().currentAccount?.id;
+    return match.canScore(accountId) &&
+        (!requireLive || match.status == FixtureStatus.live);
+  }
+
+  void _error(String message) {
+    if (mounted) showSnack(context, message, error: true);
+  }
+
+  /// Serializes lifecycle writes and releases the lock even on exceptions.
+  Future<bool> _runAction(
+    Future<bool> Function() action, {
+    required String fallback,
+  }) async {
+    if (_locked || !mounted) return false;
+    setState(() => _busy = true);
+    try {
+      final ok = await action();
+      if (!ok) _error(_controller?.lastError ?? fallback);
+      return ok;
+    } catch (_) {
+      _error(_controller?.lastError ?? fallback);
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -85,13 +124,13 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
       return LiveClock(
         ticking: widget.ticking,
         child: ScreenScaffold(
-          title: 'Scoring',
+          title: 'Official scoring',
           onRefresh: controller.refresh,
           child: ErrorState(
             title: 'Match not available',
             message:
-                'This match is no longer visible to your account. It may have '
-                'been cancelled or removed.',
+                'This match is no longer visible to your account. '
+                'It may have been cancelled or removed.',
             onRetry: controller.refresh,
             retryLabel: 'Try again',
           ),
@@ -103,23 +142,12 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
     final accent = sportColor(match.sport);
     final mayScore = match.canScore(me?.id);
     final live = match.status == FixtureStatus.live;
+    final hasHistory = match.events.isNotEmpty;
 
     return LiveClock(
       ticking: widget.ticking,
       child: ScreenScaffold(
-        title: 'Scoring',
-        bottomNavigationBar: mayScore && live
-            ? MatchScoringDock(
-                match: match,
-                progress: progress,
-                sync: controller.sync,
-                busy: _busy || _recording,
-                onUndo: match.lastActiveEvent == null
-                    ? null
-                    : () => _undo(match),
-                onPause: () => _togglePause(match),
-              )
-            : null,
+        title: 'Official scoring',
         subtitle: '${match.sideNames.first} vs ${match.sideNames.last}',
         onRefresh: controller.refresh,
         actions: [
@@ -133,11 +161,34 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
             icon: const Icon(Icons.info_outline),
           ),
         ],
+        bottomNavigationBar: mayScore && live
+            ? MatchScoringDock(
+                match: match,
+                progress: progress,
+                sync: controller.sync,
+                busy: _locked,
+                onUndo: match.lastActiveEvent == null || _locked
+                    ? null
+                    : () => _undo(match),
+                onPause: () => _togglePause(match),
+              )
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _OfficialScoringHeader(
+              sport: match.sport,
+              accent: accent,
+              live: live,
+              mayScore: mayScore,
+              paused: match.isPaused,
+              sync: controller.sync,
+            ),
+            const SizedBox(height: SportikaSpacing.sm),
             if (match.result != null && !live)
-              MatchResultCard(match: match)
+              match.sport == Sport.padel
+                  ? PadelMatchResult(match: match)
+                  : MatchResultCard(match: match)
             else if (match.sport == Sport.futsal ||
                 match.sport == Sport.cricket ||
                 match.sport == Sport.badminton)
@@ -154,9 +205,10 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
                 padding: const EdgeInsets.only(bottom: SportikaSpacing.sm),
                 child: InlineBanner(
                   text: controller.sync == MatchSyncState.offline
-                      ? 'Offline. Entries stay on this device and sync when the '
-                            'connection returns.'
-                      : 'The last entry did not reach the server.',
+                      ? 'Offline. Entries stay on this device and sync when '
+                            'the connection returns.'
+                      : 'An entry has not reached the server. Check sync '
+                            'before leaving the match.',
                   tone: SportikaColors.gold,
                   icon: controller.sync == MatchSyncState.offline
                       ? Icons.cloud_off
@@ -175,24 +227,23 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
             if (!mayScore)
               const InfoBanner(
                 text:
-                    'Only the organizer or the assigned official scorer can '
-                    'record this match. You are seeing it live.',
+                    'Only the organizer or assigned official scorer can '
+                    'record entries. You are viewing the match.',
                 tone: SportikaColors.textMuted,
                 icon: Icons.lock_outline,
               )
             else if (match.status == FixtureStatus.upcoming)
               _StartCard(
-                busy: _busy,
+                busy: _locked,
                 onStart: () => _start(match),
                 hint: match.scorerId == null
-                    ? 'You are scoring this match as the organizer.'
-                    : 'You are the official scorer for this match.',
+                    ? 'You are scoring as the organizer.'
+                    : 'You are the assigned official scorer.',
               )
             else if (!live)
               InfoBanner(
                 text: match.status == FixtureStatus.submitted
-                    ? 'The result is waiting to be published, so the log is '
-                          'closed.'
+                    ? 'Result submitted for review. The scoring log is closed.'
                     : 'This match is closed for scoring.',
                 tone: SportikaColors.textMuted,
                 icon: Icons.lock_clock,
@@ -200,35 +251,50 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
             if (mayScore && live) ...[
               if (match.isPaused && match.sport != Sport.padel)
                 const InfoBanner(
-                  text: 'Scoring is paused. Resume from the controls below to record the next entry.',
+                  text: 'Scoring is paused. Resume from the dock below.',
                   tone: SportikaColors.gold,
                   icon: Icons.pause_circle_outline,
                 ),
               IgnorePointer(
                 ignoring:
-                    _recording ||
-                    _busy ||
-                    (match.isPaused && match.sport != Sport.padel),
+                    _locked || (match.isPaused && match.sport != Sport.padel),
                 child: _workspace(match, progress, accent),
               ),
-              if (_recording) const LinearProgressIndicator(minHeight: 2),
+              if (_locked) const LinearProgressIndicator(minHeight: 2),
               const SizedBox(height: SportikaSpacing.md),
               _ControlBar(
                 match: match,
                 progress: progress,
                 accent: accent,
-                busy: _busy || _recording,
-                onUndo: () => _undo(match),
-                onEndInnings: () => _endInnings(match, progress),
+                busy: _locked,
+                onEndInnings: () => _endInnings(match),
                 onEndMatch: () => _endMatch(match),
-                onSubmit: () => _submit(match, progress),
+                onSubmit: () => _submit(match),
               ),
             ],
-            if (match.sport == Sport.cricket && match.events.isNotEmpty)
+            if (match.sport == Sport.cricket && hasHistory) ...[
+              const SizedBox(height: SportikaSpacing.sm),
               CricketMatchReport(match: match, progress: progress),
-            if (match.events.isNotEmpty) ...[
-              const SectionTitle('Entry log'),
-              MatchEventTimeline(match: match, limit: 8),
+            ],
+            if (hasHistory) ...[
+              const SizedBox(height: SportikaSpacing.md),
+              Row(
+                children: [
+                  const Expanded(child: SectionTitle('Match activity')),
+                  TextButton.icon(
+                    onPressed: () =>
+                        setState(() => _historyExpanded = !_historyExpanded),
+                    icon: Icon(
+                      _historyExpanded ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    label: Text(_historyExpanded ? 'Show less' : 'View all'),
+                  ),
+                ],
+              ),
+              MatchEventTimeline(
+                match: match,
+                limit: _historyExpanded ? match.events.length : 3,
+              ),
             ],
           ],
         ),
@@ -249,6 +315,8 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
           progress: progress,
           accent: accent,
           onRecord: _record,
+          onUndo: () => _undo(match),
+          busy: _locked,
         ),
         Sport.futsal => FutsalScoringWorkspace(
           match: match,
@@ -264,29 +332,22 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
         ),
       };
 
-  // ── Writes ──────────────────────────────────────────────────────────────
-
-  /// One tap. The validator refuses a payload the sport cannot fold, and the
-  /// client id makes a retry a no-op instead of a second score.
-  void _record(String kind, int? side, Map<String, dynamic> data) {
+  /// Validates before writing; a stable client ID protects a network retry.
+  Future<void> _record(
+    String kind,
+    int? side,
+    Map<String, dynamic> data,
+  ) async {
+    if (_locked || !mounted) return;
     final controller = context.read<MatchController>();
-    final match = controller.matchById(widget.matchId);
-    if (match == null || _recording) return;
-    if (match.sport == Sport.badminton) {
-      final now = SchedulerBinding.instance.currentSystemFrameTimeStamp;
-      if (_lastRallyTap != null &&
-          (now - _lastRallyTap!).inMilliseconds < 450) {
-        return;
-      }
-      _lastRallyTap = now;
+    final matchId = widget.matchId;
+    final match = _latestMatch(controller, matchId);
+    if (!_canMutate(match) || match == null) {
+      _error('Scoring access or match status changed. Refresh the match.');
+      return;
     }
-    final accountId = context.read<SessionController>().currentAccount?.id;
-    if (!match.canScore(accountId) || !match.isLive) {
-      showSnack(
-        context,
-        'Scoring access has changed. Refresh the match.',
-        error: true,
-      );
+    if (match.isPaused && match.sport != Sport.padel) {
+      _error('Resume the match before recording another entry.');
       return;
     }
     final progress = controller.progressOf(match);
@@ -298,176 +359,388 @@ class _MatchScoringScreenState extends State<MatchScoringScreen> {
       data: data,
     );
     if (refusal != null) {
-      showSnack(context, refusal, error: true);
+      _error(refusal);
       return;
     }
+    if (match.sport == Sport.badminton) {
+      final now = DateTime.now();
+      if (_lastBadmintonTap != null &&
+          now.difference(_lastBadmintonTap!).inMilliseconds < 450) {
+        return;
+      }
+      _lastBadmintonTap = now;
+    }
     setState(() => _recording = true);
-    controller
-        .recordEvent(
-          match.id,
-          kind: kind,
-          side: side,
-          data: data,
-          clientId: MatchEventIds.next(),
-        )
-        .then((event) {
-          if (!mounted) return;
-          setState(() => _recording = false);
-          if (event != null) return;
-          showSnack(
-            context,
-            controller.lastError ?? 'That entry could not be recorded.',
-            error: true,
-          );
-        });
+    try {
+      final event = await controller.recordEvent(
+        match.id,
+        kind: kind,
+        side: side,
+        data: data,
+        clientId: MatchEventIds.next(),
+      );
+      if (event == null) {
+        _error(controller.lastError ?? 'That entry could not be recorded.');
+      }
+    } catch (_) {
+      _error(controller.lastError ?? 'That entry could not be recorded.');
+    } finally {
+      if (mounted) setState(() => _recording = false);
+    }
   }
 
-  Future<void> _togglePause(SportMatch match) async {
-    if (_busy || _recording) return;
+  Future<void> _togglePause(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    var match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match)) {
+      _error('You no longer have permission to change this match.');
+      return;
+    }
+    final wasPaused = match!.isPaused;
     String? reason;
-    if (!match.isPaused) {
+    if (!wasPaused) {
       reason = await showPauseMatchDialog(context);
       if (reason == null || !mounted) return;
     }
-    final controller = context.read<MatchController>();
-    setState(() => _busy = true);
-    final ok = match.isPaused
-        ? await controller.resumeMatch(match.id)
-        : await controller.pauseMatch(
-            match.id,
-            reason: reason!.isEmpty ? null : reason,
-          );
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!ok) {
-      showSnack(
-        context,
-        controller.lastError ?? 'The scoring state could not be changed.',
-        error: true,
-      );
-    }
-  }
-
-  Future<void> _start(SportMatch match) async {
-    setState(() => _busy = true);
-    final ok = await context.read<MatchController>().startMatch(match.id);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!ok) {
-      showSnack(
-        context,
-        context.read<MatchController>().lastError ?? 'The match did not start.',
-        error: true,
-      );
+    match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match) || match!.isPaused != wasPaused) {
+      _error('The match state changed. Please review it and try again.');
       return;
     }
-    showSnack(context, 'The clock is yours — record the first entry.');
+    await _runAction(
+      () => wasPaused
+          ? controller.resumeMatch(snapshot.id)
+          : controller.pauseMatch(
+              snapshot.id,
+              reason: reason!.isEmpty ? null : reason,
+            ),
+      fallback: 'The scoring state could not be changed.',
+    );
   }
 
-  Future<void> _undo(SportMatch match) async {
-    final last = match.lastActiveEvent;
+  Future<void> _start(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match, requireLive: false) ||
+        match!.status != FixtureStatus.upcoming) {
+      _error('This match cannot be started from its current state.');
+      return;
+    }
+    final ok = await _runAction(
+      () => controller.startMatch(snapshot.id),
+      fallback: 'The match did not start.',
+    );
+    if (ok && mounted) showSnack(context, 'Match started. Scoring is open.');
+  }
+
+  Future<void> _undo(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match)) {
+      _error('Scoring access has changed. Refresh the match.');
+      return;
+    }
+    final last = match!.lastActiveEvent;
     if (last == null) {
-      showSnack(context, 'There is nothing to undo yet.');
+      showSnack(context, 'There is nothing to undo.');
       return;
     }
     final confirmed = await scoringConfirm(
       context,
       title: match.sport == Sport.padel
-          ? 'Undo last point?'
+          ? 'Undo the last point?'
           : 'Undo the last entry?',
       body:
-          '${eventTitle(last, match)} is withdrawn from the score. The log keeps it, '
-          'struck through, so the history stays honest.',
+          '${eventTitle(last, match)} will be removed from the live score. '
+          'The voided entry stays visible in match history.',
       confirmLabel: match.sport == Sport.padel ? 'Undo point' : 'Undo entry',
       danger: true,
     );
     if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    final ok = await context.read<MatchController>().voidEvent(
-      match.id,
-      last.id,
-    );
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!ok) {
-      showSnack(
-        context,
-        context.read<MatchController>().lastError ?? 'That entry stands.',
-        error: true,
-      );
+    final latest = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(latest) || latest!.lastActiveEvent?.id != last.id) {
+      _error('The latest entry changed. Review the log before undoing.');
+      return;
     }
+    await _runAction(
+      () => controller.voidEvent(snapshot.id, last.id),
+      fallback: 'The entry could not be undone.',
+    );
   }
 
-  Future<void> _endInnings(SportMatch match, MatchProgress progress) async {
-    final open = progress.actions.any((a) => a.id == 'end_innings');
-    if (!open) {
-      showSnack(context, 'There is no innings to close.');
+  Future<void> _endInnings(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match) || match?.sport != Sport.cricket) {
+      _error('This innings cannot be closed.');
+      return;
+    }
+    final progress = controller.progressOf(match!);
+    if (!progress.actions.any((a) => a.id == 'end_innings')) {
+      _error('There is no innings to close.');
       return;
     }
     final side = (progress.state['batSide'] as num?)?.toInt() ?? 0;
+    if (side < 0 || side >= match.sideNames.length) return;
     final confirmed = await scoringConfirm(
       context,
       title: 'End the innings?',
       body:
-          '${match.sideNames[side]} stop batting here. The other side bats '
-          'next and the target is set from the runs on the board.',
+          '${match.sideNames[side]} stop batting here. The next innings '
+          'and target will follow the official score.',
       confirmLabel: 'End innings',
     );
-    if (!confirmed) return;
-    _record(CricketEngine.kInningsEnd, side, {'reason': 'Innings closed'});
+    if (!confirmed || !mounted) return;
+    final latest = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(latest)) {
+      _error('Match state changed before the innings could be closed.');
+      return;
+    }
+    final updated = controller.progressOf(latest!);
+    if (!updated.actions.any((a) => a.id == 'end_innings') ||
+        (updated.state['batSide'] as num?)?.toInt() != side) {
+      _error('The active innings changed. Please review the score.');
+      return;
+    }
+    await _record(CricketEngine.kInningsEnd, side, {
+      'reason': 'Innings closed',
+    });
   }
 
-  Future<void> _endMatch(SportMatch match) async {
+  Future<void> _endMatch(SportMatch snapshot) async {
+    if (_locked) return;
+    if (snapshot.sport == Sport.badminton) {
+      await _retire(snapshot);
+      return;
+    }
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match)) {
+      _error('This match is no longer open for scoring.');
+      return;
+    }
+    final cricket = match!.sport == Sport.cricket;
     final confirmed = await scoringConfirm(
       context,
       title: 'End the match now?',
-      body:
-          'Use this for an abandoned or shortened game. The score stands as it '
-          'is and the result can be submitted.',
+      body: cricket
+          ? 'Use this for an abandoned or shortened cricket match. '
+                'The recorded score remains on the official log.'
+          : 'Use this for an abandoned or shortened futsal match. '
+                'The recorded score remains on the official log.',
       confirmLabel: 'End match',
       danger: true,
     );
-    if (!confirmed) return;
-    _record(FutsalEngine.kClock, null, {'action': 'end_match'});
+    if (!confirmed || !mounted) return;
+    if (!_canMutate(_latestMatch(controller, snapshot.id))) {
+      _error('Match state changed. Refresh before ending it.');
+      return;
+    }
+    if (cricket) {
+      await _record(CricketEngine.kMatchEnd, null, {'reason': 'Match ended'});
+    } else {
+      await _record(FutsalEngine.kClock, null, {'action': 'end_match'});
+    }
   }
 
-  Future<void> _submit(SportMatch match, MatchProgress progress) async {
+  Future<void> _retire(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match)) {
+      _error('This match is no longer open for scoring.');
+      return;
+    }
+    final request = await showMatchRetireSheet(
+      context,
+      match: match!,
+      progress: controller.progressOf(match),
+    );
+    if (request == null || !mounted) return;
+    if (!_canMutate(_latestMatch(controller, snapshot.id))) {
+      _error('Match state changed before retirement was recorded.');
+      return;
+    }
+    final ok = await _runAction(
+      () => controller.retireMatch(
+        snapshot.id,
+        winnerIndex: request.winnerIndex,
+        reason: request.reason,
+      ),
+      fallback: 'The retirement was not recorded.',
+    );
+    if (ok && mounted) {
+      showSnack(context, 'Match retirement recorded.');
+      Navigator.of(context).pop();
+    }
+  }
+
+  bool _requiresComplete(Sport sport) =>
+      sport == Sport.futsal ||
+      sport == Sport.cricket ||
+      sport == Sport.badminton;
+
+  Future<void> _submit(SportMatch snapshot) async {
+    if (_locked) return;
+    final controller = context.read<MatchController>();
+    final match = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(match)) {
+      _error('This match is no longer available for submission.');
+      return;
+    }
+    final progress = controller.progressOf(match!);
+    if (_requiresComplete(match.sport) && !progress.isComplete) {
+      _error(switch (match.sport) {
+        Sport.cricket => 'Close the innings or end the match first.',
+        Sport.badminton => 'Finish the winning game or retire the match.',
+        _ => 'Reach full time or end the match first.',
+      });
+      return;
+    }
     final confirmed = await confirmSubmitResult(
       context,
       match: match,
       progress: progress,
     );
     if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    final ok = await context.read<MatchController>().submitResult(
-      match.id,
-      headline: progress.headline.isEmpty
-          ? progress.resultLabel
-          : progress.headline,
-      detail: progress.detailRows.join(' · '),
-      sideScores: progress.scoreDisplay,
-      sideValues: progress.scoreValues,
-      winnerIndex: progress.isComplete ? progress.winnerIndex : -1,
-    );
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (!ok) {
-      showSnack(
-        context,
-        context.read<MatchController>().lastError ?? 'The result was not sent.',
-        error: true,
-      );
+    final latest = _latestMatch(controller, snapshot.id);
+    if (!_canMutate(latest)) {
+      _error('Match status or scoring permission changed.');
       return;
     }
-    showSnack(context, 'Result submitted for review.');
-    Navigator.of(context).pop();
+    final current = controller.progressOf(latest!);
+    if (_requiresComplete(latest.sport) && !current.isComplete) {
+      _error('The match is no longer complete. Review the score.');
+      return;
+    }
+    // Do not submit a score different from the one the scorer confirmed.
+    if (current.scoreDisplay.toString() != progress.scoreDisplay.toString() ||
+        current.scoreValues.toString() != progress.scoreValues.toString() ||
+        current.winnerIndex != progress.winnerIndex ||
+        current.isComplete != progress.isComplete) {
+      _error('The score changed while reviewing. Confirm the new result.');
+      return;
+    }
+    final ok = await _runAction(
+      () => controller.submitResult(
+        snapshot.id,
+        headline: current.headline.isEmpty
+            ? current.resultLabel
+            : current.headline,
+        detail: current.detailRows.join(' · '),
+        sideScores: current.scoreDisplay,
+        sideValues: current.scoreValues,
+        winnerIndex: current.isComplete ? current.winnerIndex : -1,
+      ),
+      fallback: 'The result was not submitted.',
+    );
+    if (ok && mounted) {
+      showSnack(context, 'Result submitted for review.');
+      Navigator.of(context).pop();
+    }
   }
 }
 
-// ── Shared pieces the sport workspaces reuse ──────────────────────────────
+class _OfficialScoringHeader extends StatelessWidget {
+  const _OfficialScoringHeader({
+    required this.sport,
+    required this.accent,
+    required this.live,
+    required this.mayScore,
+    required this.paused,
+    required this.sync,
+  });
 
-/// The score readout above every workspace, folded from the event log by the
-/// sport's own engine.
+  final Sport sport;
+  final Color accent;
+  final bool live;
+  final bool mayScore;
+  final bool paused;
+  final MatchSyncState sync;
+
+  @override
+  Widget build(BuildContext context) {
+    final sportName = switch (sport) {
+      Sport.cricket => 'CRICKET',
+      Sport.futsal => 'FUTSAL',
+      Sport.padel => 'PADEL',
+      Sport.badminton => 'BADMINTON',
+    };
+    final sportIcon = switch (sport) {
+      Sport.cricket => Icons.sports_cricket,
+      Sport.futsal => Icons.sports_soccer,
+      Sport.padel => Icons.sports_tennis,
+      Sport.badminton => Icons.sports_tennis,
+    };
+    return SurfaceCard(
+      borderColor: accent.withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(sportIcon, color: accent, size: 20),
+              const SizedBox(width: SportikaSpacing.sm),
+              Expanded(
+                child: Text(
+                  '$sportName  ·  OFFICIAL MATCH CENTER',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: SportikaType.label.copyWith(color: accent),
+                ),
+              ),
+              StatusPill(
+                live ? (paused ? 'PAUSED' : 'LIVE') : 'MATCH',
+                color: live && !paused
+                    ? SportikaColors.mint
+                    : SportikaColors.textMuted,
+              ),
+            ],
+          ),
+          const SizedBox(height: SportikaSpacing.sm),
+          Row(
+            children: [
+              Icon(
+                mayScore
+                    ? Icons.verified_user_outlined
+                    : Icons.visibility_outlined,
+                size: 16,
+                color: SportikaColors.textMuted,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  mayScore ? 'Authorized official scorer' : 'Spectator view',
+                  style: SportikaType.caption,
+                ),
+              ),
+              Icon(
+                sync.isWarning
+                    ? Icons.cloud_off_outlined
+                    : Icons.cloud_done_outlined,
+                size: 16,
+                color: sync.isWarning
+                    ? SportikaColors.gold
+                    : SportikaColors.mint,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                sync.isWarning ? 'Sync attention' : 'Sync normal',
+                style: SportikaType.caption,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact score readout for screens that do not have a dedicated score hero.
 class ScoreSummary extends StatelessWidget {
   const ScoreSummary({super.key, required this.progress, required this.accent});
 
@@ -519,13 +792,12 @@ class ScoreSummary extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: SportikaColors.surfaceAlt,
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(SportikaRadius.pill),
                       border: Border.all(color: SportikaColors.borderSubtle),
                     ),
                     child: Text(
                       chip,
                       style: SportikaType.caption.copyWith(
-                        fontSize: 10.5,
                         color: SportikaColors.textMuted,
                       ),
                     ),
@@ -549,14 +821,13 @@ class _ScoreLineRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = line.muted ? SportikaColors.textDim : SportikaColors.text;
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
           width: 4,
           height: 34,
           decoration: BoxDecoration(
             color: line.leading ? accent : SportikaColors.border,
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(SportikaRadius.xxs),
           ),
         ),
         const SizedBox(width: 10),
@@ -581,10 +852,15 @@ class _ScoreLineRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
-          line.value,
-          style: SportikaType.scoreSmall.copyWith(
-            color: line.leading ? accent : tone,
+        Flexible(
+          child: Text(
+            line.value,
+            textAlign: TextAlign.end,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: SportikaType.scoreSmall.copyWith(
+              color: line.leading ? accent : tone,
+            ),
           ),
         ),
       ],
@@ -592,14 +868,13 @@ class _ScoreLineRow extends StatelessWidget {
   }
 }
 
-/// Undo, the sport's own close-out button and submitting the result.
+/// Only close-out actions live here. Frequent undo/pause actions stay in dock.
 class _ControlBar extends StatelessWidget {
   const _ControlBar({
     required this.match,
     required this.progress,
     required this.accent,
     required this.busy,
-    required this.onUndo,
     required this.onEndInnings,
     required this.onEndMatch,
     required this.onSubmit,
@@ -609,63 +884,85 @@ class _ControlBar extends StatelessWidget {
   final MatchProgress progress;
   final Color accent;
   final bool busy;
-  final VoidCallback onUndo;
   final VoidCallback onEndInnings;
   final VoidCallback onEndMatch;
   final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
-    final canUndo = match.lastActiveEvent != null && !busy;
     final inningsOpen = progress.actions.any((a) => a.id == 'end_innings');
-    final clockEnd =
-        match.sport == Sport.futsal && progress.state['phase'] != 'complete';
+    final canEndMatch =
+        (match.sport == Sport.futsal &&
+            progress.state['phase'] != 'complete') ||
+        (match.sport == Sport.cricket &&
+            ((progress.state['innings'] as num?)?.toInt() ?? 0) >= 1 &&
+            !progress.isComplete &&
+            progress.state['ended'] != true) ||
+        (match.sport == Sport.badminton && !progress.isComplete);
+    final incomplete =
+        (match.sport == Sport.futsal ||
+            match.sport == Sport.cricket ||
+            match.sport == Sport.badminton) &&
+        !progress.isComplete;
+
     return SurfaceCard(
       padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              GhostButton(
-                label: match.sport == Sport.padel ? 'Undo point' : 'Undo',
-                icon: Icons.undo,
-                onPressed: canUndo ? onUndo : null,
-              ),
-              if (inningsOpen)
-                GhostButton(
-                  label: 'End innings',
-                  icon: Icons.flag_outlined,
-                  onPressed: busy ? null : onEndInnings,
-                ),
-              if (clockEnd)
-                GhostButton(
-                  label: 'End match',
-                  icon: Icons.timer_off_outlined,
-                  onPressed: busy ? null : onEndMatch,
-                ),
-            ],
-          ),
+          const Text('MATCH CLOSE-OUT', style: SportikaType.label),
+          const SizedBox(height: SportikaSpacing.sm),
+          if (inningsOpen || canEndMatch)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (inningsOpen)
+                  GhostButton(
+                    label: 'End innings',
+                    icon: Icons.flag_outlined,
+                    onPressed: busy ? null : onEndInnings,
+                  ),
+                if (canEndMatch)
+                  GhostButton(
+                    label: match.sport == Sport.badminton
+                        ? 'Retire / concede'
+                        : 'End match',
+                    icon: match.sport == Sport.cricket
+                        ? Icons.sports_cricket
+                        : match.sport == Sport.badminton
+                        ? Icons.flag_outlined
+                        : Icons.timer_off_outlined,
+                    onPressed: busy ? null : onEndMatch,
+                  ),
+              ],
+            ),
           const SizedBox(height: SportikaSpacing.sm),
           PrimaryButton(
-            label: progress.isComplete
-                ? 'Submit final result'
-                : 'Submit result for review',
+            label: incomplete
+                ? 'Finish match to submit'
+                : progress.isComplete
+                ? 'Review final result'
+                : 'Review result for submission',
             icon: Icons.task_alt,
-            busy: busy,
+            busy: busy && !incomplete,
             tone: accent,
-            onPressed: busy ? null : onSubmit,
+            onPressed: busy || incomplete ? null : onSubmit,
           ),
-          if (!progress.isComplete) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Submitting closes the log. The organizer publishes the result '
-              'afterwards.',
-              style: SportikaType.caption.copyWith(fontSize: 11),
-            ),
-          ],
+          const SizedBox(height: 6),
+          Text(
+            incomplete
+                ? switch (match.sport) {
+                    Sport.cricket =>
+                      'Close the innings or end the match before submission.',
+                    Sport.badminton =>
+                      'Finish the winning game or retire the match.',
+                    _ => 'Reach full time or end the match first.',
+                  }
+                : 'Review the score carefully. Submission closes the log '
+                      'until the organizer publishes the result.',
+            style: SportikaType.caption,
+          ),
         ],
       ),
     );
@@ -689,10 +986,21 @@ class _StartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Ready when you are', style: SportikaType.bodyStrong),
-          const SizedBox(height: 4),
+          const Row(
+            children: [
+              Icon(Icons.sports_score, color: SportikaColors.mint),
+              SizedBox(width: SportikaSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Ready for kick-off',
+                  style: SportikaType.bodyStrong,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: SportikaSpacing.sm),
           Text(
-            'Starting the match opens the log for scoring. $hint',
+            'Starting the match opens the official scoring log. $hint',
             style: SportikaType.caption,
           ),
           const SizedBox(height: SportikaSpacing.md),
@@ -708,7 +1016,7 @@ class _StartCard extends StatelessWidget {
   }
 }
 
-/// One tap target of a sport scoring pad.
+/// Shared touch-friendly scoring target. Sport-specific layouts stay separate.
 class ScoringPad extends StatelessWidget {
   const ScoringPad({
     super.key,
@@ -723,7 +1031,9 @@ class ScoringPad extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+
+  /// A null callback renders the pad in its disabled state.
+  final VoidCallback? onTap;
   final Color tone;
   final IconData? icon;
   final String? hint;
@@ -736,21 +1046,23 @@ class ScoringPad extends StatelessWidget {
     final foreground = tone.computeLuminance() > .45
         ? SportikaColors.deepest
         : SportikaColors.text;
+    final interactive = enabled && onTap != null;
     return SizedBox(
       width: wide ? double.infinity : null,
       child: Semantics(
         button: true,
-        enabled: enabled,
+        enabled: interactive,
+        label: hint == null ? label : '$label, $hint',
         child: Opacity(
-          opacity: enabled ? 1 : 0.45,
+          opacity: interactive ? 1 : 0.45,
           child: Material(
             color: tone,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(SportikaRadius.control),
             child: InkWell(
-              onTap: enabled ? onTap : null,
-              borderRadius: BorderRadius.circular(12),
+              onTap: interactive ? onTap : null,
+              borderRadius: BorderRadius.circular(SportikaRadius.control),
               child: Container(
-                constraints: BoxConstraints(minHeight: big ? 58 : 44),
+                constraints: BoxConstraints(minHeight: big ? 64 : 48),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
@@ -758,36 +1070,29 @@ class ScoringPad extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     if (icon != null) ...[
-                      Icon(icon, size: 18, color: foreground),
-                      const SizedBox(height: 2),
+                      Icon(icon, size: 20, color: foreground),
+                      const SizedBox(height: 4),
                     ],
                     Text(
                       label,
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: big ? 22 : 13,
-                        height: 1.1,
-                        fontWeight: FontWeight.w800,
-                        color: foreground,
-                      ),
+                      style:
+                          (big ? SportikaType.title : SportikaType.bodyStrong)
+                              .copyWith(color: foreground),
                     ),
                     if (hint != null) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         hint!,
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          height: 1.2,
-                          fontWeight: FontWeight.w600,
-                          color: foreground.withValues(alpha: 0.62),
+                        style: SportikaType.caption.copyWith(
+                          color: foreground.withValues(alpha: 0.72),
                         ),
                       ),
                     ],
@@ -802,9 +1107,6 @@ class ScoringPad extends StatelessWidget {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-
-/// A confirmation the scorer must read before a destructive close-out.
 Future<bool> scoringConfirm(
   BuildContext context, {
   required String title,
@@ -830,8 +1132,7 @@ Future<bool> scoringConfirm(
           onPressed: () => Navigator.pop(ctx, true),
           child: Text(
             confirmLabel,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
+            style: SportikaType.bodyStrong.copyWith(
               color: danger ? SportikaColors.danger : SportikaColors.blueBright,
             ),
           ),
@@ -842,7 +1143,6 @@ Future<bool> scoringConfirm(
   return result ?? false;
 }
 
-/// Asks which side an action belongs to.
 Future<int?> pickScoringSide(
   BuildContext context, {
   required String title,
@@ -852,7 +1152,9 @@ Future<int?> pickScoringSide(
   context: context,
   backgroundColor: SportikaColors.surfaceElevated,
   shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    borderRadius: BorderRadius.vertical(
+      top: Radius.circular(SportikaRadius.xl),
+    ),
   ),
   builder: (ctx) => AppSheet(
     title: title,
@@ -861,11 +1163,11 @@ Future<int?> pickScoringSide(
       children: [
         if (hint != null) ...[
           InfoBanner(text: hint),
-          const SizedBox(height: 12),
+          const SizedBox(height: SportikaSpacing.md),
         ],
         for (var i = 0; i < sides.length; i++)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: SportikaSpacing.sm),
             child: PrimaryButton(
               label: sides[i],
               icon: Icons.sports_score,
@@ -879,7 +1181,7 @@ Future<int?> pickScoringSide(
   ),
 );
 
-/// Picks an existing roster name. Full squads can scroll within the sheet.
+/// Legacy name picker. Player-linked events should use profile IDs instead.
 Future<String?> pickScoringName(
   BuildContext context, {
   required String title,
@@ -890,36 +1192,40 @@ Future<String?> pickScoringName(
   isScrollControlled: true,
   backgroundColor: SportikaColors.surfaceElevated,
   shape: const RoundedRectangleBorder(
-    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    borderRadius: BorderRadius.vertical(
+      top: Radius.circular(SportikaRadius.xl),
+    ),
   ),
-  builder: (ctx) => SingleChildScrollView(
-    child: AppSheet(
-      title: title,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (names.isEmpty)
-            const Text(
-              'Nobody is listed on this side yet.',
-              style: SportikaType.caption,
-            )
-          else ...[
-            Text(hint, style: SportikaType.caption),
-            const SizedBox(height: 8),
-            for (final name in names)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: PlayerAvatar(
-                  initials: initialsOf(name),
-                  size: 30,
-                  color: SportikaColors.blue,
+  builder: (ctx) => SafeArea(
+    child: FractionallySizedBox(
+      heightFactor: 0.72,
+      child: AppSheet(
+        title: title,
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            if (names.isEmpty)
+              const Text(
+                'Nobody is listed on this side yet.',
+                style: SportikaType.caption,
+              )
+            else ...[
+              Text(hint, style: SportikaType.caption),
+              const SizedBox(height: SportikaSpacing.sm),
+              for (final name in names)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: PlayerAvatar(
+                    initials: initialsOf(name),
+                    size: 30,
+                    color: SportikaColors.blue,
+                  ),
+                  title: Text(name, style: SportikaType.bodyStrong),
+                  onTap: () => Navigator.pop(ctx, name),
                 ),
-                title: Text(name, style: SportikaType.bodyStrong),
-                onTap: () => Navigator.pop(ctx, name),
-              ),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   ),

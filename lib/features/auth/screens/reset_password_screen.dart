@@ -189,7 +189,7 @@ class _RuleRow extends StatelessWidget {
               shape: BoxShape.circle,
               color: passed
                   ? SportikaColors.mint.withValues(alpha: .18)
-                  : Colors.transparent,
+                  : SportikaColors.transparent,
               border: Border.all(
                 color: passed
                     ? SportikaColors.mint
@@ -206,7 +206,7 @@ class _RuleRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 11.5,
-                fontWeight: FontWeight.w600,
+                fontWeight: SportikaFontWeight.semibold,
                 color: passed
                     ? SportikaColors.textBody
                     : SportikaColors.textDim,

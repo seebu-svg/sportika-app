@@ -294,18 +294,31 @@ void main() {
     await store.startMatch(match.id);
     await store.recordEvent(match.id, kind: 'point', side: 0, clientId: 'a');
     await store.recordEvent(match.id, kind: 'point', side: 0, clientId: 'b');
+    // Padel is submitted from the server's fold of the log, so this match has
+    // to have played its set out before the scorer can put a result on it.
+    for (var i = 0; i < 24; i++) {
+      await store.recordEvent(
+        match.id,
+        kind: 'point',
+        side: 0,
+        clientId: 'c$i',
+      );
+    }
 
     await store.signIn(scorer.id);
     await store.submitResult(
       match.id,
       headline: 'Rao & Iqbal lead',
       detail: 'Points 30-0',
-      sideScores: const ['30', '0'],
-      sideValues: const [30, 0],
+      sideScores: const ['6-0', '0-6'],
+      sideValues: const [1, 0],
       winnerIndex: 0,
     );
     expect(match.status, FixtureStatus.submitted);
     expect(match.awaitingReview, isTrue);
+    // The scorer's own strings are not what the record keeps: the fold's are.
+    expect(match.result!.sideScores, ['6-0', '0-6']);
+    expect(match.result!.headline, 'Rao & Iqbal lead');
 
     // The scorer cannot publish their own result.
     await expectLater(

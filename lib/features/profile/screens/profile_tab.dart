@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:sportika/app/routes.dart';
 import 'package:sportika/core/data/repositories.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
-import 'package:sportika/core/state/monetization_controller.dart';
 import 'package:sportika/core/state/profile_module_controller.dart';
 import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/core/state/teams_controller.dart';
@@ -16,11 +15,9 @@ import 'package:sportika/features/profile/widgets/sports_passport.dart';
 import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/identity_document.dart';
 import 'package:sportika/shared/models/models.dart';
-import 'package:sportika/shared/models/onboarding.dart';
 import 'package:sportika/shared/models/profile_module.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/state_views.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
@@ -112,6 +109,24 @@ class _ProfileTabState extends State<ProfileTab> {
         )
         .length;
 
+    final teamParts = [
+      if (teams.myInvites.isNotEmpty)
+        '${teams.myInvites.length} '
+            '${teams.myInvites.length == 1 ? 'invitation' : 'invitations'}',
+      if (squads.isNotEmpty)
+        '${squads.length} ${squads.length == 1 ? 'team' : 'teams'}',
+    ];
+    final activityDetail = official.isEmpty && activeTournaments.isEmpty
+        ? 'Nothing played yet'
+        : [
+            if (activeTournaments.isNotEmpty)
+              '${activeTournaments.length} active '
+                  '${activeTournaments.length == 1 ? 'tournament' : 'tournaments'}',
+            if (official.isNotEmpty)
+              '${official.length} official '
+                  '${official.length == 1 ? 'match' : 'matches'}',
+          ].join(' · ');
+
     return RefreshIndicator(
       onRefresh: _refresh,
       color: SportikaColors.mint,
@@ -121,11 +136,12 @@ class _ProfileTabState extends State<ProfileTab> {
         children: [
           Text(
             'MY PASSPORT',
-            style: SportikaType.hero.copyWith(fontSize: 30, letterSpacing: .4),
+            style: SportikaType.title.copyWith(letterSpacing: .4),
           ),
           const SizedBox(height: 12),
           SportsPassportCard(
             account: me,
+            record: record,
             onEditProfile: () => pushRoute(context, AppRoute.editProfile),
           ),
           if (!me.setupComplete) ...[
@@ -137,222 +153,151 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ],
           if (snapshot == null && module.error != null) ...[
-            const SizedBox(height: 16),
-            ErrorState(
-              title: 'Your profile card could not be loaded',
-              message: module.error,
-              compact: true,
-              onRetry: module.refresh,
+            const SizedBox(height: 12),
+            // Retry sits on the component that failed; the passport itself
+            // keeps whatever it can already show.
+            InlineBanner(
+              text: 'Some passport details could not load.',
+              tone: SportikaColors.danger,
+              icon: Icons.cloud_off_outlined,
+              action: TextButton(
+                onPressed: module.refresh,
+                style: TextButton.styleFrom(
+                  foregroundColor: SportikaColors.danger,
+                  minimumSize: const Size(0, 40),
+                ),
+                child: const Text('Retry', style: SportikaType.action),
+              ),
             ),
           ] else if (snapshot == null) ...[
             const SizedBox(height: 18),
             const LoadingSkeleton(rows: 2, label: 'Loading profile'),
           ],
-          if (snapshot != null)
-            PassportSection(
-              title: 'My sports',
-              detail: sports.isEmpty
-                  ? null
-                  : '${sports.length.toString().padLeft(2, '0')} selected',
-              action: 'Edit sports',
-              onAction: () => pushRoute(context, AppRoute.sportsPreferences),
-              child: sports.isEmpty
-                  ? _EmptyPassportCard(
-                      icon: Icons.sports_outlined,
-                      title: 'No preferred sports yet',
-                      body:
-                          'Choose the sports you play to complete your '
-                          'passport.',
-                      action: GhostButton(
-                        label: 'Choose sports',
-                        icon: Icons.tune,
-                        onPressed: () =>
-                            pushRoute(context, AppRoute.sportsPreferences),
-                      ),
-                    )
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final preference in sports)
-                          _SportChip(preference: preference),
-                      ],
-                    ),
-            ),
+          // Pending invitations lead the team list, then two previews.
           PassportSection(
-            title: 'Sporting record',
-            detail: 'Official published results only',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SportingRecordStrip(record: record),
-                if (record.draws > 0) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    record.draws == 1
-                        ? '1 match drawn · a draw counts as neither a win nor '
-                              'a loss'
-                        : '${record.draws} matches drawn · a draw counts as '
-                              'neither a win nor a loss',
-                    style: SportikaType.caption,
-                  ),
-                ],
-                if (record.isEmpty) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your first official result sets your win rate.',
-                    style: SportikaType.caption,
-                  ),
-                ],
-              ],
+            title: 'My teams',
+            detail: teamParts.isEmpty ? null : teamParts.join(' · '),
+            action: 'View all',
+            onAction: () => pushRoute(context, AppRoute.teamMemberships),
+            child: _TeamsList(
+              squads: squads.take(2).toList(),
+              invites: teams.myInvites,
+              meId: me.id,
             ),
           ),
-          const SportStatisticsCard(),
           PassportSection(
-            title: 'My journey',
-            detail: official.isEmpty && activeTournaments.isEmpty
-                ? 'Nothing played yet'
-                : [
-                    if (activeTournaments.isNotEmpty)
-                      '${activeTournaments.length} active '
-                          '${activeTournaments.length == 1 ? 'tournament' : 'tournaments'}',
-                    if (official.isNotEmpty)
-                      '${official.length} official '
-                          '${official.length == 1 ? 'match' : 'matches'}',
-                  ].join(' · '),
+            title: 'Recent activity',
+            detail: activityDetail,
             action: 'View history',
             onAction: () => pushRoute(context, AppRoute.matchHistory),
             child: official.isEmpty && activeTournaments.isEmpty
                 ? FirstMatchCard(
-                    onFindTournament: () => openHomeTab(context, 1),
+                    onFindTournament: () =>
+                        openHomeTab(context, HomeTabIndex.tournaments),
                   )
-                : _JourneyList(
-                    activeTournaments: activeTournaments.take(2).toList(),
-                    matches: official.take(3).toList(),
+                : _RecentActivity(
+                    activeTournaments: activeTournaments,
+                    matches: official,
                     myEntryIds: myEntryIds,
                     fixtures: fixtures,
                   ),
           ),
-          PassportSection(
-            title: 'My teams',
-            detail: squads.isEmpty
-                ? null
-                : '${squads.length} ${squads.length == 1 ? 'team' : 'teams'}',
-            action: 'View all',
-            onAction: () => pushRoute(context, AppRoute.teamMemberships),
-            child: _TeamsList(
-              squads: squads.take(3).toList(),
-              invites: teams.myInvites.length,
-              meId: me.id,
-            ),
-          ),
+          const SportStatisticsCard(),
           const PassportAchievements(),
-          const SectionTitle('Account & settings'),
-          SurfaceCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Column(
-              children: [
-                SheetOption(
-                  icon: Icons.person_outline,
-                  title: 'Personal information',
-                  subtitle: 'Name, handle, date of birth, city and bio',
-                  onTap: () => pushRoute(context, AppRoute.personalInformation),
+          if (state.canOrganize ||
+              fixtures.myScoringFixtures.isNotEmpty ||
+              tournamentCount > 0)
+            PassportSection(
+              title: 'Sports tools',
+              child: SurfaceCard(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
                 ),
-                SheetOption(
-                  icon: Icons.tune,
-                  title: 'Sports preferences',
-                  subtitle: sports.isEmpty
-                      ? 'Choose the sports you play'
-                      : '${sports.length} preferred '
-                            '${sports.length == 1 ? 'sport' : 'sports'}',
-                  tone: SportikaColors.mint,
-                  onTap: () => pushRoute(context, AppRoute.sportsPreferences),
-                ),
-                SheetOption(
-                  icon: Icons.badge_outlined,
-                  title: 'Identity documents',
-                  subtitle: snapshot?.identity == null
-                      ? 'CNIC or B-Form · optional'
-                      : '${snapshot!.identity!.kind.label} on file',
-                  tone: SportikaColors.gold,
-                  onTap: () => pushRoute(context, AppRoute.identityDocuments),
-                ),
-                SheetOption(
-                  icon: Icons.lock_outline,
-                  title: 'Settings & privacy',
-                  subtitle: 'Notifications, privacy and local data',
-                  onTap: () => pushRoute(context, AppRoute.settings),
-                ),
-                SheetOption(
-                  icon: Icons.workspace_premium_outlined,
-                  title: 'Billing & plans',
-                  subtitle: context.watch<MonetizationController>().isPro
-                      ? 'Organizer Pro is active'
-                      : 'Tournament pass, Organizer Pro, payment history',
-                  tone: SportikaColors.gold,
-                  onTap: () => pushRoute(context, AppRoute.pricing),
-                ),
-              ],
-            ),
-          ),
-          const SectionTitle('Records'),
-          SurfaceCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Column(
-              children: [
-                SheetOption(
-                  icon: Icons.emoji_events_outlined,
-                  title: 'Tournament history',
-                  subtitle: tournamentCount == 0
-                      ? 'No tournaments yet'
-                      : '$tournamentCount '
+                child: Column(
+                  children: [
+                    if (state.canOrganize)
+                      SheetOption(
+                        icon: Icons.dashboard_customize_outlined,
+                        title: 'My tournaments',
+                        subtitle: 'Events, entries, draws, result review',
+                        tone: SportikaColors.mint,
+                        onTap: () =>
+                            pushRoute(context, AppRoute.organizerDashboard),
+                      ),
+                    if (tournamentCount > 0)
+                      SheetOption(
+                        icon: Icons.emoji_events_outlined,
+                        title: 'Tournament history',
+                        subtitle:
+                            '$tournamentCount '
                             '${tournamentCount == 1 ? 'tournament' : 'tournaments'}',
-                  onTap: () => pushRoute(context, AppRoute.tournamentHistory),
+                        onTap: () =>
+                            pushRoute(context, AppRoute.tournamentHistory),
+                      ),
+                    SheetOption(
+                      icon: Icons.sports_score,
+                      title: 'Scorer assignments',
+                      subtitle: 'Matches you score or hand over',
+                      tone: SportikaColors.blueBright,
+                      onTap: () =>
+                          pushRoute(context, AppRoute.scorerAssignments),
+                    ),
+                    if (fixtures.myScoringFixtures.isNotEmpty)
+                      SheetOption(
+                        icon: Icons.scoreboard_outlined,
+                        title: 'Scorer workspace',
+                        subtitle:
+                            '${fixtures.myScoringFixtures.length} fixtures assigned',
+                        tone: SportikaColors.blueBright,
+                        onTap: () =>
+                            pushRoute(context, AppRoute.scorerWorkspace),
+                      ),
+                  ],
                 ),
-                SheetOption(
-                  icon: Icons.sports_score,
-                  title: 'Scorer assignments',
-                  subtitle: 'Matches you score or hand over',
-                  tone: SportikaColors.blueBright,
-                  onTap: () => pushRoute(context, AppRoute.scorerAssignments),
-                ),
-              ],
+              ),
             ),
-          ),
-          if (state.canOrganize || fixtures.myScoringFixtures.isNotEmpty) ...[
-            const SectionTitle('Your sports tools'),
-            SurfaceCard(
+          PassportSection(
+            title: 'Account & settings',
+            child: SurfaceCard(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Column(
                 children: [
-                  if (state.canOrganize)
-                    SheetOption(
-                      icon: Icons.dashboard_customize_outlined,
-                      title: 'My tournaments',
-                      subtitle: 'Events, entries, draws, result review',
-                      tone: SportikaColors.mint,
-                      onTap: () =>
-                          pushRoute(context, AppRoute.organizerDashboard),
-                    ),
-                  if (fixtures.myScoringFixtures.isNotEmpty)
-                    SheetOption(
-                      icon: Icons.scoreboard_outlined,
-                      title: 'Scorer workspace',
-                      subtitle:
-                          '${fixtures.myScoringFixtures.length} fixtures assigned',
-                      tone: SportikaColors.blueBright,
-                      onTap: () => pushRoute(context, AppRoute.scorerWorkspace),
-                    ),
+                  SheetOption(
+                    icon: Icons.person_outline,
+                    title: 'Personal information',
+                    subtitle: 'Name, handle, date of birth, city and bio',
+                    onTap: () =>
+                        pushRoute(context, AppRoute.personalInformation),
+                  ),
+                  SheetOption(
+                    icon: Icons.tune,
+                    title: 'Sports preferences',
+                    subtitle: sports.isEmpty
+                        ? 'Choose the sports you play'
+                        : '${sports.length} preferred '
+                              '${sports.length == 1 ? 'sport' : 'sports'}',
+                    tone: SportikaColors.mint,
+                    onTap: () => pushRoute(context, AppRoute.sportsPreferences),
+                  ),
+                  SheetOption(
+                    icon: Icons.badge_outlined,
+                    title: 'Identity documents',
+                    subtitle: snapshot?.identity == null
+                        ? 'CNIC or B-Form · optional'
+                        : '${snapshot!.identity!.kind.label} on file',
+                    tone: SportikaColors.gold,
+                    onTap: () => pushRoute(context, AppRoute.identityDocuments),
+                  ),
+                  SheetOption(
+                    icon: Icons.lock_outline,
+                    title: 'Settings & privacy',
+                    subtitle: 'Notifications, privacy and local data',
+                    onTap: () => pushRoute(context, AppRoute.settings),
+                  ),
                 ],
               ),
             ),
-          ],
-          const SizedBox(height: SportikaSpacing.md),
-          const InfoBanner(
-            icon: Icons.info_outline,
-            text:
-                'Sportika prototype · Cricket, Padel, Futsal and Badminton. '
-                'Personal scorecards and official results are separate records.',
           ),
         ],
       ),
@@ -360,74 +305,10 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
-/// One preferred sport as a compact passport chip: glyph, name, claimed level.
-class _SportChip extends StatelessWidget {
-  const _SportChip({required this.preference});
-
-  final ProfileSportPreference preference;
-
-  @override
-  Widget build(BuildContext context) {
-    final tone = sportColor(preference.sport);
-    final detail = [
-      if (preference.level != null) preference.level!.label,
-      if (preference.position != null) preference.position!,
-    ].join(' · ');
-
-    return Semantics(
-      label: '${preference.sport.label}${detail.isEmpty ? '' : ', $detail'}',
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
-        decoration: BoxDecoration(
-          color: SportikaColors.surfaceSunken,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: tone.withValues(alpha: .32)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 28,
-              width: 28,
-              decoration: BoxDecoration(
-                color: tone.withValues(alpha: .14),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Center(
-                child: SportGlyph(
-                  sport: preference.sport,
-                  size: 16,
-                  color: tone,
-                ),
-              ),
-            ),
-            const SizedBox(width: 9),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  preference.sport.label,
-                  style: SportikaType.bodyStrong.copyWith(fontSize: 12.5),
-                ),
-                Text(
-                  detail.isEmpty ? 'No level set' : detail,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: SportikaType.caption.copyWith(fontSize: 10.5),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Active tournaments first, then the most recent published results.
-class _JourneyList extends StatelessWidget {
-  const _JourneyList({
+/// Active tournaments first, then published results folded per tournament so a
+/// multi-match weekend stays one scannable line.
+class _RecentActivity extends StatelessWidget {
+  const _RecentActivity({
     required this.activeTournaments,
     required this.matches,
     required this.myEntryIds,
@@ -439,10 +320,12 @@ class _JourneyList extends StatelessWidget {
   final Set<String> myEntryIds;
   final FixturesController fixtures;
 
+  static const int _limit = 3;
+
   @override
   Widget build(BuildContext context) {
     final rows = <Widget>[
-      for (final tournament in activeTournaments)
+      for (final tournament in activeTournaments.take(2))
         _JourneyRow(
           leading: const _JourneyBadge(
             icon: Icons.emoji_events_outlined,
@@ -458,20 +341,21 @@ class _JourneyList extends StatelessWidget {
             args: TournamentDetailArgs(tournament.id),
           ),
         ),
-      for (final fixture in matches)
-        _JourneyRow(
-          leading: _OutcomeBadge(outcome: outcomeOf(fixture, myEntryIds)),
-          title:
-              fixtures.tournamentOf(fixture)?.name ??
-              'Official tournament match',
-          subtitle: _matchLine(fixture),
-          onTap: () => pushRoute(
-            context,
-            AppRoute.fixtureDetail,
-            args: FixtureDetailArgs(fixture.id),
-          ),
-        ),
     ];
+
+    final groups = <String, List<Fixture>>{};
+    final order = <String>[];
+    for (final fixture in matches) {
+      if (!groups.containsKey(fixture.tournamentId)) {
+        order.add(fixture.tournamentId);
+      }
+      groups.putIfAbsent(fixture.tournamentId, () => []).add(fixture);
+    }
+
+    for (final id in order) {
+      if (rows.length >= _limit) break;
+      rows.add(_resultRow(context, groups[id]!));
+    }
 
     return SurfaceCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -486,6 +370,58 @@ class _JourneyList extends StatelessWidget {
     );
   }
 
+  /// One tournament's published results as a single row.
+  Widget _resultRow(BuildContext context, List<Fixture> group) {
+    final newest = group.first;
+    final tournament = fixtures.tournamentOf(newest);
+    final wins = group
+        .where((f) => outcomeOf(f, myEntryIds) == SportingOutcome.win)
+        .length;
+    final losses = group
+        .where((f) => outcomeOf(f, myEntryIds) == SportingOutcome.loss)
+        .length;
+    final draws = group.length - wins - losses;
+
+    final Widget leading;
+    if (wins == group.length) {
+      leading = const _OutcomeBadge(outcome: SportingOutcome.win);
+    } else if (losses == group.length) {
+      leading = const _OutcomeBadge(outcome: SportingOutcome.loss);
+    } else {
+      leading = const _JourneyBadge(
+        icon: Icons.sports_score,
+        tone: SportikaColors.mint,
+      );
+    }
+
+    final subtitle = group.length == 1
+        ? _matchLine(newest)
+        : '${group.length} matches · '
+              '$wins ${wins == 1 ? 'win' : 'wins'} · '
+              '$losses ${losses == 1 ? 'loss' : 'losses'}'
+              '${draws > 0 ? ' · $draws ${draws == 1 ? 'draw' : 'draws'}' : ''}'
+              ' · ${dayLabel(newest.completedAt ?? newest.scheduledAt)}';
+
+    final canOpenTournament = group.length > 1 && tournament != null;
+
+    return _JourneyRow(
+      leading: leading,
+      title: tournament?.name ?? 'Official tournament match',
+      subtitle: subtitle,
+      onTap: () => canOpenTournament
+          ? pushRoute(
+              context,
+              AppRoute.tournamentDetail,
+              args: TournamentDetailArgs(tournament.id),
+            )
+          : pushRoute(
+              context,
+              AppRoute.fixtureDetail,
+              args: FixtureDetailArgs(newest.id),
+            ),
+    );
+  }
+
   String _matchLine(Fixture fixture) {
     final mySide = myEntryIds.contains(fixture.home.entryId) ? 0 : 1;
     final opponent = fixtures.sideLabel(fixture, mySide == 0 ? 1 : 0);
@@ -497,7 +433,8 @@ class _JourneyList extends StatelessWidget {
   }
 }
 
-/// The member's squads, plus any invitation still waiting on an answer.
+/// The member's squads, with every invitation still waiting on an answer
+/// listed before them.
 class _TeamsList extends StatelessWidget {
   const _TeamsList({
     required this.squads,
@@ -506,12 +443,12 @@ class _TeamsList extends StatelessWidget {
   });
 
   final List<Squad> squads;
-  final int invites;
+  final List<Squad> invites;
   final String meId;
 
   @override
   Widget build(BuildContext context) {
-    if (squads.isEmpty && invites == 0) {
+    if (squads.isEmpty && invites.isEmpty) {
       return _EmptyPassportCard(
         icon: Icons.groups_outlined,
         title: 'No teams yet',
@@ -527,17 +464,22 @@ class _TeamsList extends StatelessWidget {
     }
 
     final rows = <Widget>[
-      if (invites > 0)
+      for (final squad in invites)
         _JourneyRow(
           leading: const _JourneyBadge(
             icon: Icons.mail_outline,
             tone: SportikaColors.gold,
           ),
-          title: invites == 1
-              ? 'Team invitation waiting'
-              : '$invites team invitations waiting',
-          subtitle: 'Answer from Team memberships',
-          onTap: () => pushRoute(context, AppRoute.teamMemberships),
+          title: squad.name,
+          subtitle:
+              'Invitation waiting · ${squad.sport.label} · '
+              '${squad.memberAccountIds.length} '
+              '${squad.memberAccountIds.length == 1 ? 'player' : 'players'}',
+          onTap: () => pushRoute(
+            context,
+            AppRoute.teamDetail,
+            args: TeamDetailArgs(squad.id),
+          ),
         ),
       for (final squad in squads)
         _JourneyRow(
@@ -582,7 +524,7 @@ class _SquadBadge extends StatelessWidget {
       width: 32,
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(SportikaRadius.badge),
         border: Border.all(color: tone.withValues(alpha: .34)),
       ),
       child: Center(
@@ -608,10 +550,10 @@ class _JourneyRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: SportikaColors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(SportikaRadius.control),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
           child: Row(
@@ -666,7 +608,7 @@ class _JourneyBadge extends StatelessWidget {
       width: 30,
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(SportikaRadius.badge),
         border: Border.all(color: tone.withValues(alpha: .34)),
       ),
       child: Icon(icon, size: 15, color: tone),
@@ -687,7 +629,7 @@ class _OutcomeBadge extends StatelessWidget {
       width: 30,
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: BorderRadius.circular(SportikaRadius.badge),
         border: Border.all(color: tone.withValues(alpha: .38)),
       ),
       child: Center(
@@ -697,7 +639,7 @@ class _OutcomeBadge extends StatelessWidget {
             fontFamily: SportikaType.displayFamily,
             fontSize: 15,
             height: 1,
-            fontWeight: FontWeight.w800,
+            fontWeight: SportikaFontWeight.extraBold,
             color: tone,
           ),
         ),

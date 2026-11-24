@@ -118,7 +118,7 @@ class _PhotoCropperSheetState extends State<PhotoCropperSheet> {
                     'FRAME YOUR PICTURE',
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: SportikaFontWeight.extraBold,
                       letterSpacing: 1.4,
                       color: SportikaColors.textMuted,
                     ),
@@ -198,7 +198,7 @@ class _PhotoCropperSheetState extends State<PhotoCropperSheet> {
                   '${_scale.toStringAsFixed(1)}x',
                   style: const TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: SportikaFontWeight.bold,
                     color: SportikaColors.textMuted,
                   ),
                 ),
@@ -258,7 +258,7 @@ class _CropGuidePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final line = Paint()
-      ..color = Colors.white.withValues(alpha: .28)
+      ..color = SportikaColors.onAccent.withValues(alpha: .28)
       ..strokeWidth = 1;
     for (var i = 1; i < 3; i++) {
       final at = size.width * i / 3;

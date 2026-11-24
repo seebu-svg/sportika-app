@@ -9,7 +9,6 @@ import 'package:sportika/core/data/profile_photo.dart';
 import 'package:sportika/features/auth/state/auth_flow.dart';
 import 'package:sportika/shared/models/identity_document.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 class OptionalIdentityFields extends StatefulWidget {
@@ -132,7 +131,7 @@ class _OptionalIdentityFieldsState extends State<OptionalIdentityFields> {
             style: TextStyle(
               fontSize: 10,
               letterSpacing: 1.4,
-              fontWeight: FontWeight.w700,
+              fontWeight: SportikaFontWeight.bold,
               color: SportikaColors.mint,
             ),
           ),
@@ -180,7 +179,7 @@ class _OptionalIdentityFieldsState extends State<OptionalIdentityFields> {
                 helperMaxLines: 2,
                 prefixIcon: const Icon(Icons.badge_outlined, size: 20),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(SportikaRadius.md),
                   borderSide: const BorderSide(color: SportikaColors.mint),
                 ),
               ),
@@ -318,7 +317,7 @@ class _DocumentCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: SportikaColors.surfaceSunken,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         border: Border.all(
           color: selected || processing
               ? SportikaColors.mint.withValues(alpha: .55)
@@ -326,8 +325,8 @@ class _DocumentCard extends StatelessWidget {
         ),
       ),
       child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        color: SportikaColors.transparent,
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

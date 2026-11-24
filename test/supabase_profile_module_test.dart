@@ -106,7 +106,15 @@ Map<String, dynamic> _profileRow() => {
   'avatar_url': null,
   'play_style': 'competitive',
   'profile_setup_complete': true,
-  'profiles_private': {'date_of_birth': '1999-04-12', 'gender': 'man'},
+  'profiles_private': {
+    'date_of_birth': '1999-04-12',
+    'gender': 'man',
+    'height_cm': 182,
+    'weight_kg': 74.5,
+    'dominant_hand': 'right',
+    'dominant_foot': null,
+    'preferred_jersey': 10,
+  },
   'profile_sports': [
     {'sport_key': 'padel', 'level': 'advanced', 'position': 'Left side'},
     {'sport_key': 'cricket', 'level': null, 'position': '  '},
@@ -156,10 +164,23 @@ void main() {
 
       final read = backend.call('GET', '/rest/v1/profiles');
       final select = read.url.queryParameters['select']!;
-      expect(select, contains('profiles_private(date_of_birth,gender)'));
+      expect(
+        select,
+        contains(
+          'profiles_private(date_of_birth,gender,height_cm,'
+          'weight_kg,dominant_hand,dominant_foot,preferred_jersey)',
+        ),
+      );
       expect(select, contains('profile_sports(sport_key,level,position)'));
       expect(select, contains('profile_identity_documents('));
       expect(read.url.queryParameters['id'], 'eq.$owner');
+
+      // Athlete columns fold into the private row; a null clears, not zero.
+      expect(snapshot.athlete?.heightCm, 182);
+      expect(snapshot.athlete?.weightKg, 74.5);
+      expect(snapshot.athlete?.dominantHand, ProfileSide.right);
+      expect(snapshot.athlete?.dominantFoot, isNull);
+      expect(snapshot.athlete?.preferredJersey, 10);
     },
   );
 
@@ -196,6 +217,36 @@ void main() {
       expect(notified, 1);
     },
   );
+
+  test('athlete details send the laterality key and clear blanks', () async {
+    final backend = _Backend();
+    addTearDown(backend.dispose);
+    await backend.signIn();
+    const athleteRpc = 'POST /rest/v1/rpc/update_profile_athlete_details';
+    backend.routes[athleteRpc] = (request) => backend.json({}, 200, request);
+
+    final repo = SupabaseProfileModuleRepository(client: backend.client);
+    var notified = 0;
+    repo.addListener(() => notified++);
+
+    await repo.saveAthleteDetails(
+      heightCm: 180,
+      weightKg: 72.5,
+      dominantHand: ProfileSide.left,
+      dominantFoot: null,
+      preferredJersey: null,
+    );
+
+    final body = jsonDecode(
+      backend.call('POST', '/rest/v1/rpc/update_profile_athlete_details').body,
+    ) as Map<String, dynamic>;
+    expect(body['p_height_cm'], 180);
+    expect(body['p_weight_kg'], 72.5);
+    expect(body['p_dominant_hand'], 'left');
+    expect(body['p_dominant_foot'], isNull);
+    expect(body['p_preferred_jersey'], isNull);
+    expect(notified, 1);
+  });
 
   test('the handle is normalized before it reaches the unique index', () async {
     final backend = _Backend();

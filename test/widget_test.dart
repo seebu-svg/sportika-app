@@ -31,7 +31,7 @@ void main() {
       AuthServiceFixture.validPassword,
     );
     await tapVisible(tester, find.text('SIGN IN').last);
-    for (final tab in ['Home', 'Tournament', 'Match', 'Team', 'Me']) {
+    for (final tab in ['Home', 'Tournaments', 'Matches', 'Team', 'Me']) {
       expect(find.text(tab), findsWidgets);
     }
   });

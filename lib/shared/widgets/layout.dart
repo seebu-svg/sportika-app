@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
+import 'package:sportika/shared/widgets/cinematic_backdrop.dart';
 
 /// Shared page frame: safe area, clamped text scale, and a single content column
 /// that never grows past [sportikaMaxContentWidth]. Every pushed screen builds
@@ -71,6 +71,7 @@ class ScreenScaffold extends StatelessWidget {
 
     return ClampedTextScale(
       child: Scaffold(
+        backgroundColor: context.sportika.page,
         appBar: title == null
             ? null
             : AppBar(
@@ -79,7 +80,7 @@ class ScreenScaffold extends StatelessWidget {
                 actions: actions,
                 titleTextStyle: titleTextStyle,
               ),
-        body: SafeArea(child: body),
+        body: CinematicBackdrop(child: SafeArea(child: body)),
         bottomNavigationBar: bottomNavigationBar,
         floatingActionButton: floatingActionButton,
       ),
@@ -87,13 +88,7 @@ class ScreenScaffold extends StatelessWidget {
   }
 
   /// App bar titles were previously styled ad hoc per screen.
-  static const TextStyle titleTextStyle = TextStyle(
-    fontFamily: SportikaType.displayFamily,
-    fontSize: 21,
-    fontWeight: FontWeight.w800,
-    letterSpacing: 0.4,
-    color: SportikaColors.text,
-  );
+  static const TextStyle titleTextStyle = SportikaType.appBarTitle;
 }
 
 /// Large in-page header used by root tabs and full-screen forms that do not use

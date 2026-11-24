@@ -13,7 +13,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(58);
+select plan(56);
 
 -- ── fixtures ────────────────────────────────────────────────────────────────
 insert into auth.users
@@ -451,25 +451,16 @@ select is(
   (select count(*)::int from public.published_fixture_results('T-SEC')),
   0, 'a bystander sees no published fixture result they may not read');
 
--- ── zero entitlements: scoring, results and disputes stay free ──────────────
+-- ── no billing module: scoring, results and disputes stay free ────────────
 set local request.jwt.claims =
   '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","aud":"authenticated"}';
-
-select is(
-  (select count(*)::int from public.entitlements
-    where profile_id = auth.uid()),
-  0, 'the organizer holds no entitlement at all');
-
-select is(
-  public.has_entitlement('padel_scoring'),
-  false, 'there is no scoring entitlement to hold');
 
 select public.start_padel_match(public._tap_id('SEC2 fixture match'), 0, 0);
 
 select ok(
   (public.award_padel_point(public._tap_id('SEC2 fixture match'), 0, 'free-1'))->'state'->'points'
     = '[1, 0]'::jsonb,
-  'scoring a match needs no entitlement');
+  'scoring a match needs no billing module');
 
 -- ── direct writes are refused by the database itself ────────────────────────
 select throws_ok(

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sportika/shared/navigation/navigation.dart';
-import 'package:sportika/shared/widgets/filter_chip_row.dart';
 
 import 'helpers/harness.dart';
 
 void main() {
-  testWidgets('five tabs expose relocated discovery and scoring features', (
+  testWidgets('five tabs expose tournaments, standalone matches and teams', (
     tester,
   ) async {
     final state = await freshState();
@@ -18,8 +17,8 @@ void main() {
     );
     expect(destinations.map((tab) => tab.label), [
       'Home',
-      'Tournament',
-      'Match',
+      'Tournaments',
+      'Matches',
       'Team',
       'Me',
     ]);
@@ -34,38 +33,37 @@ void main() {
       expect(tester.takeException(), isNull);
     }
 
-    await select(1);
-    expect(find.text('My Tournaments'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Managing'),
-      100,
-      scrollable: find.descendant(
-        of: find.byWidgetPredicate(
-          (w) => w is FilterChipRow<int> && w.label == 'Tournament section',
-        ),
-        matching: find.byType(Scrollable),
-      ),
-    );
+    // Tournaments: discovery scopes, creation and the competition feed.
+    await select(HomeTabIndex.tournaments);
+    expect(find.text('The arena awaits.'), findsOneWidget);
+    expect(find.byTooltip('Create tournament'), findsOneWidget);
+    expect(find.text('Discover'), findsOneWidget);
+    expect(find.text('My tournaments'), findsOneWidget);
     expect(find.text('Managing'), findsOneWidget);
-    await select(2);
-    for (final label in [
-      'Live Scores',
-      'Upcoming',
-      'Results',
-      'Personal',
-      'Games',
-    ]) {
+
+    // Matches: standalone discovery, creation and status scopes.
+    await select(HomeTabIndex.matches);
+    expect(find.text('Match Center'), findsOneWidget);
+    expect(find.text('Create Match'), findsOneWidget);
+    for (final label in ['All', 'Live', 'Upcoming', 'Results']) {
       expect(find.text(label), findsOneWidget);
-      await tapVisible(tester, find.text(label));
-      expect(tester.takeException(), isNull);
     }
-    await select(3);
-    await tapVisible(tester, find.text('Find teams'));
+    await tester.tap(find.byTooltip('More match options'));
+    await tester.pumpAndSettle();
+    expect(find.text('Open to join only'), findsOneWidget);
+    expect(find.text('Pickup games'), findsOneWidget);
+    await tester.tap(find.text('Open to join only'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Team keeps its own discovery sections.
+    await select(HomeTabIndex.teams);
+    await tapVisible(tester, find.text('Find Teams'));
     expect(tester.takeException(), isNull);
     await tapVisible(tester, find.text('Players').first);
     expect(find.byType(TextField), findsWidgets);
 
-    // Game notifications must select Match and its pickup discovery section.
+    // A game notification must still select Matches and open pickup games.
     await openNotificationRoute(
       tester.element(find.byType(NavigationBar)),
       'games',
@@ -73,11 +71,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      2,
+      HomeTabIndex.matches,
     );
     expect(matchSectionRequest.value, 4);
     expect(tester.takeException(), isNull);
-    await select(4);
-    await select(0);
+
+    await select(HomeTabIndex.me);
+    await select(HomeTabIndex.home);
   });
 }

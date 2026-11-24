@@ -39,7 +39,8 @@ class SupabaseProfileModuleRepository extends ChangeNotifier
   static const String _select =
       'id, username, display_name, bio, city, avatar_preset, avatar_url, '
       'play_style, profile_setup_complete, '
-      'profiles_private(date_of_birth, gender), '
+      'profiles_private(date_of_birth, gender, height_cm, weight_kg, '
+      'dominant_hand, dominant_foot, preferred_jersey), '
       'profile_sports(sport_key, level, position), '
       'profile_identity_documents(document_type, document_number, front_path, '
       'back_path, submitted_at)';
@@ -181,6 +182,35 @@ class SupabaseProfileModuleRepository extends ChangeNotifier
       throw _mapError(error, fallback: 'That username could not be saved.');
     }
     await _accounts?.reload();
+    notifyListeners();
+  }
+
+  @override
+  Future<void> saveAthleteDetails({
+    required int? heightCm,
+    required double? weightKg,
+    required ProfileSide? dominantHand,
+    required ProfileSide? dominantFoot,
+    required int? preferredJersey,
+  }) async {
+    _requireSession();
+    try {
+      await _client.rpc(
+        'update_profile_athlete_details',
+        params: <String, dynamic>{
+          'p_height_cm': heightCm,
+          'p_weight_kg': weightKg,
+          'p_dominant_hand': dominantHand?.key,
+          'p_dominant_foot': dominantFoot?.key,
+          'p_preferred_jersey': preferredJersey,
+        },
+      );
+    } catch (error) {
+      throw _mapError(
+        error,
+        fallback: 'Your athlete details could not be saved.',
+      );
+    }
     notifyListeners();
   }
 
@@ -403,6 +433,7 @@ class SupabaseProfileModuleRepository extends ChangeNotifier
         avatarUrl: row['avatar_url'] as String?,
         setupComplete: row['profile_setup_complete'] as bool? ?? false,
       ),
+      athlete: _athleteFromPrivate(priv),
       sports: sports,
       identity: kindKey == null || submittedAt == null
           ? null
@@ -416,6 +447,20 @@ class SupabaseProfileModuleRepository extends ChangeNotifier
                   (identity?['front_path'] as String?)?.isNotEmpty == true,
               hasBack: (identity?['back_path'] as String?)?.isNotEmpty == true,
             ),
+    );
+  }
+
+  /// Reads the athlete columns out of the embedded `profiles_private` row. A
+  /// key that is absent means the backend predates the column, so the value
+  /// stays null instead of failing the whole profile read.
+  static ProfileAthleteDetails _athleteFromPrivate(Map<String, dynamic>? priv) {
+    if (priv == null) return ProfileAthleteDetails.empty;
+    return ProfileAthleteDetails(
+      heightCm: (priv['height_cm'] as num?)?.toInt(),
+      weightKg: (priv['weight_kg'] as num?)?.toDouble(),
+      dominantHand: ProfileSideX.fromKey(priv['dominant_hand'] as String?),
+      dominantFoot: ProfileSideX.fromKey(priv['dominant_foot'] as String?),
+      preferredJersey: (priv['preferred_jersey'] as num?)?.toInt(),
     );
   }
 
@@ -496,6 +541,19 @@ class SupabaseProfileModuleRepository extends ChangeNotifier
     }
     if (message.contains('invalid_play_style')) {
       return 'Choose a valid play style.';
+    }
+    if (message.contains('invalid_height')) {
+      return 'Enter a height between 50 and 280 cm.';
+    }
+    if (message.contains('invalid_weight')) {
+      return 'Enter a weight between 20 and 400 kg.';
+    }
+    if (message.contains('invalid_preferred_jersey')) {
+      return 'Enter a jersey number between 1 and 999.';
+    }
+    if (message.contains('invalid_dominant_hand') ||
+        message.contains('invalid_dominant_foot')) {
+      return 'Choose a valid dominant side.';
     }
     if (message.contains('sports_required')) {
       return 'Choose at least one preferred sport.';

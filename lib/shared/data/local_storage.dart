@@ -21,11 +21,6 @@ class LocalStorage {
   /// demo world, and they must survive a rebuild of that document.
   static const String matchOutboxKey = 'sportika.match_outbox';
 
-  /// Demo-only billing records (plans come from the seed, purchases and
-  /// entitlements are written by the simulated operator). A live build never
-  /// reads this key: its billing comes from PostgreSQL alone.
-  static const String billingKey = 'sportika.billing.v1';
-
   /// Bumped whenever the persisted shape changes. [migrateState] upgrades an
   /// older document in place, so an existing install keeps its scorecards.
   static const int schemaVersion = 3;
@@ -103,25 +98,6 @@ class LocalStorage {
     await _prefs.setString(matchOutboxKey, jsonEncode(entries));
   }
 
-  /// The simulated billing ledger of a device-only build. A corrupt document is
-  /// dropped rather than throwing: billing must never block the app from
-  /// starting.
-  Map<String, dynamic>? readBilling() {
-    final raw = _prefs.getString(billingKey);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return null;
-      return Map<String, dynamic>.from(decoded);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> writeBilling(Map<String, dynamic> billing) async {
-    await _prefs.setString(billingKey, jsonEncode(billing));
-  }
-
   Future<void> writeState(Map<String, dynamic> state) async {
     await _prefs.setString(dataKey, jsonEncode(state));
     if (storedSchemaVersion != schemaVersion) {
@@ -151,7 +127,6 @@ class LocalStorage {
     await _prefs.remove(sessionKey);
     await _prefs.remove(onboardingKey);
     await _prefs.remove(matchOutboxKey);
-    await _prefs.remove(billingKey);
     await _prefs.remove(schemaKey);
   }
 }

@@ -76,7 +76,7 @@ class AuthErrorScreen extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: SportikaColors.surface.withValues(alpha: .72),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(SportikaRadius.thumbnail),
             border: Border.all(
               color: SportikaColors.danger.withValues(alpha: .25),
             ),
@@ -103,7 +103,7 @@ class AuthErrorScreen extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: SportikaColors.danger.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(5),
+                        borderRadius: BorderRadius.circular(SportikaRadius.xs),
                         border: Border.all(
                           color: SportikaColors.danger.withValues(alpha: .3),
                         ),
@@ -112,7 +112,7 @@ class AuthErrorScreen extends StatelessWidget {
                         flow.errorCode!,
                         style: const TextStyle(
                           fontSize: 8.5,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: SportikaFontWeight.extraBold,
                           letterSpacing: 1.1,
                           color: SportikaColors.danger,
                         ),

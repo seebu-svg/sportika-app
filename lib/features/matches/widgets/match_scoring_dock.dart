@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 /// Keeps the current score and recovery controls visible while scoring scrolls.
 class MatchScoringDock extends StatelessWidget {

@@ -13,6 +13,8 @@ import 'package:sportika/core/state/session_controller.dart';
 import 'package:sportika/shared/widgets/editorial.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 import 'package:sportika/features/personal_games/screens/personal_games_screen.dart';
+import 'package:sportika/features/matches/scoring/match_scoring_shell.dart'
+    show pickScoringSide;
 import 'package:sportika/features/personal_games/screens/scorecard_screen.dart';
 import 'package:sportika/shared/widgets/filter_chip_row.dart';
 import 'package:sportika/app/routes.dart';
@@ -205,7 +207,7 @@ class _SportMatchSetupScreenState extends State<SportMatchSetupScreen> {
               style: TextStyle(
                 color: sportColor(m.sport),
                 letterSpacing: 1.8,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
               ),
             ),
             const SizedBox(height: 16),
@@ -523,7 +525,7 @@ class _FutsalClockState extends State<FutsalClock> {
               '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
               style: const TextStyle(
                 fontSize: 44,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 fontFeatures: [FontFeature.tabularFigures()],
               ),
             ),
@@ -668,7 +670,7 @@ class SportDetailScreen extends StatelessWidget {
                 children: [
                   Text(
                     over.key,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontWeight: SportikaFontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -700,7 +702,10 @@ class SportDetailScreen extends StatelessWidget {
             title: Text(line.label),
             trailing: Text(
               line.value,
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: SportikaFontWeight.bold,
+              ),
             ),
             subtitle: Text(line.sub ?? ''),
           ),
@@ -786,7 +791,10 @@ class SportDetailScreen extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           '${tb[0]} – ${tb[1]}',
-          style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            fontSize: 54,
+            fontWeight: SportikaFontWeight.extraBold,
+          ),
           textAlign: TextAlign.center,
         ),
         KeyValueRow(
@@ -836,10 +844,17 @@ class SportDetailScreen extends StatelessWidget {
       ];
     }
     if (!padel && index == 3) {
+      // The rules come from the match, not from a hardcoded sentence: a social
+      // game can be set to 11 or 15 points with its own cap.
+      final toWin = (m.rules['pointsToWinGame'] as num?)?.toInt() ?? 21;
+      final cap = (m.rules['cap'] as num?)?.toInt() ?? toWin + 9;
       return [
         Text(
           '${current[0]} – ${current[1]}',
-          style: const TextStyle(fontSize: 54, fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            fontSize: 54,
+            fontWeight: SportikaFontWeight.extraBold,
+          ),
           textAlign: TextAlign.center,
         ),
         for (final chip in p.contextChips)
@@ -847,8 +862,10 @@ class SportDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Text(chip),
           ),
-        const InfoBanner(
-          text: 'Every rally scores a point. Games to 21, win by two, capped at 30. The rally winner serves next.',
+        InfoBanner(
+          text:
+              'Every rally scores a point. Games to $toWin, win by two, capped '
+              'at $cap. The rally winner serves next.',
         ),
         const SizedBox(height: 16),
         if (m.status == PersonalMatchStatus.inProgress)
@@ -935,7 +952,13 @@ class SportDetailScreen extends StatelessWidget {
         for (final row in p.detailRows) Text(row),
         const SizedBox(height: 16),
         if (m.status == PersonalMatchStatus.inProgress)
-          for (final a in p.actions.where((a) => !a.pickSide))
+          // Clock actions need no side. A shootout kick does, and the personal
+          // log has no other surface for one: without these the shootout can be
+          // entered but never finished. Goals stay on the discipline tab, where
+          // the side is already known from the side being edited.
+          for (final a in p.actions.where(
+            (a) => !a.pickSide || a.id.startsWith('pen_'),
+          ))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: FilledButton(
@@ -949,7 +972,18 @@ class SportDetailScreen extends StatelessWidget {
                       )) {
                     return;
                   }
-                  if (context.mounted) recordSportAction(context, m, a, null);
+                  int? side;
+                  if (a.pickSide) {
+                    if (!context.mounted) return;
+                    side = await pickScoringSide(
+                      context,
+                      title: a.label,
+                      sides: m.sideNames,
+                      hint: 'Kicks alternate. Pick the side taking this one.',
+                    );
+                    if (side == null) return;
+                  }
+                  if (context.mounted) recordSportAction(context, m, a, side);
                 },
                 child: Text(a.label),
               ),
@@ -964,6 +998,9 @@ class SportDetailScreen extends StatelessWidget {
           (e) => [
             'goal',
             'foul',
+            'card',
+            // Legacy personal rows recorded one kind per colour. They stay
+            // readable and counted, but every new entry is `card` + `colour`.
             'yellow_card',
             'red_card',
             'penalty',
@@ -984,7 +1021,7 @@ class SportDetailScreen extends StatelessWidget {
           ),
           KeyValueRow(
             'Cards',
-            '${events.where((e) => e['side'] == side && e['kind'] == 'yellow_card').length} yellow · ${events.where((e) => e['side'] == side && e['kind'] == 'red_card').length} red',
+            '${events.where((e) => e['side'] == side && _isCard(e, 'yellow')).length} yellow · ${events.where((e) => e['side'] == side && _isCard(e, 'red')).length} red',
           ),
           if (m.status == PersonalMatchStatus.inProgress &&
               ['running', 'paused'].contains(p.state['phase']))
@@ -992,10 +1029,23 @@ class SportDetailScreen extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final kind in ['goal', 'foul', 'yellow_card', 'red_card'])
+                for (final entry in const [
+                  ('goal', 'goal', ''),
+                  ('foul', 'foul', ''),
+                  ('card', 'yellow card', 'yellow'),
+                  ('card', 'red card', 'red'),
+                ])
                   OutlinedButton(
-                    onPressed: () => _eventDialog(context, m, p, side, kind),
-                    child: Text(kind.replaceAll('_', ' ')),
+                    onPressed: () => _eventDialog(
+                      context,
+                      m,
+                      p,
+                      side,
+                      entry.$1,
+                      label: entry.$2,
+                      colour: entry.$3.isEmpty ? null : entry.$3,
+                    ),
+                    child: Text(entry.$2),
                   ),
               ],
             ),
@@ -1020,7 +1070,7 @@ class SportDetailScreen extends StatelessWidget {
                   : Icons.style,
             ),
             title: Text(
-              '${event['kind'].toString().replaceAll('_', ' ')}${event['side'] == null ? '' : ' · ${m.sideNames[event['side'] as int]}'}',
+              '${_eventKindLabel(event)}${event['side'] == null ? '' : ' · ${m.sideNames[event['side'] as int]}'}',
             ),
             subtitle: Text(
               '${(event['data'] as Map)['player'] ?? ''} ${(event['data'] as Map)['action'] ?? ''}\n${event['at']}',
@@ -1044,13 +1094,15 @@ class SportDetailScreen extends StatelessWidget {
     PersonalMatch m,
     MatchProgress p,
     int side,
-    String kind,
-  ) async {
+    String kind, {
+    String? label,
+    String? colour,
+  }) async {
     String player = '';
     final save = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('Record ${kind.replaceAll('_', ' ')}'),
+        title: Text('Record ${label ?? kind.replaceAll('_', ' ')}'),
         content: DropdownButtonFormField<String>(
           initialValue: '',
           isExpanded: true,
@@ -1086,6 +1138,7 @@ class SportDetailScreen extends StatelessWidget {
           side: side,
           data: {
             'half': (p.state['half'] as int) - 1,
+            'colour': ?colour,
             if (player.isNotEmpty) 'player': player,
           },
           at: DateTime.now(),
@@ -1093,6 +1146,24 @@ class SportDetailScreen extends StatelessWidget {
         ),
       );
     }
+  }
+
+  /// A card is one kind with a colour, which is the shape the official
+  /// contract and the SQL fold read. Rows recorded before that change carry one
+  /// kind per colour and are still counted, so an old log keeps its totals.
+  bool _isCard(Map event, String colour) {
+    final data = (event['data'] as Map?) ?? const {};
+    return event['kind'] == 'card'
+        ? data['colour'] == colour
+        : event['kind'] == '${colour}_card';
+  }
+
+  String _eventKindLabel(Map event) {
+    if (event['kind'] != 'card') {
+      return event['kind'].toString().replaceAll('_', ' ');
+    }
+    final colour = ((event['data'] as Map?) ?? const {})['colour'];
+    return colour is String && colour.isNotEmpty ? '$colour card' : 'card';
   }
 }
 

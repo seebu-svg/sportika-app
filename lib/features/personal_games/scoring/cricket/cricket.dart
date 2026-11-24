@@ -6,6 +6,10 @@ import 'package:sportika/features/personal_games/scoring/engine.dart';
 class CricketEngine implements SportEngine {
   static const String kBall = 'ball';
   static const String kInningsEnd = 'innings_end';
+  static const String kToss = 'toss';
+  static const String kLineup = 'lineup';
+  static const String kInningsStart = 'innings_start';
+  static const String kMatchEnd = 'match_end';
 
   @override
   Sport get sport => Sport.cricket;
@@ -43,6 +47,11 @@ class CricketEngine implements SportEngine {
     final perInningsBalls = oversPerInnings * 6;
 
     final innings = <_Innings>[];
+    final lineupSizes = <int, int>{0: 0, 1: 0};
+    int? tossWinner;
+    String? tossDecision;
+    int? firstBatSide;
+    var ended = false;
 
     void close(_Innings inn, String reason) {
       if (!inn.closed) {
@@ -51,7 +60,64 @@ class CricketEngine implements SportEngine {
       }
     }
 
+    // A named XI is all out one short of its size: ten wickets only when ten
+    // batters were named, three when a short side turned up.
+    int wicketsFor(int side) {
+      final size = lineupSizes[side] ?? 0;
+      if (size < 2) return maxWickets;
+      final byXi = size - 1;
+      return byXi < maxWickets ? byXi : maxWickets;
+    }
+
+    _Innings openInnings(int side) {
+      final inn = _Innings(side, wicketsFor(side), perInningsBalls);
+      innings.add(inn);
+      return inn;
+    }
+
     for (final e in events) {
+      if (ended) continue;
+
+      if (e.kind == kLineup) {
+        final side = e.side;
+        if (side != 0 && side != 1) continue;
+        final players = e.data['players'];
+        if (players is List && players.length >= 2) {
+          lineupSizes[side!] = players.length;
+        }
+        continue;
+      }
+      if (e.kind == kToss) {
+        final side = e.side;
+        if (side != 0 && side != 1) continue;
+        // The toss only seeds the first innings; a later one is ignored.
+        if (firstBatSide != null || innings.isNotEmpty) continue;
+        final decision = e.data['decision'] == 'bowl' ? 'bowl' : 'bat';
+        tossWinner = side;
+        tossDecision = decision;
+        firstBatSide = decision == 'bat' ? side! : 1 - side!;
+        continue;
+      }
+      if (e.kind == kInningsStart) {
+        final side = e.side;
+        if (side != 0 && side != 1) continue;
+        if (innings.length >= maxInnings) continue;
+        if (innings.isNotEmpty && !innings.last.closed) continue;
+        if (innings.any((i) => i.batSide == side)) continue;
+        openInnings(side!);
+        continue;
+      }
+      if (e.kind == kMatchEnd) {
+        if (innings.isNotEmpty && !innings.last.closed) {
+          final reason = e.data['reason'] as String?;
+          close(
+            innings.last,
+            reason == null || reason.trim().isEmpty ? 'Match ended' : reason,
+          );
+        }
+        ended = true;
+        continue;
+      }
       if (e.kind == kInningsEnd) {
         if (innings.isEmpty || innings.last.closed) {
           // Nothing to close: an explicit end before the first ball is ignored.
@@ -64,15 +130,15 @@ class CricketEngine implements SportEngine {
 
       final side = e.side ?? 0;
       if (innings.isEmpty) {
-        innings.add(_Innings(side, maxWickets, perInningsBalls));
+        openInnings(side);
       } else if (innings.last.closed) {
         if (innings.length >= maxInnings) continue;
-        innings.add(_Innings(side, maxWickets, perInningsBalls));
+        openInnings(side);
       } else if (innings.last.batSide != side && innings.last.hasBall) {
         // Batting changed without closing: treat as the innings having ended.
         close(innings.last, 'Innings ended');
         if (innings.length >= maxInnings) continue;
-        innings.add(_Innings(side, maxWickets, perInningsBalls));
+        openInnings(side);
       }
 
       final inn = innings.last;
@@ -82,7 +148,7 @@ class CricketEngine implements SportEngine {
       final target = innings.length == 2 ? innings[0].runs + 1 : null;
       if (inn.legalBalls >= perInningsBalls) {
         close(inn, 'Overs complete');
-      } else if (inn.wickets >= maxWickets) {
+      } else if (inn.wickets >= inn.maxWickets) {
         close(inn, 'All out');
       } else if (target != null && inn.runs >= target) {
         close(inn, 'Target passed');
@@ -90,7 +156,8 @@ class CricketEngine implements SportEngine {
     }
 
     final finished =
-        innings.length >= maxInnings && innings.every((i) => i.closed);
+        ended ||
+        (innings.length >= maxInnings && innings.every((i) => i.closed));
     final current = innings.isNotEmpty && !innings.last.closed
         ? innings.last
         : null;
@@ -100,12 +167,12 @@ class CricketEngine implements SportEngine {
 
     var winnerIndex = -1;
     var resultLabel = '';
-    if (finished) {
+    if (finished && innings.length >= 2) {
       final first = innings[0], second = innings[1];
       if (second.runs > first.runs) {
         winnerIndex = second.batSide;
         resultLabel =
-            '${sides[winnerIndex]} won by ${maxWickets - second.wickets} wickets';
+            '${sides[winnerIndex]} won by ${first.maxWickets - second.wickets} wickets';
       } else if (second.runs < first.runs) {
         winnerIndex = first.batSide;
         resultLabel =
@@ -114,6 +181,14 @@ class CricketEngine implements SportEngine {
         resultLabel = 'Match tied';
       }
     }
+
+    final nextBatSide = current != null
+        ? current.batSide
+        : finished
+        ? -1
+        : innings.isNotEmpty
+        ? 1 - innings.last.batSide
+        : (firstBatSide ?? -1);
 
     final runsBySide = [0, 0];
     for (final i in innings) {
@@ -146,6 +221,11 @@ class CricketEngine implements SportEngine {
     }
 
     final chips = <String>[];
+    if (innings.isEmpty && tossWinner != null) {
+      chips.add(
+        'Toss: ${sides[tossWinner]} elected to ${tossDecision == 'bowl' ? 'bowl' : 'bat'}',
+      );
+    }
     if (innings.isNotEmpty) {
       chips.add('Innings ${innings.length}/$maxInnings');
       final shown = current ?? innings.last;
@@ -171,7 +251,7 @@ class CricketEngine implements SportEngine {
         '${sides[i.batSide]}  ${i.runs}/${i.wickets}'
         '  (${_overs(i.legalBalls)})'
         '  ·  extras ${i.wides + i.noballs + i.byes + i.legByes}'
-        '  ·  ${i.wickets}/$maxWickets wickets',
+        '  ·  ${i.wickets}/${i.maxWickets} wickets',
       );
     }
 
@@ -180,7 +260,7 @@ class CricketEngine implements SportEngine {
       sides: sides,
       lines: lines,
       headline: finished
-          ? resultLabel
+          ? (resultLabel.isEmpty ? 'No result' : resultLabel)
           : innings.isEmpty
           ? 'Choose a scoring action to open the innings'
           : current == null
@@ -198,7 +278,11 @@ class CricketEngine implements SportEngine {
       isComplete: finished,
       winnerIndex: winnerIndex,
       resultLabel: resultLabel,
-      completionReason: finished ? 'Both innings complete' : '',
+      completionReason: ended
+          ? 'Match ended'
+          : finished
+          ? 'Both innings complete'
+          : '',
       scoreValues: runsBySide,
       scoreDisplay: lines.map((l) => l.value).toList(),
       actions: _actions(
@@ -213,6 +297,23 @@ class CricketEngine implements SportEngine {
         'batSide':
             current?.batSide ?? (innings.isEmpty ? -1 : innings.last.batSide),
         'target': ?target,
+        'nextBatSide': nextBatSide,
+        'open': current != null,
+        'ended': ended,
+        'phase': finished
+            ? 'complete'
+            : current != null
+            ? 'innings'
+            : innings.isEmpty
+            ? 'setup'
+            : 'break',
+        'battingSize': [lineupSizes[0] ?? 0, lineupSizes[1] ?? 0],
+        if (tossWinner != null)
+          'toss': {
+            'winner': tossWinner,
+            'decision': tossDecision ?? 'bat',
+            'batSide': firstBatSide ?? tossWinner,
+          },
       },
     );
   }

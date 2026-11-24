@@ -4,7 +4,6 @@ import 'package:sportika/shared/models/enums.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/models/models.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Displays the recorded result, never a score reconstructed from older events.
@@ -88,6 +87,12 @@ String _outcome(OfficialResult result, List<String> names) {
 
 /// Shared scoreboard for result review and correction comparisons.
 /// Scores are opaque official strings; their format belongs to each sport.
+///
+/// [stacked] states the layout for a host that cannot be measured. An
+/// [AlertDialog] asks its content for an intrinsic height, and a
+/// [LayoutBuilder] refuses that question, so a dialog passes `stacked: true`
+/// rather than probing constraints. Hosts that leave it null keep the
+/// text-scale-aware responsive choice on their own.
 class ResultScoreLines extends StatelessWidget {
   const ResultScoreLines({
     super.key,
@@ -95,79 +100,88 @@ class ResultScoreLines extends StatelessWidget {
     required this.scores,
     this.winnerIndex = -1,
     this.walkover = false,
+    this.stacked,
   });
   final List<String> labels;
   final List<String> scores;
   final int winnerIndex;
   final bool walkover;
+  final bool? stacked;
+
+  /// Below this width, tracked to the text scale, the name sits above the score.
+  static double _stackBelow(BuildContext context) =>
+      SportikaSpacing.xl * 12 * MediaQuery.textScalerOf(context).scale(1);
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final scale = MediaQuery.textScalerOf(context).scale(1);
-      final stacked = constraints.maxWidth < SportikaSpacing.xl * 12 * scale;
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Divider(height: 1, color: SportikaColors.borderSubtle),
-          for (var side = 0; side < labels.length; side++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: SportikaSpacing.md),
-              child: Builder(
-                builder: (context) {
-                  final winner = winnerIndex == side;
-                  final name = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(labels[side], style: SportikaType.bodyStrong),
-                      if (winner) ...[
-                        const SizedBox(height: SportikaSpacing.xs),
-                        Text(
-                          walkover ? 'Awarded · Walkover' : 'Winner',
-                          style: SportikaType.caption.copyWith(
-                            color: SportikaColors.mint,
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                  final score = Text(
-                    walkover
-                        ? winner
-                              ? 'W/O'
-                              : '—'
-                        : scores.length > side && scores[side].isNotEmpty
-                        ? scores[side]
-                        : '—',
-                    textAlign: stacked ? TextAlign.start : TextAlign.end,
-                    style: SportikaType.score.copyWith(
-                      fontFeatures: const [FontFeature.tabularFigures()],
+  Widget build(BuildContext context) {
+    final declared = stacked;
+    if (declared != null) return _rows(stacked: declared);
+    return LayoutBuilder(
+      builder: (context, constraints) =>
+          _rows(stacked: constraints.maxWidth < _stackBelow(context)),
+    );
+  }
+
+  Widget _rows({required bool stacked}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Divider(height: 1, color: SportikaColors.borderSubtle),
+      for (var side = 0; side < labels.length; side++) ...[
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: SportikaSpacing.md),
+          child: Builder(
+            builder: (context) {
+              final winner = winnerIndex == side;
+              final name = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(labels[side], style: SportikaType.bodyStrong),
+                  if (winner) ...[
+                    const SizedBox(height: SportikaSpacing.xs),
+                    Text(
+                      walkover ? 'Awarded · Walkover' : 'Winner',
+                      style: SportikaType.caption.copyWith(
+                        color: SportikaColors.mint,
+                      ),
                     ),
-                  );
-                  return stacked
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            name,
-                            const SizedBox(height: SportikaSpacing.sm),
-                            score,
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(child: name),
-                            const SizedBox(width: SportikaSpacing.lg),
-                            Flexible(child: score),
-                          ],
-                        );
-                },
-              ),
-            ),
-            const Divider(height: 1, color: SportikaColors.borderSubtle),
-          ],
-        ],
-      );
-    },
+                  ],
+                ],
+              );
+              final score = Text(
+                walkover
+                    ? winner
+                          ? 'W/O'
+                          : '—'
+                    : scores.length > side && scores[side].isNotEmpty
+                    ? scores[side]
+                    : '—',
+                textAlign: stacked ? TextAlign.start : TextAlign.end,
+                style: SportikaType.score.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              );
+              return stacked
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        name,
+                        const SizedBox(height: SportikaSpacing.sm),
+                        score,
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Expanded(child: name),
+                        const SizedBox(width: SportikaSpacing.lg),
+                        Flexible(child: score),
+                      ],
+                    );
+            },
+          ),
+        ),
+        const Divider(height: 1, color: SportikaColors.borderSubtle),
+      ],
+    ],
   );
 }
 

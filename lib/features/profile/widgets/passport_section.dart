@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 
 /// Section head used across the passport: an uppercase label, an optional
 /// quiet count, and at most one action.
@@ -41,7 +40,9 @@ class PassportSection extends StatelessWidget {
                       title.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: SportikaType.label,
+                      style: SportikaType.label.copyWith(
+                        color: SportikaColors.textBody,
+                      ),
                     ),
                     if (detail != null) ...[
                       const SizedBox(height: 4),
@@ -51,7 +52,7 @@ class PassportSection extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: SportikaType.caption.copyWith(
                           fontSize: 11,
-                          color: SportikaColors.textDim,
+                          color: SportikaColors.textMuted,
                         ),
                       ),
                     ],

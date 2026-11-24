@@ -1,20 +1,16 @@
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
-import 'package:sportika/app/env.dart';
 import 'package:sportika/core/data/composite_notification_repository.dart';
 import 'package:sportika/core/data/image_picker_photo_picker.dart';
-import 'package:sportika/core/data/local_monetization_repository.dart';
 import 'package:sportika/core/data/local_profile_module_repository.dart';
 import 'package:sportika/core/data/local_profile_photo_store.dart';
 import 'package:sportika/core/data/local_sportika_repository.dart';
 import 'package:sportika/core/data/profile_photo_service.dart';
 import 'package:sportika/core/data/repositories.dart';
-import 'package:sportika/core/data/unavailable_monetization_repository.dart';
 import 'package:sportika/core/state/fixtures_controller.dart';
 import 'package:sportika/core/state/games_controller.dart';
 import 'package:sportika/core/state/match_controller.dart';
-import 'package:sportika/core/state/monetization_controller.dart';
 import 'package:sportika/core/state/personal_games_controller.dart';
 import 'package:sportika/core/state/profile_module_controller.dart';
 import 'package:sportika/core/state/profile_photo_controller.dart';
@@ -51,7 +47,6 @@ Widget buildAppProviders({
   GameRepository? gameRepository,
   TeamRepository? teamRepository,
   NotificationRepository? notificationRepository,
-  MonetizationRepository? monetizationRepository,
   ProfilePhotoService? photoService,
   required Widget child,
 }) {
@@ -96,18 +91,6 @@ Widget buildAppProviders({
       ListenableProvider<TeamRepository>.value(value: teams),
       ListenableProvider<PersonalGamesRepository>.value(value: repository),
       ListenableProvider<MatchRepository>.value(value: matches),
-      ListenableProvider<MonetizationRepository>(
-        create: (_) =>
-            monetizationRepository ??
-            _fallbackMonetizationRepository(repository),
-        dispose: (_, billing) {
-          // Only the fallback adapter is owned here; an injected repository is
-          // owned by whoever built it.
-          if (monetizationRepository == null && billing is ChangeNotifier) {
-            (billing as ChangeNotifier).dispose();
-          }
-        },
-      ),
       ListenableProvider<ProfileModuleRepository>(
         create: (_) =>
             profileModuleRepository ?? LocalProfileModuleRepository(repository),
@@ -161,10 +144,6 @@ Widget buildAppProviders({
             ProfileModuleController(context.read<ProfileModuleRepository>()),
       ),
       ChangeNotifierProvider(
-        create: (context) =>
-            MonetizationController(context.read<MonetizationRepository>()),
-      ),
-      ChangeNotifierProvider(
         create: (context) => ProfilePhotoController(
           context.read<ProfileRepository>(),
           service:
@@ -175,20 +154,6 @@ Widget buildAppProviders({
     ],
     child: child,
   );
-}
-
-/// Billing when this build injected no server repository.
-///
-/// A demo build owns its ledger on the device; a live build that forgot to wire
-/// the Supabase repository gets the fail-closed adapter, never demo prices and
-/// never a fabricated entitlement.
-MonetizationRepository _fallbackMonetizationRepository(
-  LocalSportikaRepository repository,
-) {
-  if (AppEnv.demoMode) {
-    return LocalMonetizationRepository(repository, repository.storage);
-  }
-  return UnavailableMonetizationRepository();
 }
 
 /// The production wiring of the picture pipeline: system picker, on-device file

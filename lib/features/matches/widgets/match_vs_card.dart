@@ -7,7 +7,6 @@ import 'package:sportika/features/matches/widgets/team_match_logo.dart';
 import 'package:sportika/features/personal_games/scoring/engine.dart';
 import 'package:sportika/shared/models/match.dart';
 import 'package:sportika/shared/theme/theme.dart';
-import 'package:sportika/shared/theme/typography.dart';
 import 'package:sportika/shared/widgets/widgets.dart';
 
 /// Shared fixture identity and scoreboard for discovery and match heroes.

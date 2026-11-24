@@ -217,10 +217,7 @@ class FutsalEngine implements SportEngine {
               .clamp(0, 86400);
           st.resumeAt = null;
         }
-        if (st.phase == _Phase.halfTime &&
-            st.byHalf.length == st.regulationHalves) {
-          _endRegulation(st, winnerRequired, allowShootout);
-        } else if (st.halfIndex == st.regulationHalves - 1 &&
+        if (st.halfIndex == st.regulationHalves - 1 &&
             (st.goals[0] != st.goals[1] || !winnerRequired)) {
           _endRegulation(st, winnerRequired, allowShootout);
         } else if (st.halfIndex < st.byHalf.length - 1) {

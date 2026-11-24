@@ -452,7 +452,7 @@ class _OfficialFooter extends StatelessWidget {
                     result?.headline ?? 'Result published',
                     style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: SportikaFontWeight.extraBold,
                       color: SportikaColors.mint,
                     ),
                   ),
@@ -623,7 +623,7 @@ class _ScorecardBody extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: SportikaFontWeight.semibold,
                     color: SportikaColors.textMuted,
                   ),
                 ),
@@ -645,7 +645,7 @@ class _ScorecardBody extends StatelessWidget {
               progress.headline,
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.w800,
+                fontWeight: SportikaFontWeight.extraBold,
                 letterSpacing: -0.2,
                 color: progress.isComplete
                     ? SportikaColors.mint
@@ -693,7 +693,7 @@ class _ScorecardBody extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: SportikaColors.mintSubtle,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(SportikaRadius.md),
                 border: Border.all(
                   color: SportikaColors.mint.withValues(alpha: 0.35),
                 ),
@@ -825,7 +825,9 @@ class _ActionGrid extends StatelessWidget {
       context: context,
       backgroundColor: SportikaColors.surfaceElevated,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SportikaRadius.xl),
+        ),
       ),
       builder: (ctx) => AppSheet(
         title: action.label,
@@ -898,15 +900,15 @@ class _ActionButton extends StatelessWidget {
 
     return Material(
       color: fill,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(SportikaRadius.md),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(SportikaRadius.md),
         child: Container(
           constraints: const BoxConstraints(minHeight: 54),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(SportikaRadius.md),
             border: Border.all(color: border),
           ),
           child: Column(
@@ -920,7 +922,7 @@ class _ActionButton extends StatelessWidget {
                 style: TextStyle(
                   fontSize: action.label.length <= 2 ? 20 : 13.5,
                   height: 1.1,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: SportikaFontWeight.extraBold,
                   color: fg,
                 ),
               ),
@@ -933,7 +935,7 @@ class _ActionButton extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9.5,
                     height: 1.25,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: SportikaFontWeight.semibold,
                     color: fg.withValues(alpha: 0.62),
                   ),
                 ),
