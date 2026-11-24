@@ -15,8 +15,8 @@ git clone https://github.com/seebu-svg/sportika-app.git
 cd sportika-app
 ```
 
-The repo is private, so clone over HTTPS needs an authenticated `gh` login or a
-personal access token. SSH works too if your key is registered:
+This repository is public, so HTTPS cloning needs no authentication. SSH works too
+if your key is registered:
 
 ```bash
 git clone git@github.com:seebu-svg/sportika-app.git
